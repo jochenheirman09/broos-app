@@ -46,9 +46,10 @@ export async function createClub(prevState: State, formData: FormData): Promise<
     await updateDoc(userRef, {
       clubId: clubRef.id,
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Error creating club:", error);
     return {
-      error: "Failed to create club.",
+      error: error.message || "Failed to create club.",
     };
   }
 
