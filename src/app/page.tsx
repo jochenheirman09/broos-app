@@ -79,7 +79,8 @@ export default function RoleSelectionPage() {
           <ThemeToggle />
         </div>
         <div className="w-full max-w-md">
-          <div className="flex flex-col items-center justify-center mb-8">
+          <div className="flex flex-col items-center justify-center mb-8 gap-2">
+            <Logo size="large" />
             <Wordmark size="large" />
           </div>
           <Card>
@@ -94,7 +95,7 @@ export default function RoleSelectionPage() {
                 <Link key={role} href={`/register?role=${role}`} passHref>
                   <Button
                     variant="outline"
-                    className="w-full justify-start text-base !py-6 border-2 hover:bg-accent hover:text-accent-foreground"
+                    className="w-full justify-start text-base !py-6 border-0 btn-gradient-border hover:bg-accent hover:text-accent-foreground"
                   >
                     <span className="text-primary">{icon}</span>
                     <span>{label}</span>

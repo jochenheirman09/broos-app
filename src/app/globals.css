@@ -67,3 +67,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .btn-gradient-border {
+    @apply relative bg-transparent border-0;
+  }
+  .btn-gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius); 
+    padding: 2px; /* border thickness */
+    background: linear-gradient(45deg, hsl(320 80% 70%), hsl(var(--primary)));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
