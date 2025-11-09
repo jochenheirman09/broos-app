@@ -1,5 +1,3 @@
-import type { User as FirebaseUser } from "firebase/auth";
-
 export type UserRole = "player" | "staff" | "responsible";
 
 export interface UserProfile {
@@ -8,6 +6,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   clubId?: string;
+  emailVerified: boolean;
 }
 
 export interface Club {

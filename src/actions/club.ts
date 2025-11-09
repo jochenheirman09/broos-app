@@ -1,10 +1,14 @@
 "use server";
 
-import { db } from "@/lib/firebase";
-import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
+import { firebaseConfig } from "@/lib/firebase";
+import { getApps, initializeApp, getApp } from "firebase/app";
+import { getFirestore, addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
 
 const ClubSchema = z.object({
   name: z.string().min(3, "Club name must be at least 3 characters long."),

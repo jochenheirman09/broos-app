@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/context/user-context";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function AppHeader() {
-  const { userProfile, logout } = useAuth();
+  const { userProfile, logout } = useUser();
 
   const getInitials = (name: string = "") => {
     return name

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AuthProvider } from '@/context/auth-context';
 import { Toaster } from '@/components/ui/toaster';
+import { FirebaseClientProvider } from '@/firebase';
+import { UserProvider } from '@/context/user-context';
 
 export const metadata: Metadata = {
   title: 'RoleVerify',
@@ -24,10 +25,12 @@ export default function RootLayout({
         />
       </head>
       <body className="h-full font-body antialiased">
-        <AuthProvider>
-          {children}
-          <Toaster />
-        </AuthProvider>
+        <FirebaseClientProvider>
+          <UserProvider>
+            {children}
+            <Toaster />
+          </UserProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );

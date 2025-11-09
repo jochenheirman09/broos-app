@@ -1,13 +1,13 @@
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/context/user-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AppHeader } from "@/components/app/header";
 import { Spinner } from "@/components/ui/spinner";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading } = useUser();
   const router = useRouter();
 
   useEffect(() => {

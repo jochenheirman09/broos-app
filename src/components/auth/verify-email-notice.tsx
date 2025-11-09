@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/context/user-context";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
@@ -10,7 +10,7 @@ import { MailCheck } from "lucide-react";
 import { Spinner } from "../ui/spinner";
 
 export function VerifyEmailNotice() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useUser();
   const router = useRouter();
   const { toast } = useToast();
   const [isSending, setIsSending] = useState(false);

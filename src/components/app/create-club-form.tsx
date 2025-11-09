@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClub } from "@/actions/club";
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/context/user-context";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
@@ -22,7 +22,7 @@ function SubmitButton() {
 }
 
 export function CreateClubForm() {
-  const { user } = useAuth();
+  const { user } = useUser();
   const { toast } = useToast();
   const [state, formAction] = useFormState(createClub, { error: undefined });
   

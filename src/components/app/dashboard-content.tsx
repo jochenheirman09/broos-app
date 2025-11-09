@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/context/auth-context";
+import { useUser } from "@/context/user-context";
 import {
   Card,
   CardContent,
@@ -20,7 +20,7 @@ const roleIcons: { [key: string]: React.ReactNode } = {
 };
 
 export function DashboardContent() {
-  const { userProfile } = useAuth();
+  const { userProfile } = useUser();
 
   if (!userProfile) {
     return null;

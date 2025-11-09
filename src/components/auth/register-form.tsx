@@ -28,7 +28,7 @@ import {
   sendEmailVerification,
   updateProfile,
 } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import type { UserRole } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
@@ -48,6 +48,8 @@ export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const auth = useAuth();
+  const db = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -77,6 +79,7 @@ export function RegisterForm() {
         name: values.name,
         email: values.email,
         role: values.role,
+        emailVerified: false,
       });
 
       await sendEmailVerification(user);
