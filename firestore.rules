@@ -2,7 +2,7 @@
  * @file Firestore Security Rules for RoleVerify application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user data and allows for club data management. User creation is disabled.
+ * This ruleset enforces a strict user-ownership model for user data and allows for club data management.
  *
  * Data Structure:
  * - /users/{userId}: Stores private user data, including role, email verification status, and associated club ID (clubId).
@@ -10,7 +10,7 @@
  *
  * Key Security Decisions:
  * - User listing is denied to prevent information leakage.
- * - User creation is denied
+ * - A user can create their own user document upon registration.
  * - Club data access is controlled by user roles (only 'responsible' users can manage clubs).
  *
  * Denormalization for Authorization:
@@ -30,7 +30,7 @@ service cloud.firestore {
      * @deny (get) User with ID 'user456' cannot read document of 'user123'.
      * @allow (list) User with ID 'user123' can list their own documents.
      * @deny (list) User with ID 'user456' cannot list documents of 'user123'.
-     * @deny (create) No user can create a user document.
+     * @allow (create) A new user can create their own user document.
      * @allow (update) User with ID 'user123' can update their own document.
      * @deny (update) User with ID 'user456' cannot update document of 'user123'.
      * @allow (delete) User with ID 'user123' can delete their own document.
@@ -40,7 +40,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
-      allow create: if false;
+      allow create: if isSignedIn() && isOwner(userId);
       allow update: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
       allow delete: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
     }
