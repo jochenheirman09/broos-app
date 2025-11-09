@@ -76,7 +76,7 @@
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: var(--radius); 
+    border-radius: calc(var(--radius) + 4px); /* Match button's rounded-xl */
     padding: 2px; /* border thickness */
     background: linear-gradient(45deg, hsl(320 80% 70%), hsl(var(--primary)));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
