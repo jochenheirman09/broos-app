@@ -1,11 +1,11 @@
 "use client";
 
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { Copy, KeyRound, Users, RefreshCw } from "lucide-react";
+import { Copy, KeyRound, Users, RefreshCw, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -17,19 +17,23 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
+import { EditTeamDialog } from "./edit-team-dialog";
+import { DeleteTeamDialog } from "./delete-team-dialog";
 
 function TeamCard({
   clubId,
   team,
-  onCodeGenerated,
+  onTeamChange,
 }: {
   clubId: string;
   team: Team;
-  onCodeGenerated: () => void;
+  onTeamChange: () => void;
 }) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -47,7 +51,7 @@ function TeamCard({
         title: "Code Generated!",
         description: `A new invitation code has been generated for ${team.name}.`,
       });
-      onCodeGenerated(); // Refresh the list
+      onTeamChange(); // Refresh the list
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -60,62 +64,103 @@ function TeamCard({
   };
 
   return (
-    <Card className="shadow-clay-card bg-card/60">
-      <CardHeader className="p-4">
-        <CardTitle className="text-lg">{team.name}</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Invitation Code</span>
-        </div>
-      </CardContent>
-      <CardFooter className="p-4 pt-0">
-        {team.invitationCode ? (
-          <div className="flex items-center gap-2 w-full">
-            <span className="font-mono text-base bg-muted px-4 py-2 rounded-lg shadow-clay-inset flex-grow text-center">
-              {team.invitationCode}
-            </span>
+    <>
+      <Card className="shadow-clay-card bg-card/60 flex flex-col">
+        <CardHeader className="p-4 flex-row items-center justify-between">
+          <CardTitle className="text-lg">{team.name}</CardTitle>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => copyToClipboard(team.invitationCode!)}
-              aria-label="Copy invitation code"
+              className="h-8 w-8"
+              onClick={() => setIsEditDialogOpen(true)}
             >
-              <Copy className="h-5 w-5" />
+              <Pencil className="h-4 w-4" />
+              <span className="sr-only">Edit Team</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-destructive/20 hover:text-destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete Team</span>
             </Button>
           </div>
-        ) : (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleGenerateCode}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Spinner size="small" className="mr-2" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Generate Code
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
+        </CardHeader>
+        <CardContent className="p-4 pt-0 flex-grow">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              Invitation Code
+            </span>
+          </div>
+        </CardContent>
+        <CardFooter className="p-4 pt-0">
+          {team.invitationCode ? (
+            <div className="flex items-center gap-2 w-full">
+              <span className="font-mono text-base bg-muted px-4 py-2 rounded-lg shadow-clay-inset flex-grow text-center">
+                {team.invitationCode}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => copyToClipboard(team.invitationCode!)}
+                aria-label="Copy invitation code"
+              >
+                <Copy className="h-5 w-5" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleGenerateCode}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <Spinner size="small" className="mr-2" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Generate Code
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+      <EditTeamDialog
+        isOpen={isEditDialogOpen}
+        setIsOpen={setIsEditDialogOpen}
+        clubId={clubId}
+        team={team}
+        onTeamUpdated={onTeamChange}
+      />
+      <DeleteTeamDialog
+        isOpen={isDeleteDialogOpen}
+        setIsOpen={setIsDeleteDialogOpen}
+        clubId={clubId}
+        teamId={team.id}
+        teamName={team.name}
+        onTeamDeleted={onTeamChange}
+      />
+    </>
   );
 }
 
 export function TeamList({
   clubId,
-  onCodeGenerated,
+  onTeamChange,
 }: {
   clubId: string;
-  onCodeGenerated: () => void;
+  onTeamChange: () => void;
 }) {
   const firestore = useFirestore();
   const teamsQuery = useMemoFirebase(
     () =>
-      firestore ? query(collection(firestore, "clubs", clubId, "teams")) : null,
+      firestore
+        ? query(collection(firestore, "clubs", clubId, "teams"))
+        : null,
     [firestore, clubId]
   );
   const { data: teams, isLoading } = useCollection<Team>(teamsQuery);
@@ -143,7 +188,7 @@ export function TeamList({
           key={team.id}
           clubId={clubId}
           team={team}
-          onCodeGenerated={onCodeGenerated}
+          onTeamChange={onTeamChange}
         />
       ))}
     </div>

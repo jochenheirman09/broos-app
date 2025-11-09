@@ -79,7 +79,7 @@ function ClubInfo({ clubId }: { clubId: string }) {
           <TeamList
             clubId={club.id}
             key={refreshKey}
-            onCodeGenerated={handleTeamChange}
+            onTeamChange={handleTeamChange}
           />
         </div>
         <Separator />

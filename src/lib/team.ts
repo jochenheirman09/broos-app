@@ -3,6 +3,7 @@ import { useFirestore } from "@/firebase";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   updateDoc,
 } from "firebase/firestore";
@@ -67,4 +68,51 @@ export async function generateTeamInvitationCode(
   });
 
   return invitationCode;
+}
+
+interface UpdateTeamParams {
+  db: ReturnType<typeof useFirestore>;
+  clubId: string;
+  teamId: string;
+  newName: string;
+}
+
+export async function updateTeam({
+  db,
+  clubId,
+  teamId,
+  newName,
+}: UpdateTeamParams) {
+  if (!clubId || !teamId) {
+    throw new Error("Club ID and Team ID are required.");
+  }
+  if (!newName) {
+    throw new Error("New team name is required.");
+  }
+  if (!db) {
+    throw new Error("Firestore is not available");
+  }
+
+  const teamRef = doc(db, "clubs", clubId, "teams", teamId);
+  await updateDoc(teamRef, {
+    name: newName,
+  });
+}
+
+interface DeleteTeamParams {
+  db: ReturnType<typeof useFirestore>;
+  clubId: string;
+  teamId: string;
+}
+
+export async function deleteTeam({ db, clubId, teamId }: DeleteTeamParams) {
+  if (!clubId || !teamId) {
+    throw new Error("Club ID and Team ID are required.");
+  }
+  if (!db) {
+    throw new Error("Firestore is not available");
+  }
+
+  const teamRef = doc(db, "clubs", clubId, "teams", teamId);
+  await deleteDoc(teamRef);
 }
