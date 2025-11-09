@@ -5,7 +5,7 @@ import { collection, query } from "firebase/firestore";
 import type { Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { Copy, KeyRound, Users } from "lucide-react";
+import { Copy, KeyRound, Users, RefreshCw } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,9 +16,20 @@ import {
 } from "../ui/table";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { generateTeamInvitationCode } from "@/lib/team";
 
-function TeamRow({ team }: { team: Team }) {
+function TeamRow({
+  clubId,
+  team,
+  onCodeGenerated,
+}: {
+  clubId: string;
+  team: Team;
+  onCodeGenerated: () => void;
+}) {
   const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -26,6 +37,26 @@ function TeamRow({ team }: { team: Team }) {
       title: "Copied!",
       description: "Invitation code copied to clipboard.",
     });
+  };
+
+  const handleGenerateCode = async () => {
+    setIsGenerating(true);
+    try {
+      await generateTeamInvitationCode(clubId, team.id);
+      toast({
+        title: "Code Generated!",
+        description: `A new invitation code has been generated for ${team.name}.`,
+      });
+      onCodeGenerated(); // Refresh the list
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate invitation code.",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -41,19 +72,38 @@ function TeamRow({ team }: { team: Team }) {
               variant="ghost"
               size="icon"
               onClick={() => copyToClipboard(team.invitationCode!)}
+              aria-label="Copy invitation code"
             >
               <Copy className="h-4 w-4" />
             </Button>
           </div>
         ) : (
-          <span className="text-muted-foreground">N/A</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGenerateCode}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <Spinner size="small" className="mr-2" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Generate Code
+          </Button>
         )}
       </TableCell>
     </TableRow>
   );
 }
 
-export function TeamList({ clubId }: { clubId: string }) {
+export function TeamList({
+  clubId,
+  onCodeGenerated,
+}: {
+  clubId: string;
+  onCodeGenerated: () => void;
+}) {
   const firestore = useFirestore();
   const teamsQuery = useMemoFirebase(
     () =>
@@ -93,7 +143,12 @@ export function TeamList({ clubId }: { clubId: string }) {
       </TableHeader>
       <TableBody>
         {teams.map((team) => (
-          <TeamRow key={team.id} team={team} />
+          <TeamRow
+            key={team.id}
+            clubId={clubId}
+            team={team}
+            onCodeGenerated={onCodeGenerated}
+          />
         ))}
       </TableBody>
     </Table>

@@ -46,8 +46,7 @@ service cloud.firestore {
     match /clubs/{clubId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      // Allow creation only by responsible users who don't have a club yet
-      allow create: if canCreateClub(clubId);
+      allow create: if isSignedIn();
       // Allow updates and deletes only by the responsible user who owns the club
       allow update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
 
@@ -70,33 +69,20 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
     
     function isResponsible() {
-        return getUserData().role == 'responsible';
-    }
-
-    function userHasClub() {
-      return 'clubId' in getUserData() && getUserData().clubId != null;
+        return getUserData(request.auth.uid).role == 'responsible';
     }
     
     // Check ownership for existing clubs
     function isClubOwner(clubId) {
-      return isSignedIn() && isResponsible() && getUserData().clubId == clubId;
-    }
-
-    // Check ownership for new clubs
-    function isCreatingClubAsOwner(clubId) {
-      return request.resource.data.ownerId == request.auth.uid;
-    }
-    
-    function canCreateClub(clubId) {
+      let user = getUserData(request.auth.uid);
       return isSignedIn() 
-        && isResponsible() 
-        && !userHasClub()
-        && isCreatingClubAsOwner(clubId);
+        && user.role == 'responsible'
+        && user.clubId == clubId;
     }
   }
 }

@@ -6,13 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { Checkbox } from "../ui/checkbox";
 import { createTeam } from "@/lib/team";
 
-export function CreateTeamForm({ clubId }: { clubId: string }) {
+export function CreateTeamForm({
+  clubId,
+  onTeamCreated,
+}: {
+  clubId: string;
+  onTeamCreated: () => void;
+}) {
   const { toast } = useToast();
   const [teamName, setTeamName] = useState("");
-  const [generateCode, setGenerateCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -32,14 +36,13 @@ export function CreateTeamForm({ clubId }: { clubId: string }) {
       await createTeam({
         clubId,
         teamName,
-        generateCode,
       });
       toast({
         title: "Success!",
         description: `Team "${teamName}" has been created.`,
       });
       setTeamName("");
-      setGenerateCode(false);
+      onTeamCreated(); // Notify parent that a team was created
     } catch (error: any) {
       console.error("Error creating team:", error);
       toast({
@@ -64,14 +67,6 @@ export function CreateTeamForm({ clubId }: { clubId: string }) {
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
         />
-      </div>
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="generate-code"
-          checked={generateCode}
-          onCheckedChange={(checked) => setGenerateCode(checked as boolean)}
-        />
-        <Label htmlFor="generate-code">Generate join code</Label>
       </div>
       <Button type="submit" disabled={isLoading}>
         {isLoading && <Spinner size="small" className="mr-2" />}

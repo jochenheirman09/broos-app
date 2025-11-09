@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle, Building, User, Users, Shield } from "lucide-react";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { Club } from "@/lib/types";
@@ -28,11 +28,17 @@ const roleIcons: { [key: string]: React.ReactNode } = {
 
 function ClubInfo({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const clubRef = useMemoFirebase(
     () => (firestore ? doc(firestore, "clubs", clubId) : null),
     [firestore, clubId]
   );
   const { data: club, isLoading } = useDoc<Club>(clubRef);
+
+  const handleTeamChange = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   if (isLoading) {
     return <Spinner />;
@@ -60,12 +66,16 @@ function ClubInfo({ clubId }: { clubId: string }) {
       <CardContent className="space-y-6">
         <div>
           <h3 className="text-lg font-semibold mb-2">Teams</h3>
-          <TeamList clubId={club.id} />
+          <TeamList
+            clubId={club.id}
+            key={refreshKey}
+            onCodeGenerated={handleTeamChange}
+          />
         </div>
         <Separator />
         <div>
           <h3 className="text-lg font-semibold mb-2">Add a New Team</h3>
-          <CreateTeamForm clubId={club.id} />
+          <CreateTeamForm clubId={club.id} onTeamCreated={handleTeamChange} />
         </div>
       </CardContent>
     </Card>
