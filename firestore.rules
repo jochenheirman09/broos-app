@@ -62,7 +62,7 @@ service cloud.firestore {
      */
     match /clubs/{clubId} {
       allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
     }
 
