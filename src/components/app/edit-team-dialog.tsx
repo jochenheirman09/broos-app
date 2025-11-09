@@ -56,29 +56,32 @@ export function EditTeamDialog({
 
     setIsLoading(true);
 
-    try {
-      await updateTeam({
-        db: firestore,
-        clubId,
-        teamId: team.id,
-        newName: teamName,
+    updateTeam({
+      db: firestore,
+      clubId,
+      teamId: team.id,
+      newName: teamName,
+    })
+      .then(() => {
+        toast({
+          title: "Succes!",
+          description: `Teamnaam bijgewerkt naar "${teamName}".`,
+        });
+        onTeamUpdated();
+        setIsOpen(false);
+      })
+      .catch((error) => {
+        console.error("Fout bij het bijwerken van het team:", error);
+        toast({
+          variant: "destructive",
+          title: "Fout bij het bijwerken van het team",
+          description:
+            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      toast({
-        title: "Succes!",
-        description: `Teamnaam bijgewerkt naar "${teamName}".`,
-      });
-      onTeamUpdated();
-      setIsOpen(false);
-    } catch (error: any) {
-      console.error("Fout bij het bijwerken van het team:", error);
-      toast({
-        variant: "destructive",
-        title: "Fout bij het bijwerken van het team",
-        description: error.message || "Er is een onverwachte fout opgetreden.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (

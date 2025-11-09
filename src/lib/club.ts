@@ -1,6 +1,8 @@
 "use client";
 
 import { useFirestore } from "@/firebase";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, doc, writeBatch } from "firebase/firestore";
 
 export async function createClub(
@@ -16,21 +18,37 @@ export async function createClub(
   }
 
   const batch = writeBatch(db);
-
-  // 1. Create the new club document
-  const clubRef = doc(collection(db, "clubs")); // Create a ref with a new ID
-  batch.set(clubRef, {
+  const clubRef = doc(collection(db, "clubs"));
+  const clubData = {
     name: clubName,
     ownerId: userId,
     id: clubRef.id,
-  });
+  };
+  batch.set(clubRef, clubData);
 
-  // 2. Update the user's document with the new club ID
   const userRef = doc(db, "users", userId);
-  batch.update(userRef, { clubId: clubRef.id });
+  const userData = { clubId: clubRef.id };
+  batch.update(userRef, userData);
 
-  // 3. Commit the batch
-  await batch.commit();
+  return batch.commit().catch(() => {
+    // Attempt to determine which operation failed, though batch errors are not specific.
+    // We can emit a generic write error for the club path.
+    const permissionError = new FirestorePermissionError({
+      path: clubRef.path,
+      operation: "create",
+      requestResourceData: clubData,
+    });
+    errorEmitter.emit("permission-error", permissionError);
 
-  return clubRef.id;
+    // Also consider the user update might have failed.
+    const userPermissionError = new FirestorePermissionError({
+      path: userRef.path,
+      operation: "update",
+      requestResourceData: userData,
+    });
+    errorEmitter.emit("permission-error", userPermissionError);
+
+    // Re-throw the original error to allow the caller to handle the promise rejection.
+    throw permissionError;
+  });
 }

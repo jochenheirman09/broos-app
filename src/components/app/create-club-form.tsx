@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +13,6 @@ import { useFirestore } from "@/firebase";
 export function CreateClubForm() {
   const { user } = useUser();
   const { toast } = useToast();
-  const router = useRouter();
   const firestore = useFirestore();
   const [clubName, setClubName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -40,24 +38,28 @@ export function CreateClubForm() {
 
     setIsLoading(true);
 
-    try {
-      await createClub(firestore, user.uid, clubName);
-      toast({
-        title: "Succes!",
-        description: "Je club is aangemaakt.",
+    createClub(firestore, user.uid, clubName)
+      .then(() => {
+        toast({
+          title: "Succes!",
+          description: "Je club is aangemaakt.",
+        });
+        // The user context will update automatically and redirect
+        // so we don't need to force a router.push here.
+      })
+      .catch((error) => {
+        // Error is already emitted by createClub, just handle UI
+        console.error("Fout bij het maken van de club:", error);
+        toast({
+          variant: "destructive",
+          title: "Fout bij het maken van de club",
+          description:
+            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      // The user context will update automatically and redirect
-      // so we don't need to force a router.push here.
-    } catch (error: any) {
-      console.error("Fout bij het maken van de club:", error);
-      toast({
-        variant: "destructive",
-        title: "Fout bij het maken van de club",
-        description: error.message || "Er is een onverwachte fout opgetreden.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (

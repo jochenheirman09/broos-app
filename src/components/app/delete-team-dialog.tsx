@@ -40,28 +40,31 @@ export function DeleteTeamDialog({
 
   const handleDelete = async () => {
     setIsLoading(true);
-    try {
-      await deleteTeam({
-        db: firestore,
-        clubId,
-        teamId,
+    deleteTeam({
+      db: firestore,
+      clubId,
+      teamId,
+    })
+      .then(() => {
+        toast({
+          title: "Team Verwijderd",
+          description: `Het team "${teamName}" is succesvol verwijderd.`,
+        });
+        onTeamDeleted();
+        setIsOpen(false);
+      })
+      .catch((error) => {
+        console.error("Fout bij het verwijderen van het team:", error);
+        toast({
+          variant: "destructive",
+          title: "Fout bij het verwijderen van het team",
+          description:
+            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      toast({
-        title: "Team Verwijderd",
-        description: `Het team "${teamName}" is succesvol verwijderd.`,
-      });
-      onTeamDeleted();
-      setIsOpen(false);
-    } catch (error: any) {
-      console.error("Fout bij het verwijderen van het team:", error);
-      toast({
-        variant: "destructive",
-        title: "Fout bij het verwijderen van het team",
-        description: error.message || "Er is een onverwachte fout opgetreden.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (

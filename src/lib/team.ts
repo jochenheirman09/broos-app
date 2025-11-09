@@ -1,7 +1,8 @@
 "use client";
 import { useFirestore } from "@/firebase";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -26,27 +27,27 @@ interface CreateTeamParams {
 }
 
 export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
-  if (!clubId) {
-    throw new Error("Club ID is required to create a team.");
-  }
-  if (!teamName) {
-    throw new Error("Team name is required.");
-  }
-  if (!db) {
-    throw new Error("Firestore is not available");
-  }
+  if (!clubId) throw new Error("Club ID is required to create a team.");
+  if (!teamName) throw new Error("Team name is required.");
+  if (!db) throw new Error("Firestore is not available");
 
   const teamCollectionRef = collection(db, "clubs", clubId, "teams");
-  const newTeamRef = doc(teamCollectionRef); // Creates a ref with a new auto-generated ID
-
-  // Use setDoc instead of updateDoc for a new document
-  await setDoc(newTeamRef, {
+  const newTeamRef = doc(teamCollectionRef);
+  const teamData = {
     id: newTeamRef.id,
     name: teamName,
     clubId: clubId,
-  });
+  };
 
-  return newTeamRef.id;
+  return setDoc(newTeamRef, teamData).catch(() => {
+    const permissionError = new FirestorePermissionError({
+      path: newTeamRef.path,
+      operation: "create",
+      requestResourceData: teamData,
+    });
+    errorEmitter.emit("permission-error", permissionError);
+    throw permissionError;
+  });
 }
 
 export async function generateTeamInvitationCode(
@@ -54,21 +55,22 @@ export async function generateTeamInvitationCode(
   clubId: string,
   teamId: string
 ) {
-  if (!clubId || !teamId) {
-    throw new Error("Club ID and Team ID are required.");
-  }
-  if (!db) {
-    throw new Error("Firestore is not available");
-  }
+  if (!clubId || !teamId) throw new Error("Club ID and Team ID are required.");
+  if (!db) throw new Error("Firestore is not available");
 
   const invitationCode = generateCode();
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
+  const updateData = { invitationCode };
 
-  await updateDoc(teamRef, {
-    invitationCode: invitationCode,
+  return updateDoc(teamRef, updateData).catch(() => {
+    const permissionError = new FirestorePermissionError({
+      path: teamRef.path,
+      operation: "update",
+      requestResourceData: updateData,
+    });
+    errorEmitter.emit("permission-error", permissionError);
+    throw permissionError;
   });
-
-  return invitationCode;
 }
 
 interface UpdateTeamParams {
@@ -84,19 +86,21 @@ export async function updateTeam({
   teamId,
   newName,
 }: UpdateTeamParams) {
-  if (!clubId || !teamId) {
-    throw new Error("Club ID and Team ID are required.");
-  }
-  if (!newName) {
-    throw new Error("New team name is required.");
-  }
-  if (!db) {
-    throw new Error("Firestore is not available");
-  }
+  if (!clubId || !teamId) throw new Error("Club ID and Team ID are required.");
+  if (!newName) throw new Error("New team name is required.");
+  if (!db) throw new Error("Firestore is not available");
 
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
-  await updateDoc(teamRef, {
-    name: newName,
+  const updateData = { name: newName };
+
+  return updateDoc(teamRef, updateData).catch(() => {
+    const permissionError = new FirestorePermissionError({
+      path: teamRef.path,
+      operation: "update",
+      requestResourceData: updateData,
+    });
+    errorEmitter.emit("permission-error", permissionError);
+    throw permissionError;
   });
 }
 
@@ -107,13 +111,17 @@ interface DeleteTeamParams {
 }
 
 export async function deleteTeam({ db, clubId, teamId }: DeleteTeamParams) {
-  if (!clubId || !teamId) {
-    throw new Error("Club ID and Team ID are required.");
-  }
-  if (!db) {
-    throw new Error("Firestore is not available");
-  }
+  if (!clubId || !teamId) throw new Error("Club ID and Team ID are required.");
+  if (!db) throw new Error("Firestore is not available");
 
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
-  await deleteDoc(teamRef);
+
+  return deleteDoc(teamRef).catch(() => {
+    const permissionError = new FirestorePermissionError({
+      path: teamRef.path,
+      operation: "delete",
+    });
+    errorEmitter.emit("permission-error", permissionError);
+    throw permissionError;
+  });
 }

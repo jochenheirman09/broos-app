@@ -1,7 +1,7 @@
 "use client";
 
 import { useFirestore, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, updateDoc, orderBy } from "firebase/firestore";
+import { collection, query, orderBy } from "firebase/firestore";
 import type { Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
@@ -45,22 +45,24 @@ function TeamCard({
 
   const handleGenerateCode = async () => {
     setIsGenerating(true);
-    try {
-      await generateTeamInvitationCode(firestore, clubId, team.id);
-      toast({
-        title: "Code gegenereerd!",
-        description: `Een nieuwe uitnodigingscode is gegenereerd voor ${team.name}.`,
+    generateTeamInvitationCode(firestore, clubId, team.id)
+      .then(() => {
+        toast({
+          title: "Code gegenereerd!",
+          description: `Een nieuwe uitnodigingscode is gegenereerd voor ${team.name}.`,
+        });
+        onTeamChange(); // Refresh the list
+      })
+      .catch(() => {
+        toast({
+          variant: "destructive",
+          title: "Fout",
+          description: "Kon geen uitnodigingscode genereren.",
+        });
+      })
+      .finally(() => {
+        setIsGenerating(false);
       });
-      onTeamChange(); // Refresh the list
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: "Kon geen uitnodigingscode genereren.",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
   };
 
   return (

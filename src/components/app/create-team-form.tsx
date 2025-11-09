@@ -34,28 +34,31 @@ export function CreateTeamForm({
 
     setIsLoading(true);
 
-    try {
-      await createTeam({
-        db: firestore,
-        clubId,
-        teamName,
+    createTeam({
+      db: firestore,
+      clubId,
+      teamName,
+    })
+      .then(() => {
+        toast({
+          title: "Succes!",
+          description: `Team "${teamName}" is aangemaakt.`,
+        });
+        setTeamName("");
+        onTeamCreated(); // Notify parent that a team was created
+      })
+      .catch((error) => {
+        console.error("Fout bij het maken van het team:", error);
+        toast({
+          variant: "destructive",
+          title: "Fout bij het maken van het team",
+          description:
+            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-      toast({
-        title: "Succes!",
-        description: `Team "${teamName}" is aangemaakt.`,
-      });
-      setTeamName("");
-      onTeamCreated(); // Notify parent that a team was created
-    } catch (error: any) {
-      console.error("Fout bij het maken van het team:", error);
-      toast({
-        variant: "destructive",
-        title: "Fout bij het maken van het team",
-        description: error.message || "Er is een onverwachte fout opgetreden.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (

@@ -31,6 +31,8 @@ import { CalendarIcon } from "lucide-react";
 import { Calendar } from "../ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { FirestorePermissionError } from "@/firebase/errors";
+import { errorEmitter } from "@/firebase/error-emitter";
 
 const formSchema = z.object({
   birthDate: z.date({
@@ -56,52 +58,61 @@ export function CompleteProfileForm() {
     if (!user || !db) return;
 
     setIsLoading(true);
-    try {
-      // Find the team with the given invitation code
-      const teamsQuery = query(
-        collectionGroup(db, "teams"),
-        where("invitationCode", "==", values.teamCode)
-      );
-      const teamSnapshot = await getDocs(teamsQuery);
 
-      if (teamSnapshot.empty) {
-        toast({
-          variant: "destructive",
-          title: "Ongeldige Code",
-          description:
-            "Team niet gevonden. Controleer de code en probeer opnieuw.",
+    const teamsQuery = query(
+      collectionGroup(db, "teams"),
+      where("invitationCode", "==", values.teamCode)
+    );
+
+    getDocs(teamsQuery)
+      .then((teamSnapshot) => {
+        if (teamSnapshot.empty) {
+          toast({
+            variant: "destructive",
+            title: "Ongeldige Code",
+            description:
+              "Team niet gevonden. Controleer de code en probeer opnieuw.",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        const teamDoc = teamSnapshot.docs[0];
+        const teamId = teamDoc.id;
+        const userRef = doc(db, "users", user.uid);
+        const updatedProfile = {
+          birthDate: values.birthDate.toISOString().split("T")[0],
+          teamId: teamId,
+        };
+
+        updateDoc(userRef, updatedProfile)
+          .then(() => {
+            toast({
+              title: "Profiel Bijgewerkt",
+              description: "Je bent succesvol aan het team toegevoegd!",
+            });
+            // The layout will handle redirection
+          })
+          .catch(() => {
+            const permissionError = new FirestorePermissionError({
+              path: userRef.path,
+              operation: "update",
+              requestResourceData: updatedProfile,
+            });
+            errorEmitter.emit("permission-error", permissionError);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      })
+      .catch(() => {
+        const permissionError = new FirestorePermissionError({
+          path: "teams", // collection group query
+          operation: "list",
         });
+        errorEmitter.emit("permission-error", permissionError);
         setIsLoading(false);
-        return;
-      }
-
-      const teamDoc = teamSnapshot.docs[0];
-      const teamId = teamDoc.id;
-
-      // Update user profile
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
-        birthDate: values.birthDate.toISOString().split("T")[0], // format as YYYY-MM-DD
-        teamId: teamId,
       });
-
-      toast({
-        title: "Profiel Bijgewerkt",
-        description: "Je bent succesvol aan het team toegevoegd!",
-      });
-
-      // The layout will handle redirection
-    } catch (error: any) {
-      console.error("Error completing profile:", error);
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description:
-          error.message || "Kon profiel niet bijwerken. Probeer het opnieuw.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   return (
