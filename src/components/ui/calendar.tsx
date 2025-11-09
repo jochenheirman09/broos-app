@@ -69,10 +69,6 @@ function Calendar({
             useDayPicker()
           const { goToMonth, month } = useNavigation()
 
-          if (!month) {
-            return null
-          }
-
           if (props.name === "months") {
             const months = fromMonth
               ? Array.from({ length: toMonth!.getMonth() - fromMonth.getMonth() + 1 }).map(
@@ -84,14 +80,15 @@ function Calendar({
             return (
               <Select
                 onValueChange={(newValue) => {
+                  if (!month) return;
                   const newDate = new Date(month)
                   newDate.setMonth(parseInt(newValue))
                   goToMonth(newDate)
                 }}
-                value={month.getMonth().toString()}
+                value={month?.getMonth().toString()}
               >
                 <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder={month.toLocaleString("default", { month: "long" })} />
+                  <SelectValue placeholder={month?.toLocaleString("default", { month: "long" })} />
                 </SelectTrigger>
                 <SelectContent>
                   {months.map((month) => (
@@ -119,14 +116,15 @@ function Calendar({
             return (
               <Select
                 onValueChange={(newValue) => {
+                  if (!month) return;
                   const newDate = new Date(month)
                   newDate.setFullYear(parseInt(newValue))
                   goToMonth(newDate)
                 }}
-                value={month.getFullYear().toString()}
+                value={month?.getFullYear().toString()}
               >
                 <SelectTrigger className="w-[80px]">
-                  <SelectValue placeholder={month.getFullYear()} />
+                  <SelectValue placeholder={month?.getFullYear()} />
                 </SelectTrigger>
                 <SelectContent>
                   {years.map((year) => (
