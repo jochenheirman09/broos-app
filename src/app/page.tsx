@@ -16,6 +16,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const roles = [
   {
@@ -56,60 +58,62 @@ export default function RoleSelectionPage() {
       </div>
     );
   }
-  
+
   if (user) {
     return (
-       <div className="flex h-screen w-full items-center justify-center">
-         <Spinner size="large" />
-       </div>
-     );
+      <div className="flex h-screen w-full items-center justify-center">
+        <Spinner size="large" />
+      </div>
+    );
   }
 
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
-      <div className="w-full max-w-md">
-        <div className="flex flex-col items-center justify-center mb-8">
-          <Wordmark size="large" />
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <main className="relative flex min-h-screen flex-col items-center justify-center p-4 bg-background">
+        <div className="absolute top-4 right-4">
+          <ThemeToggle />
         </div>
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle>Welkom! Wie ben jij?</CardTitle>
-            <CardDescription>
-              Selecteer je rol om door te gaan.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {roles.map(({ role, label, icon }) => (
-              <Link key={role} href={`/register?role=${role}`} passHref>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-base !py-6 border-2 group hover:bg-transparent"
+        <div className="w-full max-w-md">
+          <div className="flex flex-col items-center justify-center mb-8">
+            <Wordmark size="large" />
+          </div>
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle>Welkom! Wie ben jij?</CardTitle>
+              <CardDescription>
+                Selecteer je rol om door te gaan.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {roles.map(({ role, label, icon }) => (
+                <Link key={role} href={`/register?role=${role}`} passHref>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-base !py-6 border-2"
+                  >
+                    <span className="text-primary">{icon}</span>
+                    <span>{label}</span>
+                  </Button>
+                </Link>
+              ))}
+              <div className="mt-4 text-center text-sm text-muted-foreground">
+                Heb je al een account?{" "}
+                <Link
+                  href="/login"
+                  className="font-semibold text-primary hover:underline"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl" />
-                  <div className="relative flex items-center">
-                    <span className="text-primary group-hover:text-primary-foreground transition-colors">
-                      {icon}
-                    </span>
-                    <span className="group-hover:text-primary-foreground transition-colors">
-                      {label}
-                    </span>
-                  </div>
-                </Button>
-              </Link>
-            ))}
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Heb je al een account?{" "}
-              <Link
-                href="/login"
-                className="font-semibold text-primary hover:underline"
-              >
-                Log in
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+                  Log in
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </ThemeProvider>
   );
 }
