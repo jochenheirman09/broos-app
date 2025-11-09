@@ -31,6 +31,15 @@
         "name": {
           "type": "string",
           "description": "User's display name."
+        },
+        "birthDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Player's birth date."
+        },
+        "teamId": {
+          "type": "string",
+          "description": "The ID of the team the user belongs to."
         }
       },
       "required": [

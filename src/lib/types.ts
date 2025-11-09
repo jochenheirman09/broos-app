@@ -5,8 +5,10 @@ export interface UserProfile {
   email: string;
   name: string;
   role: UserRole;
-  clubId?: string;
   emailVerified: boolean;
+  clubId?: string;
+  teamId?: string;
+  birthDate?: string;
 }
 
 export interface Club {

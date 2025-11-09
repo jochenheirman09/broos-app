@@ -35,14 +35,13 @@ export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
     throw new Error("Firestore is not available");
   }
 
-  const teamRef = await addDoc(collection(db, "clubs", clubId, "teams"), {
-    name: teamName,
-    clubId: clubId,
-  });
+  const teamCollectionRef = collection(db, "clubs", clubId, "teams");
+  const teamRef = doc(teamCollectionRef);
 
-  // add the id to the document
   await updateDoc(teamRef, {
     id: teamRef.id,
+    name: teamName,
+    clubId: clubId,
   });
 
   return teamRef.id;
