@@ -89,7 +89,8 @@ service cloud.firestore {
     }
 
     function userHasClub() {
-      return exists(/databases/$(database)/documents/clubs/$(getUserData(request.auth.uid).clubId));
+      let userData = getUserData(request.auth.uid);
+      return userData.clubId != null && exists(/databases/$(database)/documents/clubs/$(userData.clubId));
     }
     
     // Check ownership for existing clubs
