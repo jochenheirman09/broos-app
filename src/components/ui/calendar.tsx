@@ -78,6 +78,7 @@ function Calendar({
             return (
               <Select
                 onValueChange={(newValue) => {
+                  if (!month) return
                   const newDate = new Date(month)
                   newDate.setMonth(parseInt(newValue))
                   goToMonth(newDate)
@@ -114,6 +115,7 @@ function Calendar({
             return (
               <Select
                 onValueChange={(newValue) => {
+                  if (!month) return
                   const newDate = new Date(month)
                   newDate.setFullYear(parseInt(newValue))
                   goToMonth(newDate)
