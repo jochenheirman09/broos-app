@@ -11,21 +11,25 @@ import { Spinner } from "../ui/spinner";
 import { Card, CardContent } from "../ui/card";
 
 export function VerifyEmailNotice() {
-  const { user, logout } = useUser();
+  const { user, loading, logout } = useUser();
   const router = useRouter();
   const { toast } = useToast();
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
-    if (user && user.emailVerified) {
+    if (!loading && user && user.emailVerified) {
       router.replace("/dashboard");
     }
-  }, [user, router]);
+  }, [user, loading, router]);
 
   useEffect(() => {
+    if (!user) return; // Don't run the interval if there's no user
+
     const interval = setInterval(async () => {
+      // It's possible for user to be null if they log out
       if (user) {
         await user.reload();
+        // The user object is mutated directly by `reload()`, so we re-check it
         if (user.emailVerified) {
           router.replace("/dashboard");
         }
@@ -54,6 +58,14 @@ export function VerifyEmailNotice() {
       setIsSending(false);
     }
   };
+
+  if (loading || !user) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <Card>
