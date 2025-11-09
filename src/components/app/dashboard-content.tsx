@@ -55,7 +55,7 @@ function ClubInfo({ clubId }: { clubId: string }) {
       <Card>
         <CardContent>
           <p className="text-destructive">
-            Error: Club data not found for your account.
+            Fout: Clubgegevens niet gevonden voor uw account.
           </p>
         </CardContent>
       </Card>
@@ -70,12 +70,12 @@ function ClubInfo({ clubId }: { clubId: string }) {
           {club.name}
         </CardTitle>
         <CardDescription>
-          Manage your teams below.
+          Beheer hieronder je teams.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
-          <h3 className="text-xl font-semibold mb-4">Your Teams</h3>
+          <h3 className="text-xl font-semibold mb-4">Jouw Teams</h3>
           <TeamList
             clubId={club.id}
             key={refreshKey}
@@ -84,7 +84,7 @@ function ClubInfo({ clubId }: { clubId: string }) {
         </div>
         <Separator />
         <div>
-          <h3 className="text-xl font-semibold mb-4">Add a New Team</h3>
+          <h3 className="text-xl font-semibold mb-4">Voeg een Nieuw Team Toe</h3>
           <CreateTeamForm clubId={club.id} onTeamCreated={handleTeamChange} />
         </div>
       </CardContent>
@@ -105,7 +105,7 @@ export function DashboardContent() {
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-2xl font-bold">Welcome, {name}!</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welkom, {name}!</CardTitle>
           <div className="flex items-center bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium shadow-clay-inset">
             {roleIcons[role]}
             <span className="capitalize">{role}</span>
@@ -113,7 +113,7 @@ export function DashboardContent() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            This is your main dashboard. Manage your club and members from here.
+            Dit is je hoofddashboard. Beheer hier je club en leden.
           </p>
         </CardContent>
       </Card>
@@ -125,10 +125,10 @@ export function DashboardContent() {
           <CardHeader>
             <CardTitle className="flex items-center text-2xl">
               <Building className="h-7 w-7 mr-3 text-accent-foreground" />
-              Create Your Club
+              Creëer Je Club
             </CardTitle>
             <CardDescription className="text-accent-foreground/80">
-              To continue using the app, you need to create a club for your
+              Om de app te blijven gebruiken, moet je een club aanmaken voor je
               account.
             </CardDescription>
           </CardHeader>
@@ -139,7 +139,7 @@ export function DashboardContent() {
                 size="lg"
               >
                 <PlusCircle className="mr-2 h-5 w-5" />
-                Create Club
+                Club aanmaken
               </Button>
             </Link>
           </CardContent>

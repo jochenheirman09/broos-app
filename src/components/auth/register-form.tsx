@@ -36,12 +36,12 @@ import { Spinner } from "../ui/spinner";
 const roles: UserRole[] = ["player", "staff", "responsible"];
 
 const formSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  email: z.string().email({ message: "Please enter a valid email." }),
+  name: z.string().min(2, { message: "Naam moet minstens 2 tekens bevatten." }),
+  email: z.string().email({ message: "Voer een geldig e-mailadres in." }),
   password: z
     .string()
-    .min(6, { message: "Password must be at least 6 characters." }),
-  role: z.enum(roles, { required_error: "Please select a role." }),
+    .min(6, { message: "Wachtwoord moet minstens 6 tekens bevatten." }),
+  role: z.enum(roles, { required_error: "Selecteer een rol." }),
 });
 
 export function RegisterForm() {
@@ -74,8 +74,8 @@ export function RegisterForm() {
     if (!db || !auth) {
       toast({
         variant: "destructive",
-        title: "Registration Failed",
-        description: "Firebase is not available.",
+        title: "Registratie mislukt",
+        description: "Firebase is niet beschikbaar.",
       });
       return;
     }
@@ -103,16 +103,16 @@ export function RegisterForm() {
       await sendEmailVerification(user);
 
       toast({
-        title: "Registration Successful",
+        title: "Registratie succesvol",
         description:
-          "A verification email has been sent. Please check your inbox.",
+          "Er is een verificatie-e-mail verzonden. Controleer je inbox.",
       });
 
       router.push("/verify-email");
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Registration Failed",
+        title: "Registratie mislukt",
         description: error.message,
       });
     } finally {
@@ -128,9 +128,9 @@ export function RegisterForm() {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Name</FormLabel>
+              <FormLabel>Naam</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input placeholder="Jan Janssen" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -141,9 +141,9 @@ export function RegisterForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>E-mail</FormLabel>
               <FormControl>
-                <Input placeholder="john@example.com" {...field} />
+                <Input placeholder="jan@voorbeeld.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -154,7 +154,7 @@ export function RegisterForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>Wachtwoord</FormLabel>
               <FormControl>
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
@@ -169,14 +169,14 @@ export function RegisterForm() {
             name="role"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Role</FormLabel>
+                <FormLabel>Rol</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select your role" />
+                      <SelectValue placeholder="Selecteer je rol" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -204,7 +204,7 @@ export function RegisterForm() {
           size="lg"
         >
           {isLoading && <Spinner size="small" className="mr-2" />}
-          {isLoading ? "Creating account..." : "Create Account"}
+          {isLoading ? "Account aanmaken..." : "Account aanmaken"}
         </Button>
       </form>
     </Form>

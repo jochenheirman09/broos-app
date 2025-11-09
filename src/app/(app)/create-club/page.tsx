@@ -16,9 +16,9 @@ export default function CreateClubPage() {
           <div className="flex items-center mb-4">
             <Building className="h-8 w-8 mr-3 text-primary" />
             <div>
-              <CardTitle className="text-2xl">Create a New Club</CardTitle>
+              <CardTitle className="text-2xl">Creëer een Nieuwe Club</CardTitle>
               <CardDescription>
-                Fill in the details to set up your club.
+                Vul de gegevens in om je club op te zetten.
               </CardDescription>
             </div>
           </div>

@@ -21,8 +21,8 @@ import { useAuth } from "@/firebase";
 import { Spinner } from "../ui/spinner";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email." }),
-  password: z.string().min(1, { message: "Password is required." }),
+  email: z.string().email({ message: "Voer een geldig e-mailadres in." }),
+  password: z.string().min(1, { message: "Wachtwoord is vereist." }),
 });
 
 export function LoginForm() {
@@ -50,8 +50,8 @@ export function LoginForm() {
       if (!userCredential.user.emailVerified) {
         router.push("/verify-email");
         toast({
-          title: "Email not verified",
-          description: "Please verify your email before logging in.",
+          title: "E-mail niet geverifieerd",
+          description: "Verifieer je e-mailadres voordat je inlogt.",
           variant: "destructive",
         });
       } else {
@@ -60,8 +60,8 @@ export function LoginForm() {
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid email or password.",
+        title: "Inloggen mislukt",
+        description: "Ongeldig e-mailadres of wachtwoord.",
       });
     } finally {
       setIsLoading(false);
@@ -76,9 +76,9 @@ export function LoginForm() {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>E-mail</FormLabel>
               <FormControl>
-                <Input placeholder="john@example.com" {...field} />
+                <Input placeholder="jan@voorbeeld.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -89,7 +89,7 @@ export function LoginForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel>Wachtwoord</FormLabel>
               <FormControl>
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
@@ -104,7 +104,7 @@ export function LoginForm() {
           size="lg"
         >
           {isLoading && <Spinner size="small" className="mr-2" />}
-          {isLoading ? "Logging in..." : "Log In"}
+          {isLoading ? "Inloggen..." : "Log in"}
         </Button>
       </form>
     </Form>

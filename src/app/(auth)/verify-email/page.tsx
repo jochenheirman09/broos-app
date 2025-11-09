@@ -12,11 +12,11 @@ export default function VerifyEmailPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Verify Your Email</CardTitle>
-        <CardDescription>Check your inbox to continue.</CardDescription>
+        <CardTitle>Verifieer je e-mailadres</CardTitle>
+        <CardDescription>Controleer je inbox om door te gaan.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<div>Laden...</div>}>
           <VerifyEmailNotice />
         </Suspense>
       </CardContent>

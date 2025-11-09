@@ -26,8 +26,8 @@ export function CreateTeamForm({
     if (teamName.length < 3) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Team name must be at least 3 characters long.",
+        title: "Fout",
+        description: "Teamnaam moet minstens 3 tekens lang zijn.",
       });
       return;
     }
@@ -41,17 +41,17 @@ export function CreateTeamForm({
         teamName,
       });
       toast({
-        title: "Success!",
-        description: `Team "${teamName}" has been created.`,
+        title: "Succes!",
+        description: `Team "${teamName}" is aangemaakt.`,
       });
       setTeamName("");
       onTeamCreated(); // Notify parent that a team was created
     } catch (error: any) {
-      console.error("Error creating team:", error);
+      console.error("Fout bij het maken van het team:", error);
       toast({
         variant: "destructive",
-        title: "Error creating team",
-        description: error.message || "An unexpected error occurred.",
+        title: "Fout bij het maken van het team",
+        description: error.message || "Er is een onverwachte fout opgetreden.",
       });
     } finally {
       setIsLoading(false);
@@ -61,11 +61,11 @@ export function CreateTeamForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="team-name">Team Name</Label>
+        <Label htmlFor="team-name">Teamnaam</Label>
         <Input
           id="team-name"
           name="team-name"
-          placeholder="e.g. Under 11s"
+          placeholder="bv. Onder 11s"
           required
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
@@ -73,7 +73,7 @@ export function CreateTeamForm({
       </div>
       <Button type="submit" disabled={isLoading} variant="secondary">
         {isLoading && <Spinner size="small" className="mr-2" />}
-        {isLoading ? "Creating Team..." : "Create Team"}
+        {isLoading ? "Team aanmaken..." : "Team aanmaken"}
       </Button>
     </form>
   );

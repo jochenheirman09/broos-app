@@ -38,8 +38,8 @@ function TeamCard({
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
     toast({
-      title: "Copied!",
-      description: "Invitation code copied to clipboard.",
+      title: "Gekopieerd!",
+      description: "Uitnodigingscode gekopieerd naar klembord.",
     });
   };
 
@@ -48,15 +48,15 @@ function TeamCard({
     try {
       await generateTeamInvitationCode(firestore, clubId, team.id);
       toast({
-        title: "Code Generated!",
-        description: `A new invitation code has been generated for ${team.name}.`,
+        title: "Code gegenereerd!",
+        description: `Een nieuwe uitnodigingscode is gegenereerd voor ${team.name}.`,
       });
       onTeamChange(); // Refresh the list
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to generate invitation code.",
+        title: "Fout",
+        description: "Kon geen uitnodigingscode genereren.",
       });
     } finally {
       setIsGenerating(false);
@@ -76,7 +76,7 @@ function TeamCard({
               onClick={() => setIsEditDialogOpen(true)}
             >
               <Pencil className="h-4 w-4" />
-              <span className="sr-only">Edit Team</span>
+              <span className="sr-only">Team bewerken</span>
             </Button>
             <Button
               variant="ghost"
@@ -85,7 +85,7 @@ function TeamCard({
               onClick={() => setIsDeleteDialogOpen(true)}
             >
               <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete Team</span>
+              <span className="sr-only">Team verwijderen</span>
             </Button>
           </div>
         </CardHeader>
@@ -93,7 +93,7 @@ function TeamCard({
           <div className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              Invitation Code
+              Uitnodigingscode
             </span>
           </div>
         </CardContent>
@@ -107,7 +107,7 @@ function TeamCard({
                 variant="ghost"
                 size="icon"
                 onClick={() => copyToClipboard(team.invitationCode!)}
-                aria-label="Copy invitation code"
+                aria-label="Kopieer uitnodigingscode"
               >
                 <Copy className="h-5 w-5" />
               </Button>
@@ -124,7 +124,7 @@ function TeamCard({
               ) : (
                 <RefreshCw className="mr-2 h-4 w-4" />
               )}
-              Generate Code
+              Genereer code
             </Button>
           )}
         </CardFooter>
@@ -173,9 +173,9 @@ export function TeamList({
     return (
       <Alert className="bg-background">
         <Users className="h-4 w-4" />
-        <AlertTitle>No Teams Yet</AlertTitle>
+        <AlertTitle>Nog Geen Teams</AlertTitle>
         <AlertDescription>
-          You haven't created any teams for your club. Add one below.
+          Je hebt nog geen teams aangemaakt voor je club. Voeg er hieronder een toe.
         </AlertDescription>
       </Alert>
     );

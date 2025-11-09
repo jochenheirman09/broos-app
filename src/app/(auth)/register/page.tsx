@@ -12,13 +12,13 @@ export default function RegisterPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create an account</CardTitle>
-        <CardDescription>Enter your details to get started.</CardDescription>
+        <CardTitle>Maak een account aan</CardTitle>
+        <CardDescription>Voer je gegevens in om te beginnen.</CardDescription>
       </CardHeader>
       <CardContent>
         <RegisterForm />
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
+          Heb je al een account?{" "}
           <Link
             href="/login"
             className="font-semibold text-primary hover:underline"

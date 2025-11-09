@@ -24,16 +24,16 @@ export function CreateClubForm() {
     if (!user) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "You must be logged in to create a club.",
+        title: "Fout",
+        description: "Je moet ingelogd zijn om een club te maken.",
       });
       return;
     }
     if (clubName.length < 3) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Club name must be at least 3 characters long.",
+        title: "Fout",
+        description: "Clubnaam moet minstens 3 tekens lang zijn.",
       });
       return;
     }
@@ -43,17 +43,17 @@ export function CreateClubForm() {
     try {
       await createClub(firestore, user.uid, clubName);
       toast({
-        title: "Success!",
-        description: "Your club has been created.",
+        title: "Succes!",
+        description: "Je club is aangemaakt.",
       });
       // The user context will update automatically and redirect
       // so we don't need to force a router.push here.
     } catch (error: any) {
-      console.error("Error creating club:", error);
+      console.error("Fout bij het maken van de club:", error);
       toast({
         variant: "destructive",
-        title: "Error creating club",
-        description: error.message || "An unexpected error occurred.",
+        title: "Fout bij het maken van de club",
+        description: error.message || "Er is een onverwachte fout opgetreden.",
       });
     } finally {
       setIsLoading(false);
@@ -64,11 +64,11 @@ export function CreateClubForm() {
     <form onSubmit={handleSubmit}>
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="name">Club Name</Label>
+          <Label htmlFor="name">Clubnaam</Label>
           <Input
             id="name"
             name="name"
-            placeholder="e.g. Real Madrid"
+            placeholder="bv. Real Madrid"
             required
             value={clubName}
             onChange={(e) => setClubName(e.target.value)}
@@ -76,7 +76,7 @@ export function CreateClubForm() {
         </div>
         <Button type="submit" className="w-full" disabled={isLoading} size="lg">
           {isLoading && <Spinner size="small" className="mr-2" />}
-          {isLoading ? "Creating Club..." : "Create Club"}
+          {isLoading ? "Club aanmaken..." : "Club aanmaken"}
         </Button>
       </div>
     </form>

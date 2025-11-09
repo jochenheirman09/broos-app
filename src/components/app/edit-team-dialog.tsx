@@ -48,8 +48,8 @@ export function EditTeamDialog({
     if (teamName.length < 3) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Team name must be at least 3 characters long.",
+        title: "Fout",
+        description: "Teamnaam moet minstens 3 tekens lang zijn.",
       });
       return;
     }
@@ -64,17 +64,17 @@ export function EditTeamDialog({
         newName: teamName,
       });
       toast({
-        title: "Success!",
-        description: `Team name updated to "${teamName}".`,
+        title: "Succes!",
+        description: `Teamnaam bijgewerkt naar "${teamName}".`,
       });
       onTeamUpdated();
       setIsOpen(false);
     } catch (error: any) {
-      console.error("Error updating team:", error);
+      console.error("Fout bij het bijwerken van het team:", error);
       toast({
         variant: "destructive",
-        title: "Error updating team",
-        description: error.message || "An unexpected error occurred.",
+        title: "Fout bij het bijwerken van het team",
+        description: error.message || "Er is een onverwachte fout opgetreden.",
       });
     } finally {
       setIsLoading(false);
@@ -85,19 +85,19 @@ export function EditTeamDialog({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Team Name</DialogTitle>
+          <DialogTitle>Teamnaam bewerken</DialogTitle>
           <DialogDescription>
-            Enter the new name for the team &quot;{team.name}&quot;.
+            Voer de nieuwe naam in voor het team &quot;{team.name}&quot;.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="team-name">Team Name</Label>
+            <Label htmlFor="team-name">Teamnaam</Label>
             <Input
               id="team-name"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              placeholder="e.g. Under 11s"
+              placeholder="bv. Onder 11s"
             />
           </div>
         </div>
@@ -107,11 +107,11 @@ export function EditTeamDialog({
             onClick={() => setIsOpen(false)}
             disabled={isLoading}
           >
-            Cancel
+            Annuleren
           </Button>
           <Button onClick={handleSubmit} disabled={isLoading}>
             {isLoading && <Spinner size="small" className="mr-2" />}
-            {isLoading ? "Saving..." : "Save Changes"}
+            {isLoading ? "Opslaan..." : "Wijzigingen opslaan"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -41,14 +41,14 @@ export function VerifyEmailNotice() {
     try {
       await sendEmailVerification(user);
       toast({
-        title: "Email Sent",
-        description: "A new verification email has been sent.",
+        title: "E-mail verzonden",
+        description: "Er is een nieuwe verificatie-e-mail verzonden.",
       });
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to send verification email.",
+        title: "Fout",
+        description: "Kon de verificatie-e-mail niet verzenden.",
       });
     } finally {
       setIsSending(false);
@@ -61,17 +61,17 @@ export function VerifyEmailNotice() {
         <div className="text-center">
           <MailCheck className="mx-auto h-16 w-16 text-primary" />
           <p className="mt-4 text-muted-foreground">
-            A verification link has been sent to{" "}
+            Er is een verificatielink gestuurd naar{" "}
             <span className="font-semibold text-foreground">{user?.email}</span>
-            . Please click the link to verify your account.
+            . Klik op de link om je account te verifiëren.
           </p>
           <div className="mt-6 flex flex-col gap-4">
             <Button onClick={handleResend} disabled={isSending} size="lg">
               {isSending && <Spinner size="small" className="mr-2" />}
-              {isSending ? "Sending..." : "Resend Verification Email"}
+              {isSending ? "Verzenden..." : "Verificatie-e-mail opnieuw verzenden"}
             </Button>
             <Button variant="outline" onClick={logout} size="lg">
-              Log out
+              Uitloggen
             </Button>
           </div>
         </div>

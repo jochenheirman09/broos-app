@@ -47,17 +47,17 @@ export function DeleteTeamDialog({
         teamId,
       });
       toast({
-        title: "Team Deleted",
-        description: `The team "${teamName}" has been successfully deleted.`,
+        title: "Team Verwijderd",
+        description: `Het team "${teamName}" is succesvol verwijderd.`,
       });
       onTeamDeleted();
       setIsOpen(false);
     } catch (error: any) {
-      console.error("Error deleting team:", error);
+      console.error("Fout bij het verwijderen van het team:", error);
       toast({
         variant: "destructive",
-        title: "Error deleting team",
-        description: error.message || "An unexpected error occurred.",
+        title: "Fout bij het verwijderen van het team",
+        description: error.message || "Er is een onverwachte fout opgetreden.",
       });
     } finally {
       setIsLoading(false);
@@ -68,21 +68,21 @@ export function DeleteTeamDialog({
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the
-            team <span className="font-semibold">&quot;{teamName}&quot;</span>.
+            Deze actie kan niet ongedaan worden gemaakt. Dit zal het
+            team <span className="font-semibold">&quot;{teamName}&quot;</span> permanent verwijderen.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>Annuleren</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
             disabled={isLoading}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isLoading && <Spinner size="small" className="mr-2" />}
-            {isLoading ? "Deleting..." : "Delete"}
+            {isLoading ? "Verwijderen..." : "Verwijderen"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
