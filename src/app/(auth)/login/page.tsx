@@ -13,7 +13,7 @@ export default function LoginPage() {
     <Card>
       <CardHeader>
         <CardTitle>Welcome back</CardTitle>
-        <CardDescription>Log in to continue to RoleVerify.</CardDescription>
+        <CardDescription>Log in to continue to Broos.</CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm />

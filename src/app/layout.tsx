@@ -5,7 +5,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { UserProvider } from '@/context/user-context';
 
 export const metadata: Metadata = {
-  title: 'RoleVerify',
+  title: 'Broos',
   description: 'User registration and role verification',
 };
 

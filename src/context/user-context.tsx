@@ -13,6 +13,8 @@ import {
 } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
+import { Logo } from "@/components/app/logo";
+import { Wordmark } from "@/components/app/wordmark";
 
 interface UserContextType {
   user: FirebaseUser | null;
@@ -70,8 +72,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   if (loading || isLoggingOut) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <Spinner size="large" />
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <Logo size="large" />
+          <Wordmark size="large" />
+          <Spinner size="medium" className="mt-4" />
+        </div>
       </div>
     );
   }
