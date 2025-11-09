@@ -1,0 +1,224 @@
+"use client";
+import { useUser } from "@/context/user-context";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useRef, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth, useFirestore } from "@/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { updateProfile } from "firebase/auth";
+import { Spinner } from "@/components/ui/spinner";
+import { Camera } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+const profileFormSchema = z.object({
+  name: z.string().min(2, {
+    message: "Naam moet minimaal 2 karakters lang zijn.",
+  }),
+});
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
+
+export default function ProfilePage() {
+  const { user, userProfile, logout } = useUser();
+  const { toast } = useToast();
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [newPhoto, setNewPhoto] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    values: {
+      name: userProfile?.name || "",
+    },
+  });
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setNewPhoto(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onSubmit = async (data: ProfileFormValues) => {
+    if (!user || !auth.currentUser) return;
+    setIsLoading(true);
+
+    try {
+      const userDocRef = doc(firestore, "users", user.uid);
+      const updates: { name?: string; photoURL?: string } = {};
+
+      if (data.name !== userProfile?.name) {
+        updates.name = data.name;
+      }
+      if (newPhoto) {
+        // In a real app, you would upload this to Firebase Storage and get a URL.
+        // For this demo, we'll store the data URL directly, which is not recommended for production.
+        updates.photoURL = newPhoto;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        // Update Firestore document
+        await updateDoc(userDocRef, updates);
+
+        // Update Firebase Auth profile
+        await updateProfile(auth.currentUser, {
+          displayName: updates.name,
+          photoURL: updates.photoURL,
+        });
+
+        toast({
+          title: "Profiel bijgewerkt",
+          description: "Je profiel is succesvol bijgewerkt.",
+        });
+        setNewPhoto(null);
+      } else {
+        toast({
+          title: "Geen wijzigingen",
+          description: "Er waren geen wijzigingen om op te slaan.",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating profile: ", error);
+      toast({
+        variant: "destructive",
+        title: "Fout",
+        description: "Er is een fout opgetreden bij het bijwerken van je profiel.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!userProfile) return null;
+
+  return (
+    <div className="container py-8 mx-auto">
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Jouw Profiel</CardTitle>
+          <CardDescription>
+            Bekijk en bewerk hier je persoonlijke gegevens.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <Avatar
+                className="h-24 w-24 cursor-pointer"
+                onClick={handleAvatarClick}
+              >
+                <AvatarImage src={newPhoto || userProfile.photoURL} />
+                <AvatarFallback className="text-3xl bg-primary/20 text-primary font-bold">
+                  {userProfile.name
+                    ?.split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute bottom-0 right-0 bg-secondary text-secondary-foreground rounded-full p-1.5 border-2 border-background">
+                <Camera className="h-4 w-4" />
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept="image/*"
+              />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">{userProfile.name}</h2>
+              <p className="text-muted-foreground">{userProfile.email}</p>
+            </div>
+          </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Volledige naam</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Jan Janssen" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-between items-center">
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Spinner className="mr-2 h-4 w-4" />}
+                  Wijzigingen opslaan
+                </Button>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">Uitloggen</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Je wordt uitgelogd en teruggestuurd naar de
+                        startpagina.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                      <AlertDialogAction onClick={logout}>
+                        Uitloggen
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

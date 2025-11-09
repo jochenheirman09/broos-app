@@ -9,6 +9,7 @@ export interface UserProfile {
   clubId?: string;
   teamId?: string;
   birthDate?: string;
+  photoURL?: string;
 }
 
 export interface Club {

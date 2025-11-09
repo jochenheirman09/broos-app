@@ -49,23 +49,32 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const loading = isAuthLoading || isProfileLoading;
+  // Combine auth loading and profile loading state
+  const loading = isAuthLoading || (!!user && isProfileLoading);
 
   useEffect(() => {
-    if (!loading && !user) {
-      // If not loading and no user, we are logged out.
-      // No need to redirect here, the app layout will handle it.
-    }
     if (profileError) {
       console.error("Error fetching user profile:", profileError);
-      // Handle profile fetching error, e.g., logout or show an error message
     }
-  }, [user, loading, profileError]);
+  }, [profileError]);
+  
+  useEffect(() => {
+    // When user object changes, merge auth profile info into our userProfile state
+    if (user && userProfile) {
+        if (user.photoURL && user.photoURL !== userProfile.photoURL) {
+            // This is a bit of a hack to keep the user profile up to date
+            // A better solution would be to refetch the profile or have a single source of truth
+            (userProfile as any).photoURL = user.photoURL;
+        }
+    }
+  }, [user, userProfile]);
 
   const logout = async () => {
     setIsLoggingOut(true);
     await auth.signOut();
-    // No need to clear state manually, the auth listener will do it.
+    // After sign out, the auth listener will set user to null,
+    // which will trigger re-renders and layout changes.
+    // We push to the homepage as a fallback.
     router.push("/");
     setIsLoggingOut(false);
   };

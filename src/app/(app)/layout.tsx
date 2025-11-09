@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { AppHeader } from "@/components/app/header";
 import { Spinner } from "@/components/ui/spinner";
+import { PlayerLayout } from "@/components/app/player-layout";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, loading } = useUser();
@@ -57,9 +58,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (userProfile?.role === "player") {
+    return <PlayerLayout>{children}</PlayerLayout>;
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Only show the header if the profile is complete */}
       {!isProfileIncomplete && <AppHeader />}
       <main className="flex-1 p-4">{children}</main>
     </div>

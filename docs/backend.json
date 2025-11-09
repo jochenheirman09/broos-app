@@ -40,6 +40,10 @@
         "teamId": {
           "type": "string",
           "description": "The ID of the team the user belongs to."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "The URL of the user's profile picture."
         }
       },
       "required": [
