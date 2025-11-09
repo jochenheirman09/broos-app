@@ -10,7 +10,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -28,7 +27,7 @@ import { useAuth, useFirestore } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
-import { Camera } from "lucide-react";
+import { Camera, LogOut, Sparkles } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +39,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import Link from "next/link";
+import { Separator } from "@/components/ui/separator";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -92,19 +93,15 @@ export default function ProfilePage() {
         updates.name = data.name;
       }
       if (newPhoto) {
-        // In a real app, you would upload this to Firebase Storage and get a URL.
-        // For this demo, we'll store the data URL directly, which is not recommended for production.
         updates.photoURL = newPhoto;
       }
 
       if (Object.keys(updates).length > 0) {
-        // Update Firestore document
         await updateDoc(userDocRef, updates);
 
-        // Update Firebase Auth profile
         await updateProfile(auth.currentUser, {
-          displayName: updates.name,
-          photoURL: updates.photoURL,
+          displayName: updates.name ?? auth.currentUser.displayName,
+          photoURL: updates.photoURL ?? auth.currentUser.photoURL,
         });
 
         toast({
@@ -188,35 +185,58 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
-              <div className="flex justify-between items-center">
-                <Button type="submit" disabled={isLoading}>
+               <Button type="submit" disabled={isLoading} className="w-full">
                   {isLoading && <Spinner className="mr-2 h-4 w-4" />}
                   Wijzigingen opslaan
                 </Button>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">Uitloggen</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Je wordt uitgelogd en teruggestuurd naar de
-                        startpagina.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                      <AlertDialogAction onClick={logout}>
-                        Uitloggen
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
             </form>
           </Form>
+
+          {userProfile.role === 'player' && (
+            <>
+              <Separator />
+                <div className="space-y-4">
+                     <h3 className="text-lg font-medium">Buddy Instellingen</h3>
+                     <p className="text-sm text-muted-foreground">
+                        Pas de naam en het uiterlijk van je AI-buddy aan.
+                     </p>
+                    <Link href="/buddy-profile" passHref>
+                        <Button variant="outline">
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Buddy Aanpassen
+                        </Button>
+                    </Link>
+                </div>
+            </>
+          )}
+
+          <Separator />
+          
+           <div className="flex justify-end">
+             <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Uitloggen
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Je wordt uitgelogd en teruggestuurd naar de
+                    startpagina.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                  <AlertDialogAction onClick={logout}>
+                    Uitloggen
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+           </div>
         </CardContent>
       </Card>
     </div>

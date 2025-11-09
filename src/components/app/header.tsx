@@ -7,7 +7,7 @@ import { ThemeToggle } from "../theme-toggle";
 import { Logo } from "./logo";
 import { Wordmark } from "./wordmark";
 import Link from "next/link";
-import { User } from "lucide-react";
+import { User, Info } from "lucide-react";
 
 export function AppHeader() {
   const { userProfile } = useUser();
@@ -24,11 +24,19 @@ export function AppHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-20 items-center">
         <div className="mr-auto flex items-center space-x-3">
-          <Logo />
-          <Wordmark />
+          <Link href="/dashboard" className="flex items-center space-x-3">
+            <Logo />
+            <Wordmark />
+          </Link>
         </div>
         <div className="flex items-center space-x-2">
           <ThemeToggle />
+          <Link href="/about">
+            <Button variant="ghost" size="icon">
+              <Info className="h-5 w-5" />
+              <span className="sr-only">About</span>
+            </Button>
+          </Link>
           {userProfile && (
             <Link href="/profile">
               <Button

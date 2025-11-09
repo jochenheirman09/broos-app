@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SendHorizonal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ChatMessage as ChatMessageType, WithId, Alert } from "@/lib/types";
+import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "./logo";
 import { Spinner } from "../ui/spinner";
@@ -24,6 +24,8 @@ import {
   limit,
 } from "firebase/firestore";
 import { format } from "date-fns";
+import Link from "next/link";
+import { BuddyAvatar } from "./buddy-avatar";
 
 function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
   const { userProfile } = useUser();
@@ -45,11 +47,9 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
       )}
     >
       {isAssistant && (
-        <Avatar className="h-10 w-10 border-2 border-primary">
-          <AvatarFallback>
-            <Logo size="normal" />
-          </AvatarFallback>
-        </Avatar>
+        <Link href="/buddy-profile">
+          <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
+        </Link>
       )}
       <div
         className={cn(
@@ -62,12 +62,14 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
         <p className="text-base">{message.content}</p>
       </div>
       {!isAssistant && userProfile && (
-        <Avatar className="h-10 w-10 border-2 border-secondary">
-          <AvatarImage src={userProfile.photoURL} />
-          <AvatarFallback className="bg-secondary text-secondary-foreground font-bold">
-            {getInitials(userProfile.name)}
-          </AvatarFallback>
-        </Avatar>
+        <Link href="/profile">
+            <Avatar className="h-10 w-10 border-2 border-secondary">
+              <AvatarImage src={userProfile.photoURL} />
+              <AvatarFallback className="bg-secondary text-secondary-foreground font-bold">
+                {getInitials(userProfile.name)}
+              </AvatarFallback>
+            </Avatar>
+        </Link>
       )}
     </div>
   );
@@ -96,7 +98,6 @@ export function ChatInterface() {
   const { data: messages, isLoading: messagesLoading } =
     useCollection<ChatMessageType>(messagesQuery);
     
-  // Add initial message if there are no messages for today
   useEffect(() => {
     if (!messagesLoading && messages?.length === 0 && user && userProfile && db) {
       const welcomeMessage = `Hallo ${userProfile.name}! Ik ben Broos, je persoonlijke buddy. Hoe gaat het met je?`;
@@ -127,7 +128,6 @@ export function ChatInterface() {
     const userMessageContent = input;
     setInput("");
     
-    // Immediately save user message to Firestore
     await addDoc(collection(db, "users", user.uid, "chats", today, "messages"), {
       role: "user",
       content: userMessageContent,
@@ -155,7 +155,6 @@ export function ChatInterface() {
         agentResponse: agentResponse,
       });
 
-      // Save assistant message to Firestore
       await addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
         {
@@ -210,11 +209,7 @@ export function ChatInterface() {
           ))}
           {isLoading && (
             <div className="flex items-start gap-3 my-4 justify-start">
-              <Avatar className="h-10 w-10 border-2 border-primary">
-                <AvatarFallback>
-                  <Logo size="normal" />
-                </AvatarFallback>
-              </Avatar>
+              <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
               <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
                 <Spinner size="small" />
                 <span className="text-muted-foreground italic">
