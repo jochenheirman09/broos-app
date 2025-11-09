@@ -65,15 +65,15 @@ function ClubInfo({ clubId }: { clubId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center text-3xl font-bold">
-          <Building className="h-8 w-8 mr-3 text-primary" />
+        <CardTitle className="flex items-center text-2xl font-bold">
+          <Building className="h-7 w-7 mr-3 text-primary" />
           {club.name}
         </CardTitle>
-        <CardDescription className="text-lg">
-          Welcome to your club dashboard. Manage your teams from here.
+        <CardDescription>
+          Manage your teams below.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-8">
+      <CardContent className="space-y-6">
         <div>
           <h3 className="text-xl font-semibold mb-4">Your Teams</h3>
           <TeamList
@@ -102,17 +102,17 @@ export function DashboardContent() {
   const { name, role, clubId } = userProfile;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-3xl font-bold">Welcome, {name}!</CardTitle>
-          <div className="flex items-center bg-secondary text-secondary-foreground px-4 py-2 rounded-full text-base font-medium shadow-clay-inset">
+          <CardTitle className="text-2xl font-bold">Welcome, {name}!</CardTitle>
+          <div className="flex items-center bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium shadow-clay-inset">
             {roleIcons[role]}
             <span className="capitalize">{role}</span>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-muted-foreground">
             This is your main dashboard. Manage your club and members from here.
           </p>
         </CardContent>

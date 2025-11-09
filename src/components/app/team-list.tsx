@@ -6,20 +6,19 @@ import type { Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Copy, KeyRound, Users, RefreshCw } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { generateTeamInvitationCode } from "@/lib/team";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
 
-function TeamRow({
+function TeamCard({
   clubId,
   team,
   onCodeGenerated,
@@ -60,12 +59,20 @@ function TeamRow({
   };
 
   return (
-    <TableRow>
-      <TableCell className="font-medium">{team.name}</TableCell>
-      <TableCell>
+    <Card className="shadow-clay-card bg-card/60">
+      <CardHeader className="p-4">
+        <CardTitle className="text-lg">{team.name}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Invitation Code</span>
+        </div>
+      </CardContent>
+      <CardFooter className="p-4 pt-0">
         {team.invitationCode ? (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm bg-muted px-3 py-1.5 rounded-lg shadow-clay-inset">
+          <div className="flex items-center gap-2 w-full">
+            <span className="font-mono text-base bg-muted px-4 py-2 rounded-lg shadow-clay-inset flex-grow text-center">
               {team.invitationCode}
             </span>
             <Button
@@ -74,13 +81,13 @@ function TeamRow({
               onClick={() => copyToClipboard(team.invitationCode!)}
               aria-label="Copy invitation code"
             >
-              <Copy className="h-4 w-4" />
+              <Copy className="h-5 w-5" />
             </Button>
           </div>
         ) : (
           <Button
             variant="outline"
-            size="sm"
+            className="w-full"
             onClick={handleGenerateCode}
             disabled={isGenerating}
           >
@@ -92,8 +99,8 @@ function TeamRow({
             Generate Code
           </Button>
         )}
-      </TableCell>
-    </TableRow>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -129,30 +136,15 @@ export function TeamList({
   }
 
   return (
-    <div className="rounded-2xl border bg-card shadow-clay-card overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[200px]">Team Name</TableHead>
-            <TableHead>
-              <div className="flex items-center">
-                <KeyRound className="h-4 w-4 mr-2" />
-                Invitation Code
-              </div>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {teams.map((team) => (
-            <TeamRow
-              key={team.id}
-              clubId={clubId}
-              team={team}
-              onCodeGenerated={onCodeGenerated}
-            />
-          ))}
-        </TableBody>
-      </Table>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {teams.map((team) => (
+        <TeamCard
+          key={team.id}
+          clubId={clubId}
+          team={team}
+          onCodeGenerated={onCodeGenerated}
+        />
+      ))}
     </div>
   );
 }
