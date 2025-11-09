@@ -12,12 +12,53 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle, Building, User, Users, Shield } from "lucide-react";
 import React from "react";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { Club } from "@/lib/types";
+import { Spinner } from "../ui/spinner";
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <User className="h-5 w-5 mr-2" />,
   staff: <Users className="h-5 w-5 mr-2" />,
   responsible: <Shield className="h-5 w-5 mr-2" />,
 };
+
+function ClubInfo({ clubId }: { clubId: string }) {
+  const firestore = useFirestore();
+  const clubRef = useMemoFirebase(
+    () => doc(firestore, "clubs", clubId),
+    [firestore, clubId]
+  );
+  const { data: club, isLoading } = useDoc<Club>(clubRef);
+
+  if (isLoading) {
+    return <Spinner />;
+  }
+
+  if (!club) {
+    return (
+      <p className="text-destructive">
+        Error: Club data not found for your account.
+      </p>
+    );
+  }
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center text-2xl font-bold">
+          <Building className="h-6 w-6 mr-3 text-primary" />
+          {club.name}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-lg text-muted-foreground">
+          Welcome to your club dashboard.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function DashboardContent() {
   const { userProfile } = useUser();
@@ -40,10 +81,12 @@ export function DashboardContent() {
         </CardHeader>
         <CardContent>
           <p className="text-lg text-muted-foreground">
-            Hello, my name is {name} and my role is {role}.
+            This is your main dashboard. Manage your club and members from here.
           </p>
         </CardContent>
       </Card>
+
+      {role === "responsible" && clubId && <ClubInfo clubId={clubId} />}
 
       {role === "responsible" && !clubId && (
         <Card className="border-accent bg-accent/10">

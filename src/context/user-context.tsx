@@ -2,9 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { useUser as useFirebaseUser, useFirestore, useAuth } from "@/firebase";
+import {
+  useUser as useFirebaseUser,
+  useFirestore,
+  useAuth,
+  useDoc,
+  useMemoFirebase,
+} from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -23,42 +29,46 @@ const UserContext = createContext<UserContextType>({
 });
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user, isUserLoading } = useFirebaseUser();
+  const { user, isUserLoading: isAuthLoading } = useFirebaseUser();
   const firestore = useFirestore();
   const auth = useAuth();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchUserProfile = async (firebaseUser: FirebaseUser) => {
-      const userDocRef = doc(firestore, "users", firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-        setUserProfile(userDoc.data() as UserProfile);
-      } else {
-        setUserProfile(null);
-      }
-      setLoading(false);
-    };
+  const userDocRef = useMemoFirebase(
+    () => (user ? doc(firestore, "users", user.uid) : null),
+    [user, firestore]
+  );
 
-    if (!isUserLoading) {
-      if (user) {
-        fetchUserProfile(user);
-      } else {
-        setUserProfile(null);
-        setLoading(false);
-      }
+  const {
+    data: userProfile,
+    isLoading: isProfileLoading,
+    error: profileError,
+  } = useDoc<UserProfile>(userDocRef);
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const loading = isAuthLoading || isProfileLoading;
+
+  useEffect(() => {
+    if (!loading && !user) {
+      // If not loading and no user, we are logged out.
+      // No need to redirect here, the app layout will handle it.
     }
-  }, [user, isUserLoading, firestore]);
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+      // Handle profile fetching error, e.g., logout or show an error message
+    }
+  }, [user, loading, profileError]);
 
   const logout = async () => {
-    setLoading(true);
+    setIsLoggingOut(true);
     await auth.signOut();
+    // No need to clear state manually, the auth listener will do it.
     router.push("/login");
+    setIsLoggingOut(false);
   };
 
-  if (loading) {
+  if (loading || isLoggingOut) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <Spinner size="large" />
@@ -67,7 +77,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <UserContext.Provider value={{ user, userProfile, loading, logout }}>
+    <UserContext.Provider
+      value={{
+        user,
+        userProfile: userProfile as UserProfile | null,
+        loading,
+        logout,
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
