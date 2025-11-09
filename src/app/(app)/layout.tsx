@@ -17,7 +17,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       (!userProfile.teamId || !userProfile.birthDate)) ||
       (userProfile.role === "staff" && !userProfile.teamId));
 
-
   useEffect(() => {
     if (loading) return;
 
