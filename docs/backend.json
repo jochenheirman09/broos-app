@@ -58,11 +58,16 @@
         "description": {
           "type": "string",
           "description": "Description of the club."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns the club."
         }
       },
       "required": [
         "id",
-        "name"
+        "name",
+        "ownerId"
       ]
     }
   },

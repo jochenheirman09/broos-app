@@ -61,9 +61,7 @@ service cloud.firestore {
      */
     match /clubs/{clubId} {
       allow get, list: if isSignedIn();
-      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
-      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create, update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
     }
 
     function isSignedIn() {
@@ -73,9 +71,18 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function isClubOwner(clubId) {
+        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return userDoc.data.clubId == clubId || resource.data.ownerId == request.auth.uid;
+    }
 
     function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
+    }
+    
+    function isResponsible() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
     }
   }
 }
