@@ -55,77 +55,67 @@ export function CompleteProfileForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("[DEBUG] Starting onSubmit function.");
     if (!user || !db) {
-      console.error("[DEBUG] User or Firestore DB is not available.", { user, db });
       return;
     }
 
     setIsLoading(true);
-    console.log("[DEBUG] Form values submitted:", values);
 
     const teamsQuery = query(
       collectionGroup(db, "teams"),
       where("invitationCode", "==", values.teamCode)
     );
-    console.log("[DEBUG] Created teams query for code:", values.teamCode);
 
-    getDocs(teamsQuery)
-      .then((teamSnapshot) => {
-        console.log(`[DEBUG] Found ${teamSnapshot.size} teams with the code.`);
-        if (teamSnapshot.empty) {
-          toast({
-            variant: "destructive",
-            title: "Ongeldige Code",
-            description:
-              "Team niet gevonden. Controleer de code en probeer opnieuw.",
-          });
-          setIsLoading(false);
-          return;
-        }
+    try {
+      const teamSnapshot = await getDocs(teamsQuery);
 
-        const teamDoc = teamSnapshot.docs[0];
-        const teamId = teamDoc.id;
-        console.log("[DEBUG] Team found. Team ID:", teamId);
-        
-        const userRef = doc(db, "users", user.uid);
-        const updatedProfile = {
-          birthDate: values.birthDate.toISOString().split("T")[0],
-          teamId: teamId,
-        };
-        console.log("[DEBUG] Preparing to update user profile:", updatedProfile);
+      if (teamSnapshot.empty) {
+        toast({
+          variant: "destructive",
+          title: "Ongeldige Code",
+          description:
+            "Team niet gevonden. Controleer de code en probeer opnieuw.",
+        });
+        setIsLoading(false);
+        return;
+      }
 
-        updateDoc(userRef, updatedProfile)
-          .then(() => {
-            console.log("[DEBUG] User profile updated successfully.");
-            toast({
-              title: "Profiel Bijgewerkt",
-              description: "Je bent succesvol aan het team toegevoegd!",
-            });
-            // The layout will handle redirection
-          })
-          .catch((updateError) => {
-            console.error("[DEBUG] Error updating user document:", updateError);
-            const permissionError = new FirestorePermissionError({
-              path: userRef.path,
-              operation: "update",
-              requestResourceData: updatedProfile,
-            });
-            errorEmitter.emit("permission-error", permissionError);
-          })
-          .finally(() => {
-            setIsLoading(false);
-          });
-      })
-      .catch((queryError) => {
-        console.error("[DEBUG] Error executing teams query:", queryError);
+      const teamDoc = teamSnapshot.docs[0];
+      const teamId = teamDoc.id;
+      
+      const userRef = doc(db, "users", user.uid);
+      const updatedProfile = {
+        birthDate: values.birthDate.toISOString().split("T")[0],
+        teamId: teamId,
+      };
+
+      try {
+        await updateDoc(userRef, updatedProfile);
+        toast({
+          title: "Profiel Bijgewerkt",
+          description: "Je bent succesvol aan het team toegevoegd!",
+        });
+        // The layout will handle redirection
+      } catch (updateError) {
         const permissionError = new FirestorePermissionError({
-          path: "teams", // collection group query
-          operation: "list",
+          path: userRef.path,
+          operation: "update",
+          requestResourceData: updatedProfile,
         });
         errorEmitter.emit("permission-error", permissionError);
+      } finally {
         setIsLoading(false);
+      }
+    } catch (queryError) {
+      // This is now likely to be the index error
+      console.error("Error executing teams query:", queryError);
+      const permissionError = new FirestorePermissionError({
+        path: "teams", // collection group query
+        operation: "list",
       });
+      errorEmitter.emit("permission-error", permissionError);
+      setIsLoading(false);
+    }
   }
 
   return (
