@@ -15,6 +15,7 @@
  * - Club data access is controlled by user roles (only 'responsible' users can manage clubs).
  * - A responsible user can only create a club if they don't already have one.
  * - The owner of a club can manage teams within that club.
+ * - Any signed-in user can query across all teams to find one by invitation code.
  *
  * Denormalization for Authorization:
  * - The `User` document contains the `clubId`, allowing rules on both `/users/{userId}` and `/clubs/{clubId}` to make authorization decisions without additional reads.
@@ -27,6 +28,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
+     * @description Allows signed-in users to query across all teams to find one by invitation code.
+     * This is a collection group query and must be at the top level.
+     * @path /teams/{teamId}
+     */
+    match /{path=**}/teams/{teamId} {
+      allow get, list: if isSignedIn();
+    }
+
+    /**
      * @description Enforces access control for user documents.
      * @path /users/{userId}
      */
@@ -34,18 +44,9 @@ service cloud.firestore {
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
       allow create: if isSignedIn() && isOwner(userId);
-      // Allow responsible users to update the clubId on their own profile
+      // Allow users to update their own profile (e.g. to add a teamId)
       allow update: if isSignedIn() && isOwner(userId);
       allow delete: if isSignedIn() && isOwner(userId);
-    }
-    
-    /**
-     * @description Allows signed-in users to query across all teams to find one by invitation code.
-     * This is a collection group query.
-     * @path /teams/{teamId}
-     */
-    match /{path=**}/teams/{teamId} {
-      allow get, list: if isSignedIn();
     }
 
     /**
