@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@/context/user-context";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { AppHeader } from "@/components/app/header";
 import { Spinner } from "@/components/ui/spinner";
@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, loading } = useUser();
   const router = useRouter();
+  const pathname = usePathname();
 
   const isProfileIncomplete =
     userProfile &&
@@ -29,17 +30,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const currentPath = window.location.pathname;
-
     if (isProfileIncomplete) {
-      if (currentPath !== "/complete-profile") {
+      if (pathname !== "/complete-profile") {
         router.replace("/complete-profile");
       }
-    } else if (currentPath === "/complete-profile") {
+    } else if (pathname === "/complete-profile") {
       // If profile is complete, redirect away from setup page to dashboard
       router.replace("/dashboard");
     }
-  }, [user, userProfile, loading, router, isProfileIncomplete]);
+  }, [user, userProfile, loading, router, isProfileIncomplete, pathname]);
 
   if (loading || !user || !user.emailVerified) {
     return (
@@ -51,7 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // If profile is incomplete, only render the children if we are on the complete profile page.
   // Otherwise, show a spinner while we redirect.
-  if (isProfileIncomplete && window.location.pathname !== "/complete-profile") {
+  if (isProfileIncomplete && pathname !== "/complete-profile") {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Spinner size="large" />
