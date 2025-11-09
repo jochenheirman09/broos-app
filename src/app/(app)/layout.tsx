@@ -10,33 +10,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, loading } = useUser();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.replace("/login");
-        return;
-      }
-      if (!user.emailVerified) {
-        router.replace("/verify-email");
-        return;
-      }
+  const isProfileIncomplete =
+    userProfile &&
+    (userProfile.role === "player" || userProfile.role === "staff") &&
+    !userProfile.teamId;
 
-      // Profile completion check
-      if (userProfile) {
-        const isPlayerOrStaff =
-          userProfile.role === "player" || userProfile.role === "staff";
-        if (isPlayerOrStaff && !userProfile.teamId) {
-          // If player/staff has not completed profile setup (e.g., joined a team)
-          if (window.location.pathname !== "/complete-profile") {
-            router.replace("/complete-profile");
-          }
-        } else if (window.location.pathname === "/complete-profile") {
-          // If profile is complete, redirect away from setup page to dashboard
-          router.replace("/dashboard");
-        }
-      }
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      router.replace("/login");
+      return;
     }
-  }, [user, userProfile, loading, router]);
+    if (!user.emailVerified) {
+      router.replace("/verify-email");
+      return;
+    }
+
+    const currentPath = window.location.pathname;
+
+    if (isProfileIncomplete) {
+      if (currentPath !== "/complete-profile") {
+        router.replace("/complete-profile");
+      }
+    } else if (currentPath === "/complete-profile") {
+      // If profile is complete, redirect away from setup page to dashboard
+      router.replace("/dashboard");
+    }
+  }, [user, userProfile, loading, router, isProfileIncomplete]);
 
   if (loading || !user || !user.emailVerified) {
     return (
@@ -46,12 +47,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Prevent rendering children if redirection is imminent
-  if (
-    userProfile &&
-    (userProfile.role === "player" || userProfile.role === "staff") &&
-    !userProfile.teamId
-  ) {
+  // If profile is incomplete, only render the children if we are on the complete profile page.
+  // Otherwise, show a spinner while we redirect.
+  if (isProfileIncomplete && window.location.pathname !== "/complete-profile") {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Spinner size="large" />
@@ -61,7 +59,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <AppHeader />
+      {/* Only show the header if the profile is complete */}
+      {!isProfileIncomplete && <AppHeader />}
       <main className="flex-1 p-4">{children}</main>
     </div>
   );

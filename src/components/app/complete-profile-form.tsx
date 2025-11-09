@@ -13,9 +13,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, useFirestore } from "@/firebase";
+import { useFirestore } from "@/firebase";
 import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
 import {
@@ -31,23 +31,29 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Naam is vereist." }),
   teamCode: z
     .string()
-    .length(6, { message: "Teamcode moet 6 tekens lang zijn." }),
+    .min(1, { message: "Teamcode is vereist." }),
 });
 
 export function CompleteProfileForm() {
   const { user, userProfile } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const auth = useAuth();
   const db = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: userProfile?.name || "",
+      name: "",
       teamCode: "",
     },
   });
+
+  useEffect(() => {
+    if (userProfile?.name) {
+      form.setValue("name", userProfile.name);
+    }
+  }, [userProfile, form]);
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !db) return;
