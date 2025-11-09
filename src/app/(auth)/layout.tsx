@@ -21,7 +21,6 @@ export default function AuthLayout({
         </div>
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center justify-center mb-8 gap-2">
-            <Logo size="large" />
             <Wordmark size="large" />
           </div>
           {children}

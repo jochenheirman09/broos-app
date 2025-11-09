@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import {
   createUserWithEmailAndPassword,
@@ -47,9 +47,12 @@ const formSchema = z.object({
 export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const auth = useAuth();
   const db = useFirestore();
+
+  const selectedRole = searchParams.get("role") as UserRole | null;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -57,8 +60,15 @@ export function RegisterForm() {
       name: "",
       email: "",
       password: "",
+      role: selectedRole || undefined,
     },
   });
+
+  useEffect(() => {
+    if (selectedRole && roles.includes(selectedRole)) {
+      form.setValue("role", selectedRole);
+    }
+  }, [selectedRole, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!db || !auth) {
@@ -152,34 +162,41 @@ export function RegisterForm() {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="role"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Role</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem
-                      key={role}
-                      value={role}
-                      className="capitalize"
-                    >
-                      {role}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+
+        {!selectedRole && (
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Role</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem
+                        key={role}
+                        value={role}
+                        className="capitalize"
+                      >
+                        {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <Button
           type="submit"
           className="w-full"

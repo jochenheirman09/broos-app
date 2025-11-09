@@ -11,7 +11,7 @@ import Link from "next/link";
 export default function LoginPage() {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="text-center">
         <CardTitle>Welcome back</CardTitle>
         <CardDescription>Log in to continue to Broos.</CardDescription>
       </CardHeader>
@@ -20,7 +20,7 @@ export default function LoginPage() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
-            href="/register"
+            href="/"
             className="font-semibold text-primary hover:underline"
           >
             Sign up
