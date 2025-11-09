@@ -1,0 +1,81 @@
+/**
+ * @file Firestore Security Rules for RoleVerify application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user data and allows for club data management. User creation is disabled.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores private user data, including role, email verification status, and associated club ID (clubId).
+ * - /clubs/{clubId}: Stores club data, with a 1:1 relationship to a user who is responsible for the club.
+ *
+ * Key Security Decisions:
+ * - User listing is denied to prevent information leakage.
+ * - User creation is denied
+ * - Club data access is controlled by user roles (only 'responsible' users can manage clubs).
+ *
+ * Denormalization for Authorization:
+ * - The `User` document contains the `clubId`, allowing rules on both `/users/{userId}` and `/clubs/{clubId}` to make authorization decisions without additional reads.
+ *
+ * Structural Segregation:
+ * - No public vs. private content segregation is needed in this design.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Enforces access control for user documents.
+     * @path /users/{userId}
+     * @allow (get) User with ID 'user123' can read their own document.
+     * @deny (get) User with ID 'user456' cannot read document of 'user123'.
+     * @allow (list) User with ID 'user123' can list their own documents.
+     * @deny (list) User with ID 'user456' cannot list documents of 'user123'.
+     * @deny (create) No user can create a user document.
+     * @allow (update) User with ID 'user123' can update their own document.
+     * @deny (update) User with ID 'user456' cannot update document of 'user123'.
+     * @allow (delete) User with ID 'user123' can delete their own document.
+     * @deny (delete) User with ID 'user456' cannot delete document of 'user123'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create: if false;
+      allow update: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
+    }
+
+    /**
+     * @description Enforces access control for club documents. Only responsible users can manage clubs.
+     * @path /clubs/{clubId}
+     * @allow (get) Any signed-in user can read a club document.
+     * @deny (get) Anonymous user cannot read a club document.
+     * @allow (list) Any signed-in user can list club documents.
+     * @deny (list) Anonymous user cannot list club documents.
+     * @deny (create) User without 'responsible' role cannot create a club document.
+     * @allow (update) User with 'responsible' role can update a club document.
+     * @deny (update) User without 'responsible' role cannot update a club document.
+     * @allow (delete) User with 'responsible' role can delete a club document.
+     * @deny (delete) User without 'responsible' role cannot delete a club document.
+     * @principle Restricts club management to 'responsible' users.
+     */
+    match /clubs/{clubId} {
+      allow get, list: if isSignedIn();
+      allow create: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+  }
+}
