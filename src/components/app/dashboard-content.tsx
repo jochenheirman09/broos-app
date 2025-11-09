@@ -16,6 +16,9 @@ import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { Club } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
+import { CreateTeamForm } from "./create-team-form";
+import { TeamList } from "./team-list";
+import { Separator } from "../ui/separator";
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <User className="h-5 w-5 mr-2" />,
@@ -26,7 +29,7 @@ const roleIcons: { [key: string]: React.ReactNode } = {
 function ClubInfo({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
   const clubRef = useMemoFirebase(
-    () => doc(firestore, "clubs", clubId),
+    () => (firestore ? doc(firestore, "clubs", clubId) : null),
     [firestore, clubId]
   );
   const { data: club, isLoading } = useDoc<Club>(clubRef);
@@ -50,11 +53,20 @@ function ClubInfo({ clubId }: { clubId: string }) {
           <Building className="h-6 w-6 mr-3 text-primary" />
           {club.name}
         </CardTitle>
+        <CardDescription>
+          Welcome to your club dashboard. Manage your teams from here.
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <p className="text-lg text-muted-foreground">
-          Welcome to your club dashboard.
-        </p>
+      <CardContent className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Teams</h3>
+          <TeamList clubId={club.id} />
+        </div>
+        <Separator />
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Add a New Team</h3>
+          <CreateTeamForm clubId={club.id} />
+        </div>
       </CardContent>
     </Card>
   );

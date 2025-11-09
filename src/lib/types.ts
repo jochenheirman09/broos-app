@@ -14,3 +14,10 @@ export interface Club {
   name:string;
   ownerId: string;
 }
+
+export interface Team {
+  id: string;
+  name: string;
+  clubId: string;
+  invitationCode?: string;
+}

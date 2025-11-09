@@ -69,6 +69,31 @@
         "name",
         "ownerId"
       ]
+    },
+    "Team": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Team",
+      "type": "object",
+      "description": "Represents a team within a club.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Team entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the team."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "The ID of the club this team belongs to."
+        },
+        "invitationCode": {
+          "type": "string",
+          "description": "A unique code to join the team."
+        }
+      },
+      "required": ["id", "name", "clubId"]
     }
   },
   "auth": {
@@ -110,8 +135,28 @@
             }
           ]
         }
+      },
+      {
+        "path": "/clubs/{clubId}/teams/{teamId}",
+        "definition": {
+          "entityName": "Team",
+          "schema": {
+            "$ref": "#/backend/entities/Team"
+          },
+          "description": "Stores team data as a subcollection of a club.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique identifier of the club."
+            },
+            {
+              "name": "teamId",
+              "description": "The unique identifier of the team."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "This design prioritizes security and scalability for the RoleVerify application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Overall, this structure simplifies security rules and facilitates atomic operations."
+    "reasoning": "This design prioritizes security and scalability for the RoleVerify application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy."
   }
 }
