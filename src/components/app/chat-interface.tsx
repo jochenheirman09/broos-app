@@ -2,21 +2,30 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useUser } from "@/context/user-context";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { chatWithBuddy } from "@/ai/flows/buddy-flow";
 import { saveWellnessScores } from "@/lib/wellness";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { SendHorizonal, Bot } from "lucide-react";
+import { SendHorizonal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ChatMessage as ChatMessageType } from "@/lib/types";
+import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "./logo";
 import { Spinner } from "../ui/spinner";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  limit,
+} from "firebase/firestore";
+import { format } from "date-fns";
 
-function ChatMessage({ message }: { message: ChatMessageType }) {
+function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
   const { userProfile } = useUser();
   const isAssistant = message.role === "assistant";
 
@@ -69,14 +78,40 @@ export function ChatInterface() {
   const db = useFirestore();
   const { toast } = useToast();
 
-  const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+      collection(db, "users", user.uid, "chats", today, "messages"),
+      orderBy("timestamp", "asc"),
+      limit(50)
+    );
+  }, [user, db, today]);
+
+  const { data: messages, isLoading: messagesLoading } =
+    useCollection<ChatMessageType>(messagesQuery);
+    
+  // Add initial message if there are no messages for today
+  useEffect(() => {
+    if (!messagesLoading && messages?.length === 0 && user && userProfile && db) {
+      const welcomeMessage = `Hallo ${userProfile.name}! Ik ben Broos, je persoonlijke buddy. Hoe voel je je vandaag?`;
+      addDoc(
+        collection(db, "users", user.uid, "chats", today, "messages"),
+        {
+          role: "assistant",
+          content: welcomeMessage,
+          timestamp: serverTimestamp(),
+        }
+      );
+    }
+  }, [messagesLoading, messages, user, userProfile, db, today]);
 
   useEffect(() => {
-    // Automatically scroll to the bottom when messages change
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -85,60 +120,51 @@ export function ChatInterface() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    // Send a welcome message from the buddy on initial load
-    if (userProfile && messages.length === 0) {
-      setMessages([
-        {
-          id: "initial-1",
-          role: "assistant",
-          content: `Hallo ${userProfile.name}! Ik ben Broos, je persoonlijke buddy. Hoe voel je je vandaag?`,
-          timestamp: new Date(),
-        },
-      ]);
-    }
-  }, [userProfile, messages.length]);
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !userProfile || !user) return;
+    if (!input.trim() || !userProfile || !user || !db) return;
 
-    const userMessage: ChatMessageType = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: input,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    const userMessageContent = input;
     setInput("");
+    
+    // Immediately save user message to Firestore
+    await addDoc(collection(db, "users", user.uid, "chats", today, "messages"), {
+      role: "user",
+      content: userMessageContent,
+      timestamp: serverTimestamp(),
+    });
+
     setIsLoading(true);
 
     try {
-      const chatHistory = messages.map(m => `${m.role}: ${m.content}`).join('\n');
-      const agentResponse = messages.length > 0 ? messages[messages.length - 1].content : '';
-      
+      const chatHistory = (messages || [])
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n");
+        
+      const agentResponse = messages && messages.length > 0 ? messages[messages.length - 1].content : '';
+
       const { adaptedResponse, scores } = await chatWithBuddy({
         buddyName: "Broos",
         userName: userProfile.name,
         userAge: userProfile.birthDate
-          ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
+          ? new Date().getFullYear() -
+            new Date(userProfile.birthDate).getFullYear()
           : 18,
-        userMessage: input,
+        userMessage: userMessageContent,
         chatHistory: chatHistory,
         agentResponse: agentResponse,
       });
 
-      const assistantMessage: ChatMessageType = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: adaptedResponse,
-        timestamp: new Date(),
-      };
+      // Save assistant message to Firestore
+      await addDoc(
+        collection(db, "users", user.uid, "chats", today, "messages"),
+        {
+          role: "assistant",
+          content: adaptedResponse,
+          timestamp: serverTimestamp(),
+        }
+      );
 
-      setMessages((prev) => [...prev, assistantMessage]);
-      
-      // Save scores to Firestore if any were returned
       if (scores && Object.keys(scores).length > 0) {
         await saveWellnessScores({
           db,
@@ -147,7 +173,6 @@ export function ChatInterface() {
           summary: adaptedResponse,
         });
       }
-
     } catch (error) {
       console.error("Error chatting with buddy:", error);
       toast({
@@ -156,14 +181,13 @@ export function ChatInterface() {
         description:
           "Er is iets misgegaan bij het praten met Broos. Probeer het opnieuw.",
       });
-      // Optionally remove the user's message if the call fails
-      setMessages(prev => prev.slice(0, -1));
+      // We don't remove the user's message anymore, as it's already saved.
     } finally {
       setIsLoading(false);
     }
   };
-  
-  if (!userProfile) {
+
+  if (!userProfile || messagesLoading) {
     return (
       <div className="flex-grow flex items-center justify-center">
         <Spinner />
@@ -175,19 +199,21 @@ export function ChatInterface() {
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-grow" ref={scrollAreaRef}>
         <div className="px-4">
-          {messages.map((message) => (
+          {messages && messages.map((message) => (
             <ChatMessage key={message.id} message={message} />
           ))}
           {isLoading && (
             <div className="flex items-start gap-3 my-4 justify-start">
-               <Avatar className="h-10 w-10 border-2 border-primary">
+              <Avatar className="h-10 w-10 border-2 border-primary">
                 <AvatarFallback>
                   <Logo size="normal" />
                 </AvatarFallback>
               </Avatar>
               <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
                 <Spinner size="small" />
-                <span className="text-muted-foreground italic">Broos denkt na...</span>
+                <span className="text-muted-foreground italic">
+                  Broos denkt na...
+                </span>
               </div>
             </div>
           )}
@@ -203,7 +229,11 @@ export function ChatInterface() {
             autoComplete="off"
             disabled={isLoading}
           />
-          <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isLoading || !input.trim()}
+          >
             <SendHorizonal className="h-5 w-5" />
           </Button>
         </form>

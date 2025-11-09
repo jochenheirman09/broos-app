@@ -7,6 +7,7 @@
  * Data Structure:
  * - /users/{userId}: Stores private user data, including role, email verification status, and associated club ID (clubId).
  * - /users/{userId}/wellnessScores/{scoreId}: Stores daily wellness scores for a user.
+ * - /users/{userId}/chats/{chatId}**: Stores chat sessions and messages.
  * - /clubs/{clubId}: Stores club data, with a 1:1 relationship to a user who is responsible for the club.
  * - /clubs/{clubId}/teams/{teamId}: Stores team data as a subcollection of a club.
  *
@@ -17,7 +18,7 @@
  * - A responsible user can only create a club if they don't already have one.
  * - The owner of a club can manage teams within that club.
  * - Any signed-in user can query across all teams to find one by invitation code.
- * - A user can only read and write their own wellness scores.
+ * - A user can only read and write their own wellness scores, chats, and messages.
  *
  * Denormalization for Authorization:
  * - The `User` document contains the `clubId`, allowing rules on both `/users/{userId}` and `/clubs/{clubId}` to make authorization decisions without additional reads.
@@ -55,6 +56,22 @@ service cloud.firestore {
        */
       match /wellnessScores/{scoreId} {
         allow read, write: if isSignedIn() && isOwner(userId);
+      }
+      
+      /**
+       * @description Enforces access control for user's chat data.
+       * @path /users/{userId}/chats/{chatId}
+       */
+      match /chats/{chatId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+        
+        /**
+         * @description Enforces access control for messages within a chat.
+         * @path /users/{userId}/chats/{chatId}/messages/{messageId}
+         */
+        match /messages/{messageId} {
+          allow read, write: if isSignedIn() && isOwner(userId);
+        }
       }
     }
 

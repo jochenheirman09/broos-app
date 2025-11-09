@@ -26,7 +26,7 @@ export interface Team {
 }
 
 export interface WellnessScore {
-  id?: string;
+  id: string; // YYYY-MM-DD
   date: string; // YYYY-MM-DD
   mood?: number;
   stress?: number;
@@ -41,11 +41,20 @@ export interface WellnessScore {
   freeText?: string;
   shareWithStaff?: boolean;
   summary?: string; // AI generated summary for the day
+  updatedAt?: any; // Firestore ServerTimestamp
+}
+
+export interface Chat {
+  id: string; // YYYY-MM-DD
+  userId: string;
+  summary: string;
+  date: string;
+  updatedAt: any; // Firestore ServerTimestamp
 }
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp: any; // Firestore ServerTimestamp
 }
