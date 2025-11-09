@@ -68,6 +68,11 @@ function Calendar({
           const { fromDate, toDate, fromMonth, toMonth, fromYear, toYear } =
             useDayPicker()
           const { goToMonth, month } = useNavigation()
+
+          if (!month) {
+            return null
+          }
+
           if (props.name === "months") {
             const months = fromMonth
               ? Array.from({ length: toMonth!.getMonth() - fromMonth.getMonth() + 1 }).map(
