@@ -35,14 +35,22 @@ import { Spinner } from "../ui/spinner";
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
 
-const formSchema = z.object({
-  name: z.string().min(2, { message: "Naam moet minstens 2 tekens bevatten." }),
-  email: z.string().email({ message: "Voer een geldig e-mailadres in." }),
-  password: z
-    .string()
-    .min(6, { message: "Wachtwoord moet minstens 6 tekens bevatten." }),
-  role: z.enum(roles, { required_error: "Selecteer een rol." }),
-});
+const formSchema = z
+  .object({
+    name: z
+      .string()
+      .min(2, { message: "Naam moet minstens 2 tekens bevatten." }),
+    email: z.string().email({ message: "Voer een geldig e-mailadres in." }),
+    password: z
+      .string()
+      .min(6, { message: "Wachtwoord moet minstens 6 tekens bevatten." }),
+    confirmPassword: z.string(),
+    role: z.enum(roles, { required_error: "Selecteer een rol." }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Wachtwoorden komen niet overeen.",
+    path: ["confirmPassword"],
+  });
 
 export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +68,7 @@ export function RegisterForm() {
       name: "",
       email: "",
       password: "",
+      confirmPassword: "",
       role: selectedRole || undefined,
     },
   });
@@ -155,6 +164,19 @@ export function RegisterForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Wachtwoord</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="••••••••" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Herhaal wachtwoord</FormLabel>
               <FormControl>
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
