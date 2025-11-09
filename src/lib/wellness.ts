@@ -3,7 +3,9 @@ import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, doc, setDoc, serverTimestamp, addDoc } from "firebase/firestore";
-import type { WellnessScore, Alert } from "./types";
+import type { WellnessScore } from "./types";
+import type { Alert as AlertType } from "@/ai/types";
+
 
 interface SaveWellnessScoreParams {
   db: ReturnType<typeof useFirestore>;
@@ -47,7 +49,7 @@ export async function saveWellnessScores({
 interface SaveAlertParams {
     db: ReturnType<typeof useFirestore>;
     userId: string;
-    alert: Alert;
+    alert: AlertType;
 }
 
 export async function saveAlert({ db, userId, alert }: SaveAlertParams) {
