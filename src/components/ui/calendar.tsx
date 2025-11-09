@@ -2,10 +2,17 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayPicker, useDayPicker, useNavigation } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./select"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -23,7 +30,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption_label: "hidden", // Hide the default label
         caption_dropdowns: "flex justify-center gap-2",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
@@ -57,6 +64,77 @@ function Calendar({
       components={{
         IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
         IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        Dropdown: (props) => {
+          const { fromDate, toDate, fromMonth, toMonth, fromYear, toYear } =
+            useDayPicker()
+          const { goToMonth, month } = useNavigation()
+          if (props.name === "months") {
+            const months = fromMonth
+              ? Array.from({ length: toMonth!.getMonth() - fromMonth.getMonth() + 1 }).map(
+                  (_, i) => new Date(fromMonth.getFullYear(), fromMonth.getMonth() + i, 1)
+                )
+              : Array.from({ length: 12 }).map(
+                  (_, i) => new Date(new Date().getFullYear(), i, 1)
+                )
+            return (
+              <Select
+                onValueChange={(newValue) => {
+                  const newDate = new Date(month)
+                  newDate.setMonth(parseInt(newValue))
+                  goToMonth(newDate)
+                }}
+                value={month.getMonth().toString()}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder={month.toLocaleString("default", { month: "long" })} />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((month) => (
+                    <SelectItem
+                      key={month.getMonth()}
+                      value={month.getMonth().toString()}
+                    >
+                      {month.toLocaleString("default", { month: "long" })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )
+          } else if (props.name === "years") {
+            const earliestYear =
+              fromYear || fromMonth?.getFullYear() || fromDate?.getFullYear()
+            const latestYear =
+              toYear || toMonth?.getFullYear() || toDate?.getFullYear()
+            let years: number[] = []
+            if (earliestYear && latestYear) {
+              for (let i = latestYear; i >= earliestYear; i--) {
+                years.push(i)
+              }
+            }
+            return (
+              <Select
+                onValueChange={(newValue) => {
+                  const newDate = new Date(month)
+                  newDate.setFullYear(parseInt(newValue))
+                  goToMonth(newDate)
+                }}
+                value={month.getFullYear().toString()}
+              >
+                <SelectTrigger className="w-[80px]">
+                  <SelectValue placeholder={month.getFullYear()} />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )
+          }
+          return null
+        },
       }}
       {...props}
     />
