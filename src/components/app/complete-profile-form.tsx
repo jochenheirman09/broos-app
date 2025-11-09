@@ -13,7 +13,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
 import { Spinner } from "../ui/spinner";
@@ -40,7 +40,7 @@ const formSchema = z.object({
 });
 
 export function CompleteProfileForm() {
-  const { user, userProfile } = useUser();
+  const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const db = useFirestore();
@@ -135,6 +135,9 @@ export function CompleteProfileForm() {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
+                    captionLayout="dropdown-buttons"
+                    fromYear={1950}
+                    toYear={new Date().getFullYear()}
                     selected={field.value}
                     onSelect={field.onChange}
                     disabled={(date) =>
