@@ -77,7 +77,7 @@ service cloud.firestore {
     
     function isClubOwner(clubId) {
         let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-        return userDoc.data.clubId == clubId || resource.data.ownerId == request.auth.uid;
+        return userDoc.data.clubId == clubId;
     }
 
     function isExistingOwner(userId) {
