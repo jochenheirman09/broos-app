@@ -45,8 +45,7 @@ service cloud.firestore {
      * @path /teams/{teamId}
      */
     match /{path=**}/teams/{teamId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
     }
 
     /**
