@@ -1,15 +1,14 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState, useEffect } from "react";
+import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClub } from "@/actions/club";
 import { useUser } from "@/context/user-context";
-import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { Card, CardContent, CardFooter, CardHeader } from "../ui/card";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -24,7 +23,7 @@ function SubmitButton() {
 export function CreateClubForm() {
   const { user } = useUser();
   const { toast } = useToast();
-  const [state, formAction] = useFormState(createClub, { error: undefined });
+  const [state, formAction] = useActionState(createClub, { error: undefined });
   
   useEffect(() => {
     if (state?.error) {
