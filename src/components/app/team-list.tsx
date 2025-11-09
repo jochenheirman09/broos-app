@@ -1,7 +1,7 @@
 "use client";
 
 import { useFirestore, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, updateDoc } from "firebase/firestore";
+import { collection, query, updateDoc, orderBy } from "firebase/firestore";
 import type { Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
@@ -159,7 +159,7 @@ export function TeamList({
   const teamsQuery = useMemoFirebase(
     () =>
       firestore
-        ? query(collection(firestore, "clubs", clubId, "teams"))
+        ? query(collection(firestore, "clubs", clubId, "teams"), orderBy("name"))
         : null,
     [firestore, clubId]
   );
