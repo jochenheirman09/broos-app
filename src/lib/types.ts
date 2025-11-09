@@ -24,3 +24,28 @@ export interface Team {
   clubId: string;
   invitationCode?: string;
 }
+
+export interface WellnessScore {
+  id?: string;
+  date: string; // YYYY-MM-DD
+  mood?: number;
+  stress?: number;
+  sleep?: number;
+  motivation?: number;
+  rest?: number;
+  familyLife?: number;
+  school?: number;
+  hobbys?: number;
+  food?: number;
+  injury?: boolean;
+  freeText?: string;
+  shareWithStaff?: boolean;
+  summary?: string; // AI generated summary for the day
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}

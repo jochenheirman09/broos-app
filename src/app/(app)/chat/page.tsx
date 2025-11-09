@@ -1,5 +1,6 @@
 "use client";
 
+import { ChatInterface } from "@/components/app/chat-interface";
 import {
   Card,
   CardContent,
@@ -12,20 +13,18 @@ import { MessageSquare } from "lucide-react";
 export default function ChatPage() {
   return (
     <div className="container mx-auto py-8">
-      <Card>
+      <Card className="h-[calc(100vh-10rem)] flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center text-2xl">
             <MessageSquare className="h-6 w-6 mr-3" />
-            Chat met je Buddy
+            Chat met Broos
           </CardTitle>
           <CardDescription>
-            Hier kun je binnenkort chatten met je AI-buddy.
+            Begin hier je gesprek met je persoonlijke AI-buddy.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="h-96 border rounded-lg flex items-center justify-center bg-muted/20">
-            <p className="text-muted-foreground">Chat-interface komt hier...</p>
-          </div>
+        <CardContent className="flex-grow flex flex-col overflow-hidden">
+          <ChatInterface />
         </CardContent>
       </Card>
     </div>
