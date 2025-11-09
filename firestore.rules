@@ -12,7 +12,7 @@
  * - User listing is denied to prevent information leakage.
  * - A user can create their own user document upon registration.
  * - Club data access is controlled by user roles (only 'responsible' users can manage clubs).
- * - To simplify creation, any authenticated user can create a club. The UI should restrict this to 'responsible' users.
+ * - A responsible user can only create a club if they don't already have one.
  *
  * Denormalization for Authorization:
  * - The `User` document contains the `clubId`, allowing rules on both `/users/{userId}` and `/clubs/{clubId}` to make authorization decisions without additional reads.
@@ -27,42 +27,26 @@ service cloud.firestore {
     /**
      * @description Enforces access control for user documents.
      * @path /users/{userId}
-     * @allow (get) User with ID 'user123' can read their own document.
-     * @deny (get) User with ID 'user456' cannot read document of 'user123'.
-     * @allow (list) User with ID 'user123' can list their own documents.
-     * @deny (list) User with ID 'user456' cannot list documents of 'user123'.
-     * @allow (create) A new user can create their own user document.
-     * @allow (update) User with ID 'user123' can update their own document.
-     * @deny (update) User with ID 'user456' cannot update document of 'user123'.
-     * @allow (delete) User with ID 'user123' can delete their own document.
-     * @deny (delete) User with ID 'user456' cannot delete document of 'user123'.
-     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
       allow get: if isSignedIn() && isOwner(userId);
       allow list: if false;
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId) && isOwner(userId);
+      // Allow responsible users to update the clubId on their own profile
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId);
     }
 
     /**
      * @description Enforces access control for club documents. Only responsible users can manage clubs.
      * @path /clubs/{clubId}
-     * @allow (get) Any signed-in user can read a club document.
-     * @deny (get) Anonymous user cannot read a club document.
-     * @allow (list) Any signed-in user can list club documents.
-     * @deny (list) Anonymous user cannot list club documents.
-     * @allow (create) Any signed-in user can create a club.
-     * @allow (update) User with 'responsible' role can update a club document they own.
-     * @deny (update) User without 'responsible' role or who does not own the club cannot update a club document.
-     * @allow (delete) User with 'responsible' role can delete a club document they own.
-     * @deny (delete) User without 'responsible' role or who does not own the club cannot delete a club document.
-     * @principle Restricts club management to 'responsible' users and enforces one club per user.
      */
     match /clubs/{clubId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // Allow creation only by responsible users who don't have a club yet
+      allow create: if canCreateClub(clubId);
+      // Allow updates and deletes only by the responsible user who owns the club
       allow update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
     }
 
@@ -73,18 +57,34 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    function isClubOwner(clubId) {
-        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-        return userDoc.data.clubId == clubId;
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isExistingOwner(userId) {
-        return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+    function isResponsible() {
+        return getUserData().role == 'responsible';
+    }
+
+    function userHasClub() {
+      return 'clubId' in getUserData();
     }
     
-    function isResponsible() {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
+    // Check ownership for existing clubs
+    function isClubOwner(clubId) {
+      return getUserData().clubId == clubId;
+    }
+
+    // Check ownership for new clubs
+    function isCreatingClubAsOwner(clubId) {
+      return request.resource.data.ownerId == request.auth.uid;
+    }
+    
+    function canCreateClub(clubId) {
+      return isSignedIn() 
+        && isResponsible() 
+        && !userHasClub()
+        && isCreatingClubAsOwner(clubId);
     }
   }
 }
