@@ -1,15 +1,18 @@
 "use client";
 
-import { getFirestore, addDoc, collection, doc, updateDoc, writeBatch } from "firebase/firestore";
-import { getApp, getApps, initializeApp } from "firebase/app";
-import { firebaseConfig } from "@/lib/firebase";
+import { useFirestore } from "@/firebase";
+import { collection, doc, writeBatch } from "firebase/firestore";
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-
-export async function createClub(userId: string, clubName: string) {
+export async function createClub(
+  db: ReturnType<typeof useFirestore>,
+  userId: string,
+  clubName: string
+) {
   if (!userId) {
     throw new Error("User ID is required to create a club.");
+  }
+  if (!db) {
+    throw new Error("Firestore is not available.");
   }
 
   const batch = writeBatch(db);

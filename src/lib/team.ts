@@ -1,16 +1,11 @@
 "use client";
+import { useFirestore } from "@/firebase";
 import {
-  getFirestore,
   addDoc,
   collection,
   doc,
   updateDoc,
 } from "firebase/firestore";
-import { getApp, getApps, initializeApp } from "firebase/app";
-import { firebaseConfig } from "@/lib/firebase";
-
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
 
 // Function to generate a random 6-character alphanumeric code
 const generateCode = () => {
@@ -23,16 +18,20 @@ const generateCode = () => {
 };
 
 interface CreateTeamParams {
+  db: ReturnType<typeof useFirestore>;
   clubId: string;
   teamName: string;
 }
 
-export async function createTeam({ clubId, teamName }: CreateTeamParams) {
+export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
   if (!clubId) {
     throw new Error("Club ID is required to create a team.");
   }
   if (!teamName) {
     throw new Error("Team name is required.");
+  }
+  if (!db) {
+    throw new Error("Firestore is not available");
   }
 
   const teamRef = await addDoc(collection(db, "clubs", clubId, "teams"), {
@@ -44,14 +43,20 @@ export async function createTeam({ clubId, teamName }: CreateTeamParams) {
   await updateDoc(teamRef, {
     id: teamRef.id,
   });
+
+  return teamRef.id;
 }
 
 export async function generateTeamInvitationCode(
+  db: ReturnType<typeof useFirestore>,
   clubId: string,
   teamId: string
 ) {
   if (!clubId || !teamId) {
     throw new Error("Club ID and Team ID are required.");
+  }
+  if (!db) {
+    throw new Error("Firestore is not available");
   }
 
   const invitationCode = generateCode();

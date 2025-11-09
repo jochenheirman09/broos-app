@@ -9,11 +9,13 @@ import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { createClub } from "@/lib/club";
+import { useFirestore } from "@/firebase";
 
 export function CreateClubForm() {
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const firestore = useFirestore();
   const [clubName, setClubName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,12 +41,13 @@ export function CreateClubForm() {
     setIsLoading(true);
 
     try {
-      await createClub(user.uid, clubName);
+      await createClub(firestore, user.uid, clubName);
       toast({
         title: "Success!",
         description: "Your club has been created.",
       });
-      router.push("/dashboard");
+      // The user context will update automatically and redirect
+      // so we don't need to force a router.push here.
     } catch (error: any) {
       console.error("Error creating club:", error);
       toast({

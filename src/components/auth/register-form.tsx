@@ -61,6 +61,14 @@ export function RegisterForm() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!db || !auth) {
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: "Firebase is not available.",
+      });
+      return;
+    }
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(

@@ -28,6 +28,7 @@ function TeamCard({
   onCodeGenerated: () => void;
 }) {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [isGenerating, setIsGenerating] = useState(false);
 
   const copyToClipboard = (code: string) => {
@@ -41,7 +42,7 @@ function TeamCard({
   const handleGenerateCode = async () => {
     setIsGenerating(true);
     try {
-      await generateTeamInvitationCode(clubId, team.id);
+      await generateTeamInvitationCode(firestore, clubId, team.id);
       toast({
         title: "Code Generated!",
         description: `A new invitation code has been generated for ${team.name}.`,

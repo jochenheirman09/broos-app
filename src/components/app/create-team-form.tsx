@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { createTeam } from "@/lib/team";
+import { useFirestore } from "@/firebase";
 
 export function CreateTeamForm({
   clubId,
@@ -16,6 +17,7 @@ export function CreateTeamForm({
   onTeamCreated: () => void;
 }) {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [teamName, setTeamName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,6 +36,7 @@ export function CreateTeamForm({
 
     try {
       await createTeam({
+        db: firestore,
         clubId,
         teamName,
       });
