@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AppHeader } from "@/components/app/header";
 import { Spinner } from "@/components/ui/spinner";
-import { ThemeProvider } from "@/components/theme-provider";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useUser();
@@ -30,18 +29,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <div className="flex min-h-screen flex-col bg-background">
-        <AppHeader />
-        <main className="flex-1 p-4">
-          {children}
-        </main>
-      </div>
-    </ThemeProvider>
+    <div className="flex min-h-screen flex-col bg-background">
+      <AppHeader />
+      <main className="flex-1 p-4">
+        {children}
+      </main>
+    </div>
   );
 }

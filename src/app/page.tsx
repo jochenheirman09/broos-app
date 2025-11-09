@@ -16,7 +16,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
-import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const roles = [
@@ -68,53 +67,46 @@ export default function RoleSelectionPage() {
   }
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <main className="relative flex min-h-screen flex-col items-center justify-center p-4 bg-background">
-        <div className="absolute top-4 right-4">
-          <ThemeToggle />
+    <main className="relative flex min-h-screen flex-col items-center justify-center p-4 bg-background">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-md">
+        <div className="flex flex-col items-center justify-center mb-8 gap-2">
+          <Logo size="large" />
+          <Wordmark size="large" />
         </div>
-        <div className="w-full max-w-md">
-          <div className="flex flex-col items-center justify-center mb-8 gap-2">
-            <Logo size="large" />
-            <Wordmark size="large" />
-          </div>
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle>Welkom! Wie ben jij?</CardTitle>
-              <CardDescription>
-                Selecteer je rol om door te gaan.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {roles.map(({ role, label, icon }) => (
-                <Link key={role} href={`/register?role=${role}`} passHref>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-base !py-6 border-0 btn-gradient-border hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <span className="text-primary">{icon}</span>
-                    <span>{label}</span>
-                  </Button>
-                </Link>
-              ))}
-              <div className="mt-4 text-center text-sm text-muted-foreground">
-                Heb je al een account?{" "}
-                <Link
-                  href="/login"
-                  className="font-semibold text-primary hover:underline"
+        <Card>
+          <CardHeader className="text-center">
+            <CardTitle>Welkom! Wie ben jij?</CardTitle>
+            <CardDescription>
+              Selecteer je rol om door te gaan.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {roles.map(({ role, label, icon }) => (
+              <Link key={role} href={`/register?role=${role}`} passHref>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-base !py-6 border-0 btn-gradient-border hover:bg-accent hover:text-accent-foreground"
                 >
-                  Log in
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </ThemeProvider>
+                  <span className="text-primary">{icon}</span>
+                  <span>{label}</span>
+                </Button>
+              </Link>
+            ))}
+            <div className="mt-4 text-center text-sm text-muted-foreground">
+              Heb je al een account?{" "}
+              <Link
+                href="/login"
+                className="font-semibold text-primary hover:underline"
+              >
+                Log in
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 }
