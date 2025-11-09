@@ -38,6 +38,14 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOwner(userId);
       allow delete: if isSignedIn() && isOwner(userId);
     }
+    
+    /**
+     * @description Allows signed-in users to query across all teams to find one by invitation code.
+     * @path /teams/{teamId}
+     */
+    match /teams/{teamId} {
+      allow list: if isSignedIn();
+    }
 
     /**
      * @description Enforces access control for club and team documents.
@@ -55,7 +63,7 @@ service cloud.firestore {
        * @path /clubs/{clubId}/teams/{teamId}
        */
       match /teams/{teamId} {
-        allow get, list: if isSignedIn();
+        allow get: if isSignedIn();
         // Allow team management only by the club owner.
         allow create, update, delete: if isClubOwner(clubId);
       }
