@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { createClub } from "@/lib/club"; // Updated import
+import { createClub } from "@/lib/club";
 
 export function CreateClubForm() {
   const { user } = useUser();
@@ -59,7 +59,7 @@ export function CreateClubForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="name">Club Name</Label>
           <Input
@@ -71,7 +71,7 @@ export function CreateClubForm() {
             onChange={(e) => setClubName(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full" disabled={isLoading} size="lg">
           {isLoading && <Spinner size="small" className="mr-2" />}
           {isLoading ? "Creating Club..." : "Create Club"}
         </Button>

@@ -1,4 +1,4 @@
-import type {Config} from 'tailwindcss';
+import type { Config } from 'tailwindcss';
 
 export default {
   darkMode: ['class'],
@@ -55,21 +55,19 @@ export default {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
-        sidebar: {
-          DEFAULT: 'hsl(var(--sidebar-background))',
-          foreground: 'hsl(var(--sidebar-foreground))',
-          primary: 'hsl(var(--sidebar-primary))',
-          'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-          accent: 'hsl(var(--sidebar-accent))',
-          'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-          border: 'hsl(var(--sidebar-border))',
-          ring: 'hsl(var(--sidebar-ring))',
-        },
       },
       borderRadius: {
         lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        md: 'calc(var(--radius) - 4px)',
+        sm: 'calc(var(--radius) - 8px)',
+        xl: 'calc(var(--radius) + 4px)',
+        '2xl': 'calc(var(--radius) + 8px)',
+      },
+      boxShadow: {
+        'clay-card': '5px 5px 10px hsl(var(--background) / 0.7), -5px -5px 10px hsl(var(--card) / 1.5)',
+        'clay-btn': '3px 3px 6px hsl(var(--background) / 0.7), -3px -3px 6px hsl(var(--card) / 1.5)',
+        'clay-outline-btn': 'inset 0 0 0 2px hsl(var(--border)), 3px 3px 6px hsl(var(--background) / 0.7), -3px -3px 6px hsl(var(--card) / 1.5)',
+        'clay-inset': 'inset 2px 2px 5px hsl(var(--background) / 0.9), inset -2px -2px 5px hsl(var(--card) / 1.2)',
       },
       keyframes: {
         'accordion-down': {

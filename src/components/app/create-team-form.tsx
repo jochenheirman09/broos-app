@@ -68,7 +68,7 @@ export function CreateTeamForm({
           onChange={(e) => setTeamName(e.target.value)}
         />
       </div>
-      <Button type="submit" disabled={isLoading}>
+      <Button type="submit" disabled={isLoading} variant="secondary">
         {isLoading && <Spinner size="small" className="mr-2" />}
         {isLoading ? "Creating Team..." : "Create Team"}
       </Button>

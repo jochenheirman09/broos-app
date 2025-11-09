@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { sendEmailVerification } from "firebase/auth";
 import { MailCheck } from "lucide-react";
 import { Spinner } from "../ui/spinner";
+import { Card, CardContent } from "../ui/card";
 
 export function VerifyEmailNotice() {
   const { user, logout } = useUser();
@@ -55,22 +56,26 @@ export function VerifyEmailNotice() {
   };
 
   return (
-    <div className="text-center">
-      <MailCheck className="mx-auto h-12 w-12 text-primary" />
-      <p className="mt-4 text-muted-foreground">
-        A verification link has been sent to{" "}
-        <span className="font-semibold text-foreground">{user?.email}</span>.
-        Please click the link to verify your account.
-      </p>
-      <div className="mt-6 flex flex-col gap-4">
-        <Button onClick={handleResend} disabled={isSending}>
-          {isSending && <Spinner size="small" className="mr-2" />}
-          {isSending ? "Sending..." : "Resend Verification Email"}
-        </Button>
-        <Button variant="outline" onClick={logout}>
-          Log out
-        </Button>
-      </div>
-    </div>
+    <Card>
+      <CardContent>
+        <div className="text-center">
+          <MailCheck className="mx-auto h-16 w-16 text-primary" />
+          <p className="mt-4 text-muted-foreground">
+            A verification link has been sent to{" "}
+            <span className="font-semibold text-foreground">{user?.email}</span>
+            . Please click the link to verify your account.
+          </p>
+          <div className="mt-6 flex flex-col gap-4">
+            <Button onClick={handleResend} disabled={isSending} size="lg">
+              {isSending && <Spinner size="small" className="mr-2" />}
+              {isSending ? "Sending..." : "Resend Verification Email"}
+            </Button>
+            <Button variant="outline" onClick={logout} size="lg">
+              Log out
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

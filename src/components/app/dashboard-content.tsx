@@ -41,31 +41,41 @@ function ClubInfo({ clubId }: { clubId: string }) {
   }, []);
 
   if (isLoading) {
-    return <Spinner />;
+    return (
+      <Card>
+        <CardContent className="flex justify-center items-center p-8">
+          <Spinner />
+        </CardContent>
+      </Card>
+    );
   }
 
   if (!club) {
     return (
-      <p className="text-destructive">
-        Error: Club data not found for your account.
-      </p>
+      <Card>
+        <CardContent>
+          <p className="text-destructive">
+            Error: Club data not found for your account.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <Card className="shadow-lg">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center text-2xl font-bold">
-          <Building className="h-6 w-6 mr-3 text-primary" />
+        <CardTitle className="flex items-center text-3xl font-bold">
+          <Building className="h-8 w-8 mr-3 text-primary" />
           {club.name}
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-lg">
           Welcome to your club dashboard. Manage your teams from here.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         <div>
-          <h3 className="text-lg font-semibold mb-2">Teams</h3>
+          <h3 className="text-xl font-semibold mb-4">Your Teams</h3>
           <TeamList
             clubId={club.id}
             key={refreshKey}
@@ -74,7 +84,7 @@ function ClubInfo({ clubId }: { clubId: string }) {
         </div>
         <Separator />
         <div>
-          <h3 className="text-lg font-semibold mb-2">Add a New Team</h3>
+          <h3 className="text-xl font-semibold mb-4">Add a New Team</h3>
           <CreateTeamForm clubId={club.id} onTeamCreated={handleTeamChange} />
         </div>
       </CardContent>
@@ -93,10 +103,10 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-8">
-      <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-2xl font-bold">Welcome, {name}!</CardTitle>
-          <div className="flex items-center text-muted-foreground bg-muted px-3 py-1 rounded-full text-sm font-medium">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle className="text-3xl font-bold">Welcome, {name}!</CardTitle>
+          <div className="flex items-center bg-secondary text-secondary-foreground px-4 py-2 rounded-full text-base font-medium shadow-clay-inset">
             {roleIcons[role]}
             <span className="capitalize">{role}</span>
           </div>
@@ -111,21 +121,24 @@ export function DashboardContent() {
       {role === "responsible" && clubId && <ClubInfo clubId={clubId} />}
 
       {role === "responsible" && !clubId && (
-        <Card className="border-accent bg-accent/10">
+        <Card className="bg-accent/20 border-accent">
           <CardHeader>
-            <CardTitle className="flex items-center text-accent-foreground/80">
-              <Building className="h-6 w-6 mr-3 text-accent" />
+            <CardTitle className="flex items-center text-2xl">
+              <Building className="h-7 w-7 mr-3 text-accent-foreground" />
               Create Your Club
             </CardTitle>
-            <CardDescription className="text-accent-foreground/70">
+            <CardDescription className="text-accent-foreground/80">
               To continue using the app, you need to create a club for your
               account.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/create-club">
-              <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <PlusCircle className="mr-2 h-4 w-4" />
+              <Button
+                variant="accent"
+                size="lg"
+              >
+                <PlusCircle className="mr-2 h-5 w-5" />
                 Create Club
               </Button>
             </Link>

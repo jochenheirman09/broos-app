@@ -65,7 +65,7 @@ function TeamRow({
       <TableCell>
         {team.invitationCode ? (
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
+            <span className="font-mono text-sm bg-muted px-3 py-1.5 rounded-lg shadow-clay-inset">
               {team.invitationCode}
             </span>
             <Button
@@ -118,7 +118,7 @@ export function TeamList({
 
   if (!teams || teams.length === 0) {
     return (
-      <Alert>
+      <Alert className="bg-background">
         <Users className="h-4 w-4" />
         <AlertTitle>No Teams Yet</AlertTitle>
         <AlertDescription>
@@ -129,28 +129,30 @@ export function TeamList({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Team Name</TableHead>
-          <TableHead>
-            <div className="flex items-center">
-              <KeyRound className="h-4 w-4 mr-2" />
-              Invitation Code
-            </div>
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {teams.map((team) => (
-          <TeamRow
-            key={team.id}
-            clubId={clubId}
-            team={team}
-            onCodeGenerated={onCodeGenerated}
-          />
-        ))}
-      </TableBody>
-    </Table>
+    <div className="rounded-2xl border bg-card shadow-clay-card overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px]">Team Name</TableHead>
+            <TableHead>
+              <div className="flex items-center">
+                <KeyRound className="h-4 w-4 mr-2" />
+                Invitation Code
+              </div>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {teams.map((team) => (
+            <TeamRow
+              key={team.id}
+              clubId={clubId}
+              team={team}
+              onCodeGenerated={onCodeGenerated}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
