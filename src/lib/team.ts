@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 
@@ -36,15 +37,16 @@ export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
   }
 
   const teamCollectionRef = collection(db, "clubs", clubId, "teams");
-  const teamRef = doc(teamCollectionRef);
+  const newTeamRef = doc(teamCollectionRef); // Creates a ref with a new auto-generated ID
 
-  await updateDoc(teamRef, {
-    id: teamRef.id,
+  // Use setDoc instead of updateDoc for a new document
+  await setDoc(newTeamRef, {
+    id: newTeamRef.id,
     name: teamName,
     clubId: clubId,
   });
 
-  return teamRef.id;
+  return newTeamRef.id;
 }
 
 export async function generateTeamInvitationCode(

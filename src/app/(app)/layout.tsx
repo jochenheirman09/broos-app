@@ -12,8 +12,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isProfileIncomplete =
     userProfile &&
-    (userProfile.role === "player" || userProfile.role === "staff") &&
-    !userProfile.teamId;
+    ((userProfile.role === "player" &&
+      (!userProfile.teamId || !userProfile.birthDate)) ||
+      (userProfile.role === "staff" && !userProfile.teamId));
+
 
   useEffect(() => {
     if (loading) return;

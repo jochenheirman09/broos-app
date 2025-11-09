@@ -92,6 +92,24 @@ function ClubInfo({ clubId }: { clubId: string }) {
   );
 }
 
+function PlayerDashboard() {
+  const { userProfile } = useUser();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Speler Dashboard</CardTitle>
+        <CardDescription>Welkom op je persoonlijke dashboard.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p>
+          Binnenkort beschikbaar: je welzijnsoverzicht en chat met je buddy!
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+
 export function DashboardContent() {
   const { userProfile } = useUser();
 
@@ -100,6 +118,10 @@ export function DashboardContent() {
   }
 
   const { name, role, clubId } = userProfile;
+  
+  if (role === 'player') {
+    return <PlayerDashboard />;
+  }
 
   return (
     <div className="space-y-6">

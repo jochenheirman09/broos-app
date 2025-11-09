@@ -26,12 +26,17 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "../ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const formSchema = z.object({
-  name: z.string().min(2, { message: "Naam is vereist." }),
-  teamCode: z
-    .string()
-    .min(1, { message: "Teamcode is vereist." }),
+  birthDate: z.date({
+    required_error: "Geboortedatum is vereist.",
+  }),
+  teamCode: z.string().min(1, { message: "Teamcode is vereist." }),
 });
 
 export function CompleteProfileForm() {
@@ -43,17 +48,9 @@ export function CompleteProfileForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
       teamCode: "",
     },
   });
-
-  useEffect(() => {
-    if (userProfile?.name) {
-      form.setValue("name", userProfile.name);
-    }
-  }, [userProfile, form]);
-
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !db) return;
@@ -71,7 +68,8 @@ export function CompleteProfileForm() {
         toast({
           variant: "destructive",
           title: "Ongeldige Code",
-          description: "Team niet gevonden. Controleer de code en probeer opnieuw.",
+          description:
+            "Team niet gevonden. Controleer de code en probeer opnieuw.",
         });
         setIsLoading(false);
         return;
@@ -83,7 +81,7 @@ export function CompleteProfileForm() {
       // Update user profile
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
-        name: values.name,
+        birthDate: values.birthDate.toISOString().split("T")[0], // format as YYYY-MM-DD
         teamId: teamId,
       });
 
@@ -111,13 +109,41 @@ export function CompleteProfileForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="name"
+          name="birthDate"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Volledige Naam</FormLabel>
-              <FormControl>
-                <Input placeholder="Jan Janssen" {...field} />
-              </FormControl>
+            <FormItem className="flex flex-col">
+              <FormLabel>Geboortedatum</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full pl-3 text-left font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value ? (
+                        format(field.value, "PPP")
+                      ) : (
+                        <span>Kies een datum</span>
+                      )}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    disabled={(date) =>
+                      date > new Date() || date < new Date("1900-01-01")
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <FormMessage />
             </FormItem>
           )}
