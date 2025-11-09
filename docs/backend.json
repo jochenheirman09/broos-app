@@ -138,7 +138,7 @@
         "summary": { "type": "string", "description": "An AI-generated summary of the conversation for that day." },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "date"]
+      "required": ["id", "date", "updatedAt"]
     },
     "Chat": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -197,6 +197,30 @@
         }
       },
       "required": ["id", "role", "content", "timestamp"]
+    },
+    "Alert": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Alert",
+      "type": "object",
+      "description": "Represents an alert triggered by the AI based on a user's message.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the alert." },
+        "userId": { "type": "string", "description": "The ID of the user who triggered the alert." },
+        "date": { "type": "string", "format": "date", "description": "The date the alert was triggered." },
+        "alertType": {
+          "type": "string",
+          "enum": ["Mental Health", "Aggression", "Substance Abuse", "Extreme Negativity"],
+          "description": "The category of the alert."
+        },
+        "triggeringMessage": { "type": "string", "description": "The message that triggered the alert." },
+        "status": {
+          "type": "string",
+          "enum": ["new", "acknowledged", "resolved"],
+          "description": "The status of the alert."
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the alert was created." }
+      },
+      "required": ["id", "userId", "date", "alertType", "triggeringMessage", "status", "createdAt"]
     }
   },
   "auth": {
@@ -260,6 +284,18 @@
           ]
         }
       },
+       {
+        "path": "/users/{userId}/alerts/{alertId}",
+        "definition": {
+          "entityName": "Alert",
+          "schema": { "$ref": "#/backend/entities/Alert" },
+          "description": "Stores alerts triggered for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "alertId", "description": "The unique ID of the alert." }
+          ]
+        }
+      },
       {
         "path": "/clubs/{clubId}",
         "definition": {
@@ -297,6 +333,6 @@
         }
       }
     ],
-    "reasoning": "This design prioritizes security and scalability for the RoleVerify application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages and wellness scores are stored in subcollections under the user, ensuring data privacy and easy retrieval."
+    "reasoning": "This design prioritizes security and scalability for the RoleVerify application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages, wellness scores, and alerts are stored in subcollections under the user, ensuring data privacy and easy retrieval."
   }
 }

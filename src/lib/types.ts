@@ -58,3 +58,15 @@ export interface ChatMessage {
   content: string;
   timestamp: any; // Firestore ServerTimestamp
 }
+
+export type WithId<T> = T & { id: string };
+
+export interface Alert {
+  id?: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
+  triggeringMessage: string;
+  status: 'new' | 'acknowledged' | 'resolved';
+  createdAt: any; // Firestore ServerTimestamp
+}

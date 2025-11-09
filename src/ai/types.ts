@@ -28,6 +28,16 @@ export const ScoreSchema = z.object({
   shareWithStaff: z.optional(z.boolean()),
 });
 
+export const AlertSchema = z.object({
+  alertType: z
+    .enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity'])
+    .describe('The category of the detected alert.'),
+  triggeringMessage: z
+    .string()
+    .describe("The user's message that triggered the alert."),
+});
+export type Alert = z.infer<typeof AlertSchema>;
+
 export const BuddyOutputSchema = z.object({
   adaptedResponse: z
     .string()
@@ -37,5 +47,11 @@ export const BuddyOutputSchema = z.object({
   scores: ScoreSchema.describe(
     'The scores generated based on the analysis of the latest user message.'
   ),
+  alerts: z
+    .array(AlertSchema)
+    .optional()
+    .describe(
+      'A list of alerts generated if the user message contains alarming signs.'
+    ),
 });
 export type BuddyOutput = z.infer<typeof BuddyOutputSchema>;

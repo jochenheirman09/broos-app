@@ -4,14 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { chatWithBuddy } from "@/ai/flows/buddy-flow";
-import { saveWellnessScores } from "@/lib/wellness";
+import { saveWellnessScores, saveAlert } from "@/lib/wellness";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SendHorizonal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
+import type { ChatMessage as ChatMessageType, WithId, Alert } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "./logo";
 import { Spinner } from "../ui/spinner";
@@ -99,7 +99,7 @@ export function ChatInterface() {
   // Add initial message if there are no messages for today
   useEffect(() => {
     if (!messagesLoading && messages?.length === 0 && user && userProfile && db) {
-      const welcomeMessage = `Hallo ${userProfile.name}! Ik ben Broos, je persoonlijke buddy. Hoe voel je je vandaag?`;
+      const welcomeMessage = `Hallo ${userProfile.name}! Ik ben Broos, je persoonlijke buddy. Hoe gaat het met je?`;
       addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
         {
@@ -143,7 +143,7 @@ export function ChatInterface() {
         
       const agentResponse = messages && messages.length > 0 ? messages[messages.length - 1].content : '';
 
-      const { adaptedResponse, scores } = await chatWithBuddy({
+      const { adaptedResponse, scores, alerts } = await chatWithBuddy({
         buddyName: "Broos",
         userName: userProfile.name,
         userAge: userProfile.birthDate
@@ -173,6 +173,13 @@ export function ChatInterface() {
           summary: adaptedResponse,
         });
       }
+      
+      if (alerts && alerts.length > 0) {
+        for (const alert of alerts) {
+          await saveAlert({ db, userId: user.uid, alert });
+        }
+      }
+
     } catch (error) {
       console.error("Error chatting with buddy:", error);
       toast({
@@ -181,7 +188,6 @@ export function ChatInterface() {
         description:
           "Er is iets misgegaan bij het praten met Broos. Probeer het opnieuw.",
       });
-      // We don't remove the user's message anymore, as it's already saved.
     } finally {
       setIsLoading(false);
     }

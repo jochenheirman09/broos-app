@@ -2,8 +2,8 @@
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
-import type { WellnessScore } from "./types";
+import { collection, doc, setDoc, serverTimestamp, addDoc } from "firebase/firestore";
+import type { WellnessScore, Alert } from "./types";
 
 interface SaveWellnessScoreParams {
   db: ReturnType<typeof useFirestore>;
@@ -25,6 +25,7 @@ export async function saveWellnessScores({
 
   const dataToSave: Partial<WellnessScore> & { updatedAt: any } = {
     ...scores,
+    id: today,
     date: today,
     summary,
     updatedAt: serverTimestamp(),
@@ -41,4 +42,35 @@ export async function saveWellnessScores({
     // Re-throw to allow caller to handle UI state
     throw permissionError;
   });
+}
+
+interface SaveAlertParams {
+    db: ReturnType<typeof useFirestore>;
+    userId: string;
+    alert: Alert;
+}
+
+export async function saveAlert({ db, userId, alert }: SaveAlertParams) {
+    if (!db || !userId) return;
+
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const alertRef = collection(db, "users", userId, "alerts");
+
+    const dataToSave = {
+        ...alert,
+        userId,
+        date: today,
+        status: 'new',
+        createdAt: serverTimestamp(),
+    };
+
+    return addDoc(alertRef, dataToSave).catch((error) => {
+        const permissionError = new FirestorePermissionError({
+            path: alertRef.path,
+            operation: 'create',
+            requestResourceData: dataToSave,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw permissionError;
+    });
 }
