@@ -13,7 +13,6 @@ import { SendHorizonal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { Logo } from "./logo";
 import { Spinner } from "../ui/spinner";
 import {
   collection,
@@ -63,12 +62,12 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
       </div>
       {!isAssistant && userProfile && (
         <Link href="/profile">
-            <Avatar className="h-10 w-10 border-2 border-secondary">
-              <AvatarImage src={userProfile.photoURL} />
-              <AvatarFallback className="bg-secondary text-secondary-foreground font-bold">
-                {getInitials(userProfile.name)}
-              </AvatarFallback>
-            </Avatar>
+          <Avatar className="h-10 w-10 border-2 border-secondary">
+            <AvatarImage src={userProfile.photoURL} />
+            <AvatarFallback className="bg-secondary text-secondary-foreground font-bold">
+              {getInitials(userProfile.name)}
+            </AvatarFallback>
+          </Avatar>
         </Link>
       )}
     </div>
@@ -83,7 +82,7 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  
+
   const today = format(new Date(), "yyyy-MM-dd");
 
   const messagesQuery = useMemoFirebase(() => {
@@ -97,20 +96,50 @@ export function ChatInterface() {
 
   const { data: messages, isLoading: messagesLoading } =
     useCollection<ChatMessageType>(messagesQuery);
+
+  const handleInitialMessage = async () => {
+    if (!userProfile || !user || !db) return;
     
-  useEffect(() => {
-    if (!messagesLoading && messages?.length === 0 && user && userProfile && db) {
-      const welcomeMessage = `Hallo ${userProfile.name}! Ik ben Broos, je persoonlijke buddy. Hoe gaat het met je?`;
-      addDoc(
-        collection(db, "users", user.uid, "chats", today, "messages"),
-        {
-          role: "assistant",
-          content: welcomeMessage,
-          timestamp: serverTimestamp(),
-        }
-      );
+    setIsLoading(true);
+    try {
+        const { adaptedResponse } = await chatWithBuddy({
+            buddyName: "Broos",
+            userName: userProfile.name,
+            userAge: userProfile.birthDate
+                ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
+                : 18,
+            userMessage: '', // Start with an empty message
+            chatHistory: '', // No history yet
+        });
+
+        await addDoc(
+            collection(db, "users", user.uid, "chats", today, "messages"),
+            {
+                role: "assistant",
+                content: adaptedResponse,
+                timestamp: serverTimestamp(),
+            }
+        );
+    } catch (error) {
+        console.error("Error fetching initial buddy message:", error);
+        toast({
+            variant: "destructive",
+            title: "Oh nee!",
+            description: "Kon het gesprek met Broos niet starten.",
+        });
+    } finally {
+        setIsLoading(false);
     }
-  }, [messagesLoading, messages, user, userProfile, db, today]);
+  };
+
+  useEffect(() => {
+    // If loading is finished and there are no messages, trigger the initial message flow.
+    if (!messagesLoading && messages?.length === 0) {
+      handleInitialMessage();
+    }
+  // We only want to run this once when the component loads and messages are confirmed empty.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messagesLoading, messages]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -127,12 +156,15 @@ export function ChatInterface() {
 
     const userMessageContent = input;
     setInput("");
-    
-    await addDoc(collection(db, "users", user.uid, "chats", today, "messages"), {
-      role: "user",
-      content: userMessageContent,
-      timestamp: serverTimestamp(),
-    });
+
+    await addDoc(
+      collection(db, "users", user.uid, "chats", today, "messages"),
+      {
+        role: "user",
+        content: userMessageContent,
+        timestamp: serverTimestamp(),
+      }
+    );
 
     setIsLoading(true);
 
@@ -140,8 +172,11 @@ export function ChatInterface() {
       const chatHistory = (messages || [])
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
-        
-      const agentResponse = messages && messages.length > 0 ? messages[messages.length - 1].content : '';
+
+      const agentResponse =
+        messages && messages.length > 0
+          ? messages[messages.length - 1].content
+          : "";
 
       const { adaptedResponse, scores, alerts } = await chatWithBuddy({
         buddyName: "Broos",
@@ -172,13 +207,12 @@ export function ChatInterface() {
           summary: adaptedResponse,
         });
       }
-      
+
       if (alerts && alerts.length > 0) {
         for (const alert of alerts) {
           await saveAlert({ db, userId: user.uid, alert });
         }
       }
-
     } catch (error) {
       console.error("Error chatting with buddy:", error);
       toast({
@@ -204,9 +238,10 @@ export function ChatInterface() {
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-grow" ref={scrollAreaRef}>
         <div className="px-4">
-          {messages && messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
+          {messages &&
+            messages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
           {isLoading && (
             <div className="flex items-start gap-3 my-4 justify-start">
               <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
@@ -228,12 +263,12 @@ export function ChatInterface() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Typ je bericht..."
             autoComplete="off"
-            disabled={isLoading}
+            disabled={isLoading || (!messages || messages.length === 0)}
           />
           <Button
             type="submit"
             size="icon"
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || !input.trim() || (!messages || messages.length === 0)}
           >
             <SendHorizonal className="h-5 w-5" />
           </Button>
