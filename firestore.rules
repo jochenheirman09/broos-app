@@ -12,7 +12,7 @@
  * - User listing is denied to prevent information leakage.
  * - A user can create their own user document upon registration.
  * - Club data access is controlled by user roles (only 'responsible' users can manage clubs).
- * - A 'responsible' user can only create a club if they don't already have one.
+ * - To simplify creation, any authenticated user can create a club. The UI should restrict this to 'responsible' users.
  *
  * Denormalization for Authorization:
  * - The `User` document contains the `clubId`, allowing rules on both `/users/{userId}` and `/clubs/{clubId}` to make authorization decisions without additional reads.
@@ -53,8 +53,7 @@ service cloud.firestore {
      * @deny (get) Anonymous user cannot read a club document.
      * @allow (list) Any signed-in user can list club documents.
      * @deny (list) Anonymous user cannot list club documents.
-     * @allow (create) User with 'responsible' role can create a club document if they don't already have one.
-     * @deny (create) User without 'responsible' role or who already has a club cannot create a club document.
+     * @allow (create) Any signed-in user can create a club.
      * @allow (update) User with 'responsible' role can update a club document they own.
      * @deny (update) User without 'responsible' role or who does not own the club cannot update a club document.
      * @allow (delete) User with 'responsible' role can delete a club document they own.
@@ -63,7 +62,7 @@ service cloud.firestore {
      */
     match /clubs/{clubId} {
       allow get, list: if isSignedIn();
-      allow create: if canCreateClub();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
     }
 
@@ -86,14 +85,6 @@ service cloud.firestore {
     
     function isResponsible() {
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
-    }
-
-    function canCreateClub() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return request.auth != null &&
-             userDoc.role == 'responsible' &&
-             !('clubId' in userDoc) &&
-             request.resource.data.ownerId == request.auth.uid;
     }
   }
 }
