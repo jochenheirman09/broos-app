@@ -66,7 +66,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoggingOut(true);
     await auth.signOut();
     // No need to clear state manually, the auth listener will do it.
-    router.push("/login");
+    router.push("/");
     setIsLoggingOut(false);
   };
 
