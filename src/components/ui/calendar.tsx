@@ -70,39 +70,37 @@ function Calendar({
           const { goToMonth, month } = useNavigation()
 
           if (props.name === "months") {
-            const months = fromMonth
-              ? Array.from({ length: toMonth!.getMonth() - fromMonth.getMonth() + 1 }).map(
-                  (_, i) => new Date(fromMonth.getFullYear(), fromMonth.getMonth() + i, 1)
-                )
-              : Array.from({ length: 12 }).map(
-                  (_, i) => new Date(new Date().getFullYear(), i, 1)
-                )
+            if (!month) return null;
+            const months =
+              Array.from({ length: 12 }).map(
+                (_, i) => new Date(new Date().getFullYear(), i, 1)
+              )
             return (
               <Select
                 onValueChange={(newValue) => {
-                  if (!month) return;
                   const newDate = new Date(month)
                   newDate.setMonth(parseInt(newValue))
                   goToMonth(newDate)
                 }}
-                value={month?.getMonth().toString()}
+                value={month.getMonth().toString()}
               >
                 <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder={month?.toLocaleString("default", { month: "long" })} />
+                  <SelectValue>{month.toLocaleString("default", { month: "long" })}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {months.map((month) => (
+                  {months.map((m) => (
                     <SelectItem
-                      key={month.getMonth()}
-                      value={month.getMonth().toString()}
+                      key={m.getMonth()}
+                      value={m.getMonth().toString()}
                     >
-                      {month.toLocaleString("default", { month: "long" })}
+                      {m.toLocaleString("default", { month: "long" })}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )
           } else if (props.name === "years") {
+            if (!month) return null;
             const earliestYear =
               fromYear || fromMonth?.getFullYear() || fromDate?.getFullYear()
             const latestYear =
@@ -116,15 +114,14 @@ function Calendar({
             return (
               <Select
                 onValueChange={(newValue) => {
-                  if (!month) return;
                   const newDate = new Date(month)
                   newDate.setFullYear(parseInt(newValue))
                   goToMonth(newDate)
                 }}
-                value={month?.getFullYear().toString()}
+                value={month.getFullYear().toString()}
               >
                 <SelectTrigger className="w-[80px]">
-                  <SelectValue placeholder={month?.getFullYear()} />
+                  <SelectValue>{month.getFullYear()}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {years.map((year) => (
