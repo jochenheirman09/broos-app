@@ -63,7 +63,7 @@ service cloud.firestore {
      */
     match /clubs/{clubId} {
       allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && isResponsible() && !userHasClub() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if canCreateClub();
       allow update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
     }
 
@@ -81,15 +81,19 @@ service cloud.firestore {
     }
 
     function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
     }
     
     function isResponsible() {
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
     }
 
-    function userHasClub() {
-      return 'clubId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function canCreateClub() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return request.auth != null &&
+             userDoc.role == 'responsible' &&
+             !('clubId' in userDoc) &&
+             request.resource.data.ownerId == request.auth.uid;
     }
   }
 }

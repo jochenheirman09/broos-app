@@ -47,9 +47,9 @@ export async function createClub(prevState: State, formData: FormData): Promise<
       clubId: clubRef.id,
     });
   } catch (error: any) {
-    console.error("Error creating club:", error);
+    console.error("Error creating club:", error.code, error.message);
     return {
-      error: error.message || "Failed to create club.",
+      error: `Failed to create club. Code: ${error.code}. Message: ${error.message}`,
     };
   }
 
