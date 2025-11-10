@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { useFirestore } from "@/firebase";
 import type { Team } from "@/lib/types";
-import { updateTeam } from "@/lib/team";
+import { updateTeam } from "@/lib/firebase/firestore/team";
 
 interface EditTeamDialogProps {
   isOpen: boolean;
@@ -56,32 +56,30 @@ export function EditTeamDialog({
 
     setIsLoading(true);
 
-    updateTeam({
-      db: firestore,
-      clubId,
-      teamId: team.id,
-      newName: teamName,
-    })
-      .then(() => {
-        toast({
-          title: "Succes!",
-          description: `Teamnaam bijgewerkt naar "${teamName}".`,
-        });
-        onTeamUpdated();
-        setIsOpen(false);
-      })
-      .catch((error) => {
-        console.error("Fout bij het bijwerken van het team:", error);
-        toast({
-          variant: "destructive",
-          title: "Fout bij het bijwerken van het team",
-          description:
-            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
-        });
-      })
-      .finally(() => {
-        setIsLoading(false);
+    try {
+      await updateTeam({
+        db: firestore,
+        clubId,
+        teamId: team.id,
+        newName: teamName,
       });
+      toast({
+        title: "Succes!",
+        description: `Teamnaam bijgewerkt naar "${teamName}".`,
+      });
+      onTeamUpdated();
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Fout bij het bijwerken van het team:", error);
+      toast({
+        variant: "destructive",
+        title: "Fout bij het bijwerken van het team",
+        description:
+          "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -37,9 +37,14 @@ export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
     id: newTeamRef.id,
     name: teamName,
     clubId: clubId,
+    invitationCode: generateCode(), // Generate code on creation
   };
 
-  return setDoc(newTeamRef, teamData).catch(() => {
+  try {
+    await setDoc(newTeamRef, teamData);
+    return teamData;
+  } catch (error) {
+    console.error("Error creating team:", error);
     const permissionError = new FirestorePermissionError({
       path: newTeamRef.path,
       operation: "create",
@@ -47,7 +52,7 @@ export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
     });
     errorEmitter.emit("permission-error", permissionError);
     throw permissionError;
-  });
+  }
 }
 
 export async function generateTeamInvitationCode(
@@ -62,7 +67,11 @@ export async function generateTeamInvitationCode(
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
   const updateData = { invitationCode };
 
-  return updateDoc(teamRef, updateData).catch(() => {
+  try {
+    await updateDoc(teamRef, updateData);
+    return invitationCode;
+  } catch (error) {
+    console.error("Error generating team invitation code:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "update",
@@ -70,7 +79,7 @@ export async function generateTeamInvitationCode(
     });
     errorEmitter.emit("permission-error", permissionError);
     throw permissionError;
-  });
+  }
 }
 
 interface UpdateTeamParams {
@@ -93,7 +102,10 @@ export async function updateTeam({
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
   const updateData = { name: newName };
 
-  return updateDoc(teamRef, updateData).catch(() => {
+  try {
+    await updateDoc(teamRef, updateData);
+  } catch (error) {
+    console.error("Error updating team:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "update",
@@ -101,7 +113,7 @@ export async function updateTeam({
     });
     errorEmitter.emit("permission-error", permissionError);
     throw permissionError;
-  });
+  }
 }
 
 interface DeleteTeamParams {
@@ -116,12 +128,15 @@ export async function deleteTeam({ db, clubId, teamId }: DeleteTeamParams) {
 
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
 
-  return deleteDoc(teamRef).catch(() => {
+  try {
+    await deleteDoc(teamRef);
+  } catch (error) {
+    console.error("Error deleting team:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "delete",
     });
     errorEmitter.emit("permission-error", permissionError);
     throw permissionError;
-  });
+  }
 }

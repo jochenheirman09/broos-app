@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { createClub } from "@/lib/club";
+import { createClub } from "@/lib/firebase/firestore/club";
 import { useFirestore } from "@/firebase";
 
 export function CreateClubForm() {
@@ -38,28 +38,27 @@ export function CreateClubForm() {
 
     setIsLoading(true);
 
-    createClub(firestore, user.uid, clubName)
-      .then(() => {
-        toast({
-          title: "Succes!",
-          description: "Je club is aangemaakt.",
-        });
-        // The user context will update automatically and redirect
-        // so we don't need to force a router.push here.
-      })
-      .catch((error) => {
-        // Error is already emitted by createClub, just handle UI
-        console.error("Fout bij het maken van de club:", error);
-        toast({
-          variant: "destructive",
-          title: "Fout bij het maken van de club",
-          description:
-            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
-        });
-      })
-      .finally(() => {
-        setIsLoading(false);
+    try {
+      await createClub(firestore, user.uid, clubName);
+      toast({
+        title: "Succes!",
+        description: "Je club is aangemaakt.",
       });
+      // The user context will update automatically and redirect
+      // so we don't need to force a router.push here.
+    } catch (error) {
+      // Error is already emitted by createClub, so we don't need to re-emit.
+      // We can show a generic toast message.
+      console.error("Fout bij het maken van de club:", error);
+      toast({
+        variant: "destructive",
+        title: "Fout bij het maken van de club",
+        description:
+          "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

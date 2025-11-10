@@ -16,6 +16,7 @@ export function FirebaseErrorListener() {
     // The callback now expects a strongly-typed error, matching the event payload.
     const handleError = (error: FirestorePermissionError) => {
       // Set error in state to trigger a re-render.
+      console.error("FirebaseErrorListener caught an error:", error.message);
       setError(error);
     };
 

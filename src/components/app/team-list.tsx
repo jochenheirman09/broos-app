@@ -9,7 +9,7 @@ import { Copy, KeyRound, Users, RefreshCw, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { generateTeamInvitationCode } from "@/lib/team";
+import { generateTeamInvitationCode } from "@/lib/firebase/firestore/team";
 import {
   Card,
   CardContent,
@@ -45,24 +45,22 @@ function TeamCard({
 
   const handleGenerateCode = async () => {
     setIsGenerating(true);
-    generateTeamInvitationCode(firestore, clubId, team.id)
-      .then(() => {
-        toast({
-          title: "Code gegenereerd!",
-          description: `Een nieuwe uitnodigingscode is gegenereerd voor ${team.name}.`,
-        });
-        onTeamChange(); // Refresh the list
-      })
-      .catch(() => {
-        toast({
-          variant: "destructive",
-          title: "Fout",
-          description: "Kon geen uitnodigingscode genereren.",
-        });
-      })
-      .finally(() => {
-        setIsGenerating(false);
+    try {
+      await generateTeamInvitationCode(firestore, clubId, team.id);
+      toast({
+        title: "Code gegenereerd!",
+        description: `Een nieuwe uitnodigingscode is gegenereerd voor ${team.name}.`,
       });
+      onTeamChange(); // Refresh the list
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Fout",
+        description: "Kon geen uitnodigingscode genereren.",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -177,7 +175,8 @@ export function TeamList({
         <Users className="h-4 w-4" />
         <AlertTitle>Nog Geen Teams</AlertTitle>
         <AlertDescription>
-          Je hebt nog geen teams aangemaakt voor je club. Voeg er hieronder een toe.
+          Je hebt nog geen teams aangemaakt voor je club. Voeg er hieronder een
+          toe.
         </AlertDescription>
       </Alert>
     );

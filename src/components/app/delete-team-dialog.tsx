@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { useFirestore } from "@/firebase";
-import { deleteTeam } from "@/lib/team";
+import { deleteTeam } from "@/lib/firebase/firestore/team";
 
 interface DeleteTeamDialogProps {
   isOpen: boolean;
@@ -40,31 +40,29 @@ export function DeleteTeamDialog({
 
   const handleDelete = async () => {
     setIsLoading(true);
-    deleteTeam({
-      db: firestore,
-      clubId,
-      teamId,
-    })
-      .then(() => {
-        toast({
-          title: "Team Verwijderd",
-          description: `Het team "${teamName}" is succesvol verwijderd.`,
-        });
-        onTeamDeleted();
-        setIsOpen(false);
-      })
-      .catch((error) => {
-        console.error("Fout bij het verwijderen van het team:", error);
-        toast({
-          variant: "destructive",
-          title: "Fout bij het verwijderen van het team",
-          description:
-            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
-        });
-      })
-      .finally(() => {
-        setIsLoading(false);
+    try {
+      await deleteTeam({
+        db: firestore,
+        clubId,
+        teamId,
       });
+      toast({
+        title: "Team Verwijderd",
+        description: `Het team "${teamName}" is succesvol verwijderd.`,
+      });
+      onTeamDeleted();
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Fout bij het verwijderen van het team:", error);
+      toast({
+        variant: "destructive",
+        title: "Fout bij het verwijderen van het team",
+        description:
+          "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -73,8 +71,9 @@ export function DeleteTeamDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
           <AlertDialogDescription>
-            Deze actie kan niet ongedaan worden gemaakt. Dit zal het
-            team <span className="font-semibold">&quot;{teamName}&quot;</span> permanent verwijderen.
+            Deze actie kan niet ongedaan worden gemaakt. Dit zal het team{" "}
+            <span className="font-semibold">&quot;{teamName}&quot;</span>{" "}
+            permanent verwijderen.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

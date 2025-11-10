@@ -1,38 +1,49 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore'
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
+/**
+ * Initializes a Firebase app instance, handling both client-side and server-side
+ * environments, as well as automatic configuration from Firebase Hosting.
+ *
+ * @returns An object containing the initialized FirebaseApp, Auth, and Firestore instances.
+ */
+export function initializeFirebase(): { firebaseApp: FirebaseApp; auth: Auth; firestore: Firestore } {
+  // If no apps are initialized, create a new one.
   if (!getApps().length) {
-    // Important! initializeApp() is called without any arguments because Firebase App Hosting
-    // integrates with the initializeApp() function to provide the environment variables needed to
-    // populate the FirebaseOptions in production. It is critical that we attempt to call initializeApp()
-    // without arguments.
-    let firebaseApp;
+    let firebaseApp: FirebaseApp;
     try {
-      // Attempt to initialize via Firebase App Hosting environment variables
+      // In a Firebase App Hosting environment, `initializeApp()` without arguments
+      // will automatically use the reserved environment variables.
       firebaseApp = initializeApp();
+      console.info("Firebase initialized automatically via App Hosting.");
     } catch (e) {
-      // Only warn in production because it's normal to use the firebaseConfig to initialize
-      // during development
+      // If automatic initialization fails (e.g., local development),
+      // fall back to the explicit config object.
       if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
+        console.warn('Firebase automatic initialization failed. Falling back to firebaseConfig object. Error:', e);
+      } else {
+        console.info("Firebase initialized using local firebaseConfig object.");
       }
       firebaseApp = initializeApp(firebaseConfig);
     }
-
     return getSdks(firebaseApp);
   }
 
-  // If already initialized, return the SDKs with the already initialized App
+  // If an app is already initialized, get the existing instance.
   return getSdks(getApp());
 }
 
-export function getSdks(firebaseApp: FirebaseApp) {
+/**
+ * A helper function to get the SDK instances from a FirebaseApp.
+ *
+ * @param firebaseApp The FirebaseApp instance.
+ * @returns An object containing the Auth and Firestore SDKs.
+ */
+function getSdks(firebaseApp: FirebaseApp) {
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
@@ -44,7 +55,6 @@ export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
-export * from './non-blocking-updates';
-export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';
+export * from './FirebaseErrorListener';

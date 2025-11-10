@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { createTeam } from "@/lib/team";
+import { createTeam } from "@/lib/firebase/firestore/team";
 import { useFirestore } from "@/firebase";
 
 export function CreateTeamForm({
@@ -34,31 +34,29 @@ export function CreateTeamForm({
 
     setIsLoading(true);
 
-    createTeam({
-      db: firestore,
-      clubId,
-      teamName,
-    })
-      .then(() => {
-        toast({
-          title: "Succes!",
-          description: `Team "${teamName}" is aangemaakt.`,
-        });
-        setTeamName("");
-        onTeamCreated(); // Notify parent that a team was created
-      })
-      .catch((error) => {
-        console.error("Fout bij het maken van het team:", error);
-        toast({
-          variant: "destructive",
-          title: "Fout bij het maken van het team",
-          description:
-            "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
-        });
-      })
-      .finally(() => {
-        setIsLoading(false);
+    try {
+      await createTeam({
+        db: firestore,
+        clubId,
+        teamName,
       });
+      toast({
+        title: "Succes!",
+        description: `Team "${teamName}" is aangemaakt.`,
+      });
+      setTeamName("");
+      onTeamCreated(); // Notify parent that a team was created
+    } catch (error) {
+      console.error("Fout bij het maken van het team:", error);
+      toast({
+        variant: "destructive",
+        title: "Fout bij het maken van het team",
+        description:
+          "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

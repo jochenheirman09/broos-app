@@ -30,17 +30,20 @@ export async function createClub(
   const userData = { clubId: clubRef.id };
   batch.update(userRef, userData);
 
-  return batch.commit().catch(() => {
-    // Attempt to determine which operation failed, though batch errors are not specific.
-    // We can emit a generic write error for the club path.
-    const permissionError = new FirestorePermissionError({
+  try {
+    await batch.commit();
+  } catch (error) {
+    console.error("Batch commit failed in createClub:", error);
+
+    // It's hard to know which write failed in a batch.
+    // We can emit errors for both operations to be safe.
+    const clubPermissionError = new FirestorePermissionError({
       path: clubRef.path,
       operation: "create",
       requestResourceData: clubData,
     });
-    errorEmitter.emit("permission-error", permissionError);
+    errorEmitter.emit("permission-error", clubPermissionError);
 
-    // Also consider the user update might have failed.
     const userPermissionError = new FirestorePermissionError({
       path: userRef.path,
       operation: "update",
@@ -49,6 +52,6 @@ export async function createClub(
     errorEmitter.emit("permission-error", userPermissionError);
 
     // Re-throw the original error to allow the caller to handle the promise rejection.
-    throw permissionError;
-  });
+    throw error;
+  }
 }

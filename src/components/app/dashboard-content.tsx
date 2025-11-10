@@ -19,6 +19,7 @@ import { Spinner } from "../ui/spinner";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { Separator } from "../ui/separator";
+import { PlayerDashboard } from "./player-dashboard";
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <User className="h-5 w-5 mr-2" />,
@@ -26,7 +27,7 @@ const roleIcons: { [key: string]: React.ReactNode } = {
   responsible: <Shield className="h-5 w-5 mr-2" />,
 };
 
-function ClubInfo({ clubId }: { clubId: string }) {
+function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -53,7 +54,7 @@ function ClubInfo({ clubId }: { clubId: string }) {
   if (!club) {
     return (
       <Card>
-        <CardContent>
+        <CardContent className="p-6">
           <p className="text-destructive">
             Fout: Clubgegevens niet gevonden voor uw account.
           </p>
@@ -69,9 +70,7 @@ function ClubInfo({ clubId }: { clubId: string }) {
           <Building className="h-7 w-7 mr-3 text-primary" />
           {club.name}
         </CardTitle>
-        <CardDescription>
-          Beheer hieronder je teams.
-        </CardDescription>
+        <CardDescription>Beheer hieronder je teams.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
@@ -92,24 +91,6 @@ function ClubInfo({ clubId }: { clubId: string }) {
   );
 }
 
-function PlayerDashboard() {
-  const { userProfile } = useUser();
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Speler Dashboard</CardTitle>
-        <CardDescription>Welkom op je persoonlijke dashboard.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p>
-          Binnenkort beschikbaar: je welzijnsoverzicht en chat met je buddy!
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-
 export function DashboardContent() {
   const { userProfile } = useUser();
 
@@ -118,8 +99,8 @@ export function DashboardContent() {
   }
 
   const { name, role, clubId } = userProfile;
-  
-  if (role === 'player') {
+
+  if (role === "player") {
     return <PlayerDashboard />;
   }
 
@@ -140,7 +121,7 @@ export function DashboardContent() {
         </CardContent>
       </Card>
 
-      {role === "responsible" && clubId && <ClubInfo clubId={clubId} />}
+      {role === "responsible" && clubId && <ClubManagement clubId={clubId} />}
 
       {role === "responsible" && !clubId && (
         <Card className="bg-accent/20 border-accent">
@@ -156,10 +137,7 @@ export function DashboardContent() {
           </CardHeader>
           <CardContent>
             <Link href="/create-club">
-              <Button
-                variant="accent"
-                size="lg"
-              >
+              <Button variant="accent" size="lg">
                 <PlusCircle className="mr-2 h-5 w-5" />
                 Club aanmaken
               </Button>
