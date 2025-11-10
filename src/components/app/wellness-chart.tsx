@@ -3,7 +3,7 @@
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
 import { collection, query, orderBy, limit } from "firebase/firestore";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -34,6 +34,39 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 const EMOJIS = ["", "😞", "😟", "😐", "🙂", "😄"];
+
+// Custom Bar component to have full control over rendering
+const CustomBar = (props: any) => {
+  const { x, y, width, height, value, emoji, fill, payload } = props;
+  const ratingText = `${value}/5`;
+  const isDarkTheme = document.documentElement.classList.contains('dark');
+
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill} rx={8} ry={8} />
+      <text
+        x={x + width - 10}
+        y={y + height / 2}
+        fill={isDarkTheme ? "#fff" : "#111"}
+        textAnchor="end"
+        dy=".35em"
+        className="text-sm font-bold"
+      >
+        {ratingText}
+      </text>
+       <text
+        x={x + width - 40}
+        y={y + height / 2}
+        textAnchor="end"
+        dy=".35em"
+        className="text-lg"
+      >
+        {emoji}
+      </text>
+    </g>
+  );
+};
+
 
 export function WellnessChart() {
   const { user } = useUser();
@@ -141,28 +174,25 @@ export function WellnessChart() {
               tickLine={false}
               axisLine={false}
               tickMargin={10}
-              width={100}
-              tick={({ x, y, payload }) => {
-                 const item = chartData.find((d) => d.metric === payload.value);
-                return (
-                   <g transform={`translate(${x},${y})`}>
-                    <text x={-25} y={0} dy={4} textAnchor="middle" className="text-lg fill-muted-foreground">{item?.emoji}</text>
-                    <text x={0} y={0} dy={4} textAnchor="end" fill="hsl(var(--foreground))" className="text-sm">{payload.value}</text>
-                  </g>
-                )
-              }}
+              width={80}
+              className="text-sm fill-muted-foreground"
             />
             <XAxis dataKey="value" type="number" domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} />
             <ChartTooltip
-              cursor={false}
+              cursor={{fill: 'hsl(var(--muted))', opacity: 0.5, radius: 8}}
               content={
                 <ChartTooltipContent
-                  formatter={(value, name) => `${value}/5`}
+                  formatter={(value, name, item) => (
+                      <div className="flex flex-col">
+                          <span>{`${value}/5`}</span>
+                          <span className="text-xs text-muted-foreground">{item.payload.reason}</span>
+                      </div>
+                  )}
                   indicator="line"
                 />
               }
             />
-            <Bar dataKey="value" layout="vertical" radius={8} barSize={32} />
+            <Bar dataKey="value" layout="vertical" radius={8} barSize={40} shape={<CustomBar />} />
           </BarChart>
         </ChartContainer>
       </div>
