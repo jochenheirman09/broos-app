@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/chart";
 import type { WellnessScore } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { TrendingUp, FileWarning, MoreHorizontal } from "lucide-react";
+import { TrendingUp, FileWarning } from "lucide-react";
 import { Spinner } from "../ui/spinner";
 import { placeholderWellnessScores } from "@/lib/placeholder-data";
 import { useState } from "react";
@@ -41,8 +41,8 @@ const EMOJIS = ["", "😞", "😟", "😐", "🙂", "😄"];
 
 // Custom Bar component to have full control over rendering
 const CustomBar = (props: any) => {
-  const { x, y, width, height, value, emoji, fill, payload } = props;
-  const ratingText = `${value}/5`;
+  const { x, y, width, height, value, emoji, fill } = props;
+  const ratingText = value ? value.toFixed(1) : "N/A";
   const isDarkTheme = document.documentElement.classList.contains('dark');
 
   return (
@@ -143,7 +143,7 @@ export function WellnessChart() {
         value: scoreValue || 0,
         fill: config.color,
         emoji: scoreValue ? EMOJIS[scoreValue] : "📊",
-        reason: reason || "Geen details beschikbaar.",
+        reason: reason || "Nog geen gedetailleerde feedback voor dit onderwerp.",
       };
     })
     .filter((item) => item.value > 0);
@@ -188,8 +188,8 @@ export function WellnessChart() {
                 <ChartTooltipContent
                   formatter={(value, name, item) => (
                       <div className="flex flex-col">
-                          <span>{`${value}/5`}</span>
-                          <span className="text-xs text-muted-foreground">{item.payload.reason}</span>
+                          <span className="font-bold">{`${item.payload.metric}: ${value ? (value as number).toFixed(1) : 'N/A'}`}</span>
+                          <span className="text-xs text-muted-foreground mt-1">{item.payload.reason}</span>
                       </div>
                   )}
                   indicator="line"
@@ -202,8 +202,7 @@ export function WellnessChart() {
       </div>
       <div className="flex justify-center">
         <Button variant="outline" onClick={() => setIsSheetOpen(true)}>
-          <MoreHorizontal className="mr-2 h-4 w-4" />
-          Meer Details
+          Details
         </Button>
       </div>
 
@@ -224,7 +223,7 @@ export function WellnessChart() {
                     <span className="text-2xl">{item.emoji}</span>
                     <h3 className="font-bold text-lg">{item.metric}</h3>
                    </div>
-                   <div className="font-bold text-lg">{item.value}/5</div>
+                   <div className="font-bold text-lg">{item.value ? item.value.toFixed(1) : 'N/A'}</div>
                  </div>
                  <p className="text-muted-foreground text-sm">{item.reason}</p>
               </div>
