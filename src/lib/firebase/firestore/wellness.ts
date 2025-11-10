@@ -29,9 +29,10 @@ export async function saveWellnessScores({
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const wellnessRef = doc(db, "users", userId, "wellnessScores", today);
 
-  // Filter out any '...Reason' fields that are empty or null
+  // Filter out any key-value pairs where the value is null or undefined.
+  // We keep empty strings for '...Reason' fields if the AI provides them.
   const cleanedScores = Object.entries(scores).reduce((acc, [key, value]) => {
-    if (value !== null && value !== undefined && value !== '') {
+    if (value !== null && value !== undefined) {
       (acc as any)[key] = value;
     }
     return acc;
