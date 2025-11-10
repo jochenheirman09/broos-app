@@ -21,8 +21,10 @@ export function PlayerDashboard() {
     <div className="space-y-6">
       <Card className="text-center">
         <CardHeader>
-          <CardTitle>Welkom terug, {userProfile?.name}!</CardTitle>
-          <CardDescription>Klaar om te reflecteren met je buddy?</CardDescription>
+          <CardTitle>Jouw Dashboard</CardTitle>
+          <CardDescription>
+            Klaar voor je dagelijkse check-in met Broos?
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Link href="/chat">

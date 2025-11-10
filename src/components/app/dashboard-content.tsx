@@ -80,22 +80,22 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-2xl font-bold">Welkom, {name}!</CardTitle>
-          <div className="flex items-center bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium shadow-clay-inset">
-            {roleIcons[role]}
-            <span className="capitalize">{role}</span>
-          </div>
-        </CardHeader>
-        {role !== 'player' && (
-           <CardContent>
-            <p className="text-muted-foreground">
-              Dit is je hoofddashboard. Beheer hier je club en leden.
-            </p>
-          </CardContent>
-        )}
-      </Card>
+      {role !== 'player' && (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardTitle className="text-2xl font-bold">Welkom, {name}!</CardTitle>
+            <div className="flex items-center bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium shadow-clay-inset">
+                {roleIcons[role]}
+                <span className="capitalize">{role}</span>
+            </div>
+            </CardHeader>
+            <CardContent>
+                <p className="text-muted-foreground">
+                Dit is je hoofddashboard. Beheer hier je club en leden.
+                </p>
+            </CardContent>
+        </Card>
+      )}
       
       <RoleSpecificDashboard role={role} clubId={clubId} />
     </div>
