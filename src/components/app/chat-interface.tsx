@@ -102,14 +102,15 @@ export function ChatInterface() {
     
     setIsLoading(true);
     try {
+        // We explicitly pass an empty userMessage and chatHistory to signal a new conversation.
         const { adaptedResponse } = await chatWithBuddy({
             buddyName: "Broos",
             userName: userProfile.name,
             userAge: userProfile.birthDate
                 ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
                 : 18,
-            userMessage: '', // Start with an empty message
-            chatHistory: '', // No history yet
+            userMessage: '', 
+            chatHistory: '', 
         });
 
         await addDoc(
