@@ -93,6 +93,8 @@ export default function ProfilePage() {
         updates.name = data.name;
       }
       if (newPhoto) {
+        // In a real app, you would upload the file to Firebase Storage
+        // and get a URL. For this prototype, we'll use the data URL.
         updates.photoURL = newPhoto;
       }
 
