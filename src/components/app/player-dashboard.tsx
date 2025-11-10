@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
+import { PlayerUpdates } from "./player-updates";
+import { Separator } from "../ui/separator";
 
 export function PlayerDashboard() {
   const { userProfile } = useUser();
@@ -32,12 +34,24 @@ export function PlayerDashboard() {
           </Link>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Jouw Recente Weetjes</CardTitle>
+          <CardDescription>
+            Interessante inzichten en vergelijkingen met je team.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PlayerUpdates />
+        </CardContent>
+      </Card>
+      
       <Card>
         <CardHeader>
           <CardTitle>Recent Welzijnsoverzicht</CardTitle>
           <CardDescription>
-            Een visueel overzicht van je recente scores. Klik op een staaf voor
-            details.
+            Een visueel overzicht van je recente scores.
           </CardDescription>
         </CardHeader>
         <CardContent>

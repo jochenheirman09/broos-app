@@ -70,3 +70,23 @@ export interface Alert {
   status: 'new' | 'acknowledged' | 'resolved';
   createdAt: any; // Firestore ServerTimestamp
 }
+
+export interface PlayerUpdate {
+  id: string;
+  title: string;
+  content: string;
+  category: 'Sleep' | 'Nutrition' | 'Motivation' | 'Stress' | 'Wellness';
+  date: string; // YYYY-MM-DD
+}
+
+export interface TeamSummary {
+    id: string; // e.g., 'weekly-2024-20'
+    teamId: string;
+    date: string;
+    averageMood?: number;
+    averageStress?: number;
+    averageSleep?: number;
+    averageMotivation?: number;
+    injuryCount?: number;
+    commonTopics?: string[];
+}

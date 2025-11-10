@@ -221,6 +221,38 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the alert was created." }
       },
       "required": ["id", "userId", "date", "alertType", "triggeringMessage", "status", "createdAt"]
+    },
+    "PlayerUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PlayerUpdate",
+      "type": "object",
+      "description": "Represents an insightful update or 'weetje' for a player, comparing their data to the team average.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the update." },
+        "title": { "type": "string", "description": "The headline of the update." },
+        "content": { "type": "string", "description": "The detailed content of the update." },
+        "category": { "type": "string", "enum": ["Sleep", "Nutrition", "Motivation", "Stress", "Wellness"], "description": "The category of the update." },
+        "date": { "type": "string", "format": "date", "description": "The date the update was generated." }
+      },
+      "required": ["id", "title", "content", "category", "date"]
+    },
+    "TeamSummary": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "TeamSummary",
+        "type": "object",
+        "description": "Represents an aggregated summary of a team's wellness scores.",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier for the summary, e.g., 'weekly-2024-20'." },
+            "teamId": { "type": "string" },
+            "date": { "type": "string", "format": "date" },
+            "averageMood": { "type": "number" },
+            "averageStress": { "type": "number" },
+            "averageSleep": { "type": "number" },
+            "averageMotivation": { "type": "number" },
+            "injuryCount": { "type": "number" },
+            "commonTopics": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "teamId", "date"]
     }
   },
   "auth": {
@@ -297,6 +329,18 @@
         }
       },
       {
+        "path": "/users/{userId}/updates/{updateId}",
+        "definition": {
+          "entityName": "PlayerUpdate",
+          "schema": { "$ref": "#/backend/entities/PlayerUpdate" },
+          "description": "Stores generated insights and updates for a player.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "updateId", "description": "The unique ID of the update." }
+          ]
+        }
+      },
+      {
         "path": "/clubs/{clubId}",
         "definition": {
           "entityName": "Club",
@@ -331,8 +375,21 @@
             }
           ]
         }
+      },
+      {
+        "path": "/clubs/{clubId}/teams/{teamId}/summaries/{summaryId}",
+        "definition": {
+          "entityName": "TeamSummary",
+          "schema": { "$ref": "#/backend/entities/TeamSummary" },
+          "description": "Stores aggregated wellness summaries for a team.",
+          "params": [
+            { "name": "clubId", "description": "The club's ID." },
+            { "name": "teamId", "description": "The team's ID." },
+            { "name": "summaryId", "description": "The summary's ID (e.g., 'weekly-2024-20')." }
+          ]
+        }
       }
     ],
-    "reasoning": "This design prioritizes security and scalability for the RoleVerify application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages, wellness scores, and alerts are stored in subcollections under the user, ensuring data privacy and easy retrieval."
+    "reasoning": "This design prioritizes security and scalability for the RoleVerify application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages, wellness scores, alerts and player updates are stored in subcollections under the user, ensuring data privacy and easy retrieval. Team summaries are stored under the team, allowing for aggregated analysis."
   }
 }

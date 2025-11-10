@@ -9,23 +9,22 @@
  * - /users/{userId}/wellnessScores/{scoreId}: Stores daily wellness scores for a user.
  * - /users/{userId}/chats/{chatId}**: Stores chat sessions and messages.
  * - /users/{userId}/alerts/{alertId}: Stores alerts triggered by the AI for a user.
+ * - /users/{userId}/updates/{updateId}: Stores AI-generated insights for the player.
  * - /clubs/{clubId}: Stores club data, with a 1:1 relationship to a user who is responsible for the club.
  * - /clubs/{clubId}/teams/{teamId}: Stores team data as a subcollection of a club.
+ * - /clubs/{clubId}/teams/{teamId}/summaries/{summaryId}: Stores aggregated team wellness data.
  *
  * Key Security Decisions:
  * - User listing is denied to prevent information leakage.
  * - A user can create their own user document upon registration.
  * - Club data access is controlled by user roles (only 'responsible' users can manage clubs).
  * - A responsible user can only create a club if they don't already have one.
- * - The owner of a club can manage teams within that club.
+ * - The owner of a club can manage teams and summaries within that club.
  * - Any signed-in user can query across all teams to find one by invitation code.
- * - A user can only read and write their own wellness scores, chats, messages and create their own alerts. Staff will be given read access later.
+ * - A user can only read and write their own private data (wellness, chats, alerts, updates). Staff will be given read access later.
  *
  * Denormalization for Authorization:
  * - The `User` document contains the `clubId`, allowing rules on both `/users/{userId}` and `/clubs/{clubId}` to make authorization decisions without additional reads.
- *
- * Structural Segregation:
- * - No public vs. private content segregation is needed in this design.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -85,6 +84,17 @@ service cloud.firestore {
         // Reading alerts will be restricted to staff in a later rule.
         allow read, update, delete: if false; 
       }
+
+      /**
+       * @description Enforces access control for user's updates.
+       * @path /users/{userId}/updates/{updateId}
+       */
+      match /updates/{updateId} {
+        // Users can read their own updates.
+        allow read: if isSignedIn() && isOwner(userId);
+        // Updates are created by a backend process, not directly by users.
+        allow write: if false;
+      }
     }
 
     /**
@@ -107,6 +117,15 @@ service cloud.firestore {
         allow get: if isSignedIn();
         // Allow team management only by the club owner.
         allow create, update, delete: if isClubOwner(clubId);
+
+        /**
+         * @description Enforces access control for team summaries.
+         * @path /clubs/{clubId}/teams/{teamId}/summaries/{summaryId}
+         */
+        match /summaries/{summaryId} {
+            // Only the club owner can create/manage team summaries.
+            allow read, write: if isClubOwner(clubId);
+        }
       }
     }
 

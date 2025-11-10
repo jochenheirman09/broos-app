@@ -10,10 +10,11 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import type { WellnessScore, WithId } from "@/lib/types";
+import type { WellnessScore } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { TrendingUp, FileWarning } from "lucide-react";
 import { Spinner } from "../ui/spinner";
+import { placeholderWellnessScores } from "@/lib/placeholder-data";
 
 const chartConfig = {
   mood: { label: "Stemming", color: "hsl(var(--chart-1))" },
@@ -44,6 +45,11 @@ export function WellnessChart() {
     error,
   } = useCollection<WellnessScore>(scoresQuery);
 
+  const latestScore = 
+    !isLoading && scoresData && scoresData.length > 0 
+    ? scoresData[0] 
+    : placeholderWellnessScores[0];
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -64,7 +70,7 @@ export function WellnessChart() {
     );
   }
 
-  if (!scoresData || scoresData.length === 0) {
+  if (!latestScore) {
     return (
       <Alert>
         <TrendingUp className="h-4 w-4" />
@@ -76,8 +82,7 @@ export function WellnessChart() {
       </Alert>
     );
   }
-
-  const latestScore = scoresData[0];
+  
   const chartData = Object.entries(chartConfig)
     .map(([key, config]) => {
       const scoreValue = latestScore[key as keyof WellnessScore] as
