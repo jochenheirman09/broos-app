@@ -3,7 +3,7 @@
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
 import { collection, query, orderBy, limit } from "firebase/firestore";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -42,7 +42,7 @@ const EMOJIS = ["", "😞", "😟", "😐", "🙂", "😄"];
 // Custom Bar component to have full control over rendering
 const CustomBar = (props: any) => {
   const { x, y, width, height, value, emoji, fill } = props;
-  const ratingText = value ? value.toFixed(1) : "N/A";
+  const ratingText = value ? (value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)) : "N/A";
   const isDarkTheme = document.documentElement.classList.contains('dark');
 
   return (
@@ -142,7 +142,7 @@ export function WellnessChart() {
         metric: config.label,
         value: scoreValue || 0,
         fill: config.color,
-        emoji: scoreValue ? EMOJIS[scoreValue] : "📊",
+        emoji: scoreValue ? EMOJIS[Math.round(scoreValue)] : "📊",
         reason: reason || "Nog geen gedetailleerde feedback voor dit onderwerp.",
       };
     })
@@ -186,12 +186,14 @@ export function WellnessChart() {
               cursor={{fill: 'hsl(var(--muted))', opacity: 0.5, radius: 8}}
               content={
                 <ChartTooltipContent
-                  formatter={(value, name, item) => (
+                  formatter={(value, name, item) => {
+                      const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)) : value;
+                      return (
                       <div className="flex flex-col">
-                          <span className="font-bold">{`${item.payload.metric}: ${value ? (value as number).toFixed(1) : 'N/A'}`}</span>
+                          <span className="font-bold">{`${item.payload.metric}: ${formattedValue}`}</span>
                           <span className="text-xs text-muted-foreground mt-1">{item.payload.reason}</span>
                       </div>
-                  )}
+                  )}}
                   indicator="line"
                 />
               }
@@ -216,18 +218,20 @@ export function WellnessChart() {
             </SheetDescription>
           </SheetHeader>
           <div className="py-4 space-y-6">
-            {chartData.map((item) => (
+            {chartData.map((item) => {
+                const formattedValue = item.value ? (item.value % 1 === 0 ? item.value.toFixed(0) : item.value.toFixed(1)) : 'N/A';
+                return (
               <div key={item.metric} className="p-4 rounded-xl bg-card/50 shadow-clay-card">
                  <div className="flex items-center justify-between mb-2">
                    <div className="flex items-center gap-3">
                     <span className="text-2xl">{item.emoji}</span>
                     <h3 className="font-bold text-lg">{item.metric}</h3>
                    </div>
-                   <div className="font-bold text-lg">{item.value ? item.value.toFixed(1) : 'N/A'}</div>
+                   <div className="font-bold text-lg">{formattedValue}</div>
                  </div>
                  <p className="text-muted-foreground text-sm">{item.reason}</p>
               </div>
-            ))}
+            )})}
           </div>
         </SheetContent>
       </Sheet>
