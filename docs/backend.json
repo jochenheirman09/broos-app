@@ -236,6 +236,34 @@
       },
       "required": ["id", "title", "content", "category", "date"]
     },
+    "StaffUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StaffUpdate",
+      "type": "object",
+      "description": "Represents an insight for staff about team-level trends.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["Team Performance", "Player Wellness", "Injury Risk"] },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "title", "content", "category", "date"]
+    },
+    "ClubUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ClubUpdate",
+      "type": "object",
+      "description": "Represents a high-level insight for club management.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["Club Trends", "Team Comparison", "Resource Suggestion"] },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "title", "content", "category", "date"]
+    },
     "TeamSummary": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "TeamSummary",
@@ -356,6 +384,18 @@
           ]
         }
       },
+       {
+        "path": "/clubs/{clubId}/clubUpdates/{updateId}",
+        "definition": {
+          "entityName": "ClubUpdate",
+          "schema": { "$ref": "#/backend/entities/ClubUpdate" },
+          "description": "Stores high-level generated insights for club management.",
+          "params": [
+            { "name": "clubId", "description": "The club's ID." },
+            { "name": "updateId", "description": "The unique ID of the update." }
+          ]
+        }
+      },
       {
         "path": "/clubs/{clubId}/teams/{teamId}",
         "definition": {
@@ -386,6 +426,19 @@
             { "name": "clubId", "description": "The club's ID." },
             { "name": "teamId", "description": "The team's ID." },
             { "name": "summaryId", "description": "The summary's ID (e.g., 'weekly-2024-20')." }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/teams/{teamId}/staffUpdates/{updateId}",
+        "definition": {
+          "entityName": "StaffUpdate",
+          "schema": { "$ref": "#/backend/entities/StaffUpdate" },
+          "description": "Stores generated insights about the team for staff.",
+          "params": [
+            { "name": "clubId", "description": "The club's ID." },
+            { "name": "teamId", "description": "The team's ID." },
+            { "name": "updateId", "description": "The unique ID of the update." }
           ]
         }
       }

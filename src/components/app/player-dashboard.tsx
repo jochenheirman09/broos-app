@@ -13,7 +13,6 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
-import { Separator } from "../ui/separator";
 
 export function PlayerDashboard() {
   const { userProfile } = useUser();
@@ -34,18 +33,6 @@ export function PlayerDashboard() {
           </Link>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Jouw Recente Weetjes</CardTitle>
-          <CardDescription>
-            Interessante inzichten en vergelijkingen met je team.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PlayerUpdates />
-        </CardContent>
-      </Card>
       
       <Card>
         <CardHeader>
@@ -56,6 +43,18 @@ export function PlayerDashboard() {
         </CardHeader>
         <CardContent>
           <WellnessChart />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Jouw Recente Weetjes</CardTitle>
+          <CardDescription>
+            Interessante inzichten en vergelijkingen met je team.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PlayerUpdates />
         </CardContent>
       </Card>
     </div>

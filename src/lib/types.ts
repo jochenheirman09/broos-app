@@ -79,6 +79,23 @@ export interface PlayerUpdate {
   date: string; // YYYY-MM-DD
 }
 
+export interface StaffUpdate {
+  id: string;
+  title: string;
+  content: string;
+  category: 'Team Performance' | 'Player Wellness' | 'Injury Risk';
+  date: string;
+}
+
+export interface ClubUpdate {
+    id: string;
+    title: string;
+    content: string;
+    category: 'Club Trends' | 'Team Comparison' | 'Resource Suggestion';
+    date: string;
+}
+
+
 export interface TeamSummary {
     id: string; // e.g., 'weekly-2024-20'
     teamId: string;

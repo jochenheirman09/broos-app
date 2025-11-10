@@ -109,6 +109,15 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && isResponsible() && isClubOwner(clubId);
 
       /**
+       * @description Enforces access control for club-level updates.
+       * @path /clubs/{clubId}/clubUpdates/{updateId}
+       */
+      match /clubUpdates/{updateId} {
+        allow read: if isClubOwner(clubId);
+        allow write: if false; // Only backend processes can write
+      }
+
+      /**
        * @description Enforces access control for team documents within a club.
        * @path /clubs/{clubId}/teams/{teamId}
        */
@@ -125,6 +134,16 @@ service cloud.firestore {
         match /summaries/{summaryId} {
             // Only the club owner can create/manage team summaries.
             allow read, write: if isClubOwner(clubId);
+        }
+
+        /**
+         * @description Enforces access control for staff updates on a team.
+         * @path /clubs/{clubId}/teams/{teamId}/staffUpdates/{updateId}
+         */
+        match /staffUpdates/{updateId} {
+            // Club owner and assigned staff (future rule) can read.
+            allow read: if isClubOwner(clubId);
+            allow write: if false; // Only backend processes can write
         }
       }
     }
