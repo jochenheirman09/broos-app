@@ -13,15 +13,33 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, limit, query } from "firebase/firestore";
+import { Chat } from "@/lib/types";
 
 export function PlayerDashboard() {
-  const { userProfile } = useUser();
+  const { userProfile, user } = useUser();
+  const db = useFirestore();
+
+  const firstName = userProfile?.name.split(" ")[0];
+
+  // Check if there's any chat history to adjust the button text
+  const previousChatsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(db, "users", user.uid, "chats"), limit(1));
+  }, [user, db]);
+
+  const { data: previousChats } = useCollection<Chat>(previousChatsQuery);
+
+  const hasChatHistory = previousChats ? previousChats.length > 0 : false;
 
   return (
     <div className="space-y-6">
       <Card className="text-center">
         <CardHeader>
-          <CardTitle>Jouw Dashboard</CardTitle>
+          <CardTitle>
+            Jouw Dashboard{firstName ? `, ${firstName}` : ""}
+          </CardTitle>
           <CardDescription>
             Klaar voor je dagelijkse check-in met Broos?
           </CardDescription>
@@ -29,7 +47,9 @@ export function PlayerDashboard() {
         <CardContent>
           <Link href="/chat">
             <Button size="lg" className="w-full sm:w-auto">
-              Start Gesprek met Broos
+              {hasChatHistory
+                ? "Zet je gesprek verder met Broos"
+                : "Start Gesprek met Broos"}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
