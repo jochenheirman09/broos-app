@@ -130,7 +130,16 @@ export function WellnessChart() {
               return (
                 <g transform={`translate(${x},${y})`}>
                   <text
-                    x={-10}
+                    x={-25}
+                    y={0}
+                    dy={4}
+                    textAnchor="end"
+                    className="text-lg"
+                  >
+                    {item?.emoji}
+                  </text>
+                  <text
+                    x={-5}
                     y={0}
                     dy={4}
                     textAnchor="end"
@@ -139,19 +148,10 @@ export function WellnessChart() {
                   >
                     {item?.metric}
                   </text>
-                  <text
-                    x={-30}
-                    y={0}
-                    dy={4}
-                    textAnchor="end"
-                    className="text-lg"
-                  >
-                    {item?.emoji}
-                  </text>
                 </g>
               );
             }}
-            width={100}
+            width={120}
           />
           <XAxis dataKey="value" type="number" hide domain={[0, 5]} />
           <ChartTooltip
