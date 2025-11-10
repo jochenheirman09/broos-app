@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { chatWithBuddy } from "@/ai/flows/buddy-flow";
-import { saveWellnessScores, saveAlert } from "@/lib/wellness";
+import { saveWellnessScores, saveAlert } from "@/lib/firebase/firestore/wellness";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
