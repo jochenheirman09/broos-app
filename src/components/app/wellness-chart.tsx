@@ -31,6 +31,10 @@ const chartConfig = {
   sleep: { label: "Slaap", color: "hsl(var(--chart-3))" },
   motivation: { label: "Motivatie", color: "hsl(var(--chart-4))" },
   rest: { label: "Rust", color: "hsl(var(--chart-5))" },
+  familyLife: { label: "Thuis", color: "hsl(var(--chart-1))" },
+  school: { label: "School", color: "hsl(var(--chart-2))" },
+  hobbys: { label: "Hobby's", color: "hsl(var(--chart-3))" },
+  food: { label: "Voeding", color: "hsl(var(--chart-4))" },
 } satisfies ChartConfig;
 
 const EMOJIS = ["", "😞", "😟", "😐", "🙂", "😄"];
@@ -55,9 +59,9 @@ const CustomBar = (props: any) => {
         {ratingText}
       </text>
        <text
-        x={x + width - 40}
+        x={x + 15}
         y={y + height / 2}
-        textAnchor="end"
+        textAnchor="start"
         dy=".35em"
         className="text-lg"
       >
@@ -159,7 +163,7 @@ export function WellnessChart() {
 
   return (
     <div className="space-y-4">
-      <div className="h-80 w-full">
+      <div className="h-[26rem] w-full">
         <ChartContainer config={chartConfig} className="w-full h-full">
           <BarChart
             accessibilityLayer

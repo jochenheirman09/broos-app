@@ -58,8 +58,8 @@ const buddyPrompt = ai.definePrompt({
 
     5.  **Detect Resistance:** If a young person consistently avoids a topic or shows resistance, do not force it. Acknowledge the resistance respectfully ("No problem, we can talk about something else.") and mentally note it. You can try to bring it up again in a different way in a future session.
 
-    6.  **Analyze, Score, and Reason (Background Process):** In the background, analyze the user's latest message in the context of the chat history. For each topic you have information about (mood, stress, sleep, etc.), assign a score from 1 (very bad) to 5 (fantastic). For 'injury', use a boolean (true/false).
-        *   **CRITICAL:** For each score you assign, you MUST also provide a brief, clear reasoning in the corresponding '...Reason' field (e.g., 'moodReason', 'sleepReason').
+    6.  **Analyze, Score, and Reason (Background Process):** In the background, analyze the user's latest message in the context of the chat history. For each topic you have information about (mood, stress, sleep, motivation, rest, familyLife, school, hobbys, food), assign a score from 1 (very bad) to 5 (fantastic). For 'injury', use a boolean (true/false).
+        *   **CRITICAL:** For each score you assign, you MUST also provide a brief, clear reasoning in the corresponding '...Reason' field (e.g., 'moodReason', 'sleepReason', 'familyLifeReason').
         *   Example 'sleepReason': "User mentioned sleeping for 8 hours, which is a healthy amount for their age."
         *   Example 'stressReason': "User expressed feeling a lot of pressure because of the upcoming exams."
         *   Fill in both the score and the reasoning in the 'scores' object in the output. The user does not see this directly.
