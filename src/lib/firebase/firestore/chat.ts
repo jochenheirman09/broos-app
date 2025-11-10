@@ -9,8 +9,8 @@ import {
 } from "firebase/firestore";
 
 /**
- * Deletes all chat documents and their associated message subcollections for a specific user.
- * This function is intended for testing and development purposes.
+ * Deletes all chat documents, their associated message subcollections, and all wellness scores for a specific user.
+ * This function is intended for testing and development purposes for a full data reset.
  * @param db The Firestore instance.
  * @param userId The ID of the user whose chats should be deleted.
  */
@@ -23,16 +23,13 @@ export async function deleteAllUserChats(
   }
 
   const batch = writeBatch(db);
+
+  // 1. Delete all chats and their messages
   const chatsRef = collection(db, "users", userId, "chats");
   const chatsSnapshot = await getDocs(chatsRef);
 
-  // If there are no chats, there's nothing to do.
-  if (chatsSnapshot.empty) {
-    return;
-  }
-
-  // Iterate over each chat document to delete its messages subcollection
   for (const chatDoc of chatsSnapshot.docs) {
+    // Delete subcollection of messages
     const messagesRef = collection(
       db,
       "users",
@@ -42,16 +39,21 @@ export async function deleteAllUserChats(
       "messages"
     );
     const messagesSnapshot = await getDocs(query(messagesRef));
-
-    // Add all messages in the subcollection to the batch for deletion
     messagesSnapshot.forEach((messageDoc) => {
       batch.delete(messageDoc.ref);
     });
 
-    // Add the parent chat document to the batch for deletion
+    // Delete the parent chat document
     batch.delete(chatDoc.ref);
   }
 
+  // 2. Delete all wellness scores
+  const wellnessScoresRef = collection(db, "users", userId, "wellnessScores");
+  const wellnessScoresSnapshot = await getDocs(wellnessScoresRef);
+  wellnessScoresSnapshot.forEach((scoreDoc) => {
+    batch.delete(scoreDoc.ref);
+  });
+  
   // Commit the batch operation
   await batch.commit();
 }
