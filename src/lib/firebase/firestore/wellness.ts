@@ -29,8 +29,17 @@ export async function saveWellnessScores({
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const wellnessRef = doc(db, "users", userId, "wellnessScores", today);
 
+  // Filter out any '...Reason' fields that are empty or null
+  const cleanedScores = Object.entries(scores).reduce((acc, [key, value]) => {
+    if (value !== null && value !== undefined && value !== '') {
+      (acc as any)[key] = value;
+    }
+    return acc;
+  }, {} as Partial<WellnessScore>);
+
+
   const dataToSave: Partial<WellnessScore> & { updatedAt: any } = {
-    ...scores,
+    ...cleanedScores,
     id: today,
     date: today,
     summary,

@@ -15,15 +15,25 @@ export type BuddyInput = z.infer<typeof BuddyInputSchema>;
 
 export const ScoreSchema = z.object({
   mood: z.optional(z.number().min(1).max(5)),
+  moodReason: z.optional(z.string().describe("The reasoning behind the mood score.")),
   stress: z.optional(z.number().min(1).max(5)),
+  stressReason: z.optional(z.string().describe("The reasoning behind the stress score.")),
   sleep: z.optional(z.number().min(1).max(5)),
+  sleepReason: z.optional(z.string().describe("The reasoning behind the sleep score.")),
   motivation: z.optional(z.number().min(1).max(5)),
+  motivationReason: z.optional(z.string().describe("The reasoning behind the motivation score.")),
   rest: z.optional(z.number().min(1).max(5)),
+  restReason: z.optional(z.string().describe("The reasoning behind the rest score.")),
   familyLife: z.optional(z.number().min(1).max(5)),
+  familyLifeReason: z.optional(z.string().describe("The reasoning behind the family life score.")),
   school: z.optional(z.number().min(1).max(5)),
+  schoolReason: z.optional(z.string().describe("The reasoning behind the school score.")),
   hobbys: z.optional(z.number().min(1).max(5)),
+  hobbysReason: z.optional(z.string().describe("The reasoning behind the hobbys score.")),
   food: z.optional(z.number().min(1).max(5)),
+  foodReason: z.optional(z.string().describe("The reasoning behind the food score.")),
   injury: z.optional(z.boolean()),
+  injuryReason: z.optional(z.string().describe("The reasoning behind the injury status.")),
   freeText: z.optional(z.string()),
   shareWithStaff: z.optional(z.boolean()),
 });
@@ -45,7 +55,7 @@ export const BuddyOutputSchema = z.object({
       'An empathetic, context-aware, and psychologically sound response.'
     ),
   scores: ScoreSchema.describe(
-    'The scores generated based on the analysis of the latest user message.'
+    'The scores and reasoning generated based on the analysis of the latest user message.'
   ),
   alerts: z
     .array(AlertSchema)

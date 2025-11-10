@@ -29,15 +29,25 @@ export interface WellnessScore {
   id: string; // YYYY-MM-DD
   date: string; // YYYY-MM-DD
   mood?: number;
+  moodReason?: string;
   stress?: number;
+  stressReason?: string;
   sleep?: number;
+  sleepReason?: string;
   motivation?: number;
+  motivationReason?: string;
   rest?: number;
+  restReason?: string;
   familyLife?: number;
+  familyLifeReason?: string;
   school?: number;
+  schoolReason?: string;
   hobbys?: number;
+  hobbysReason?: string;
   food?: number;
+  foodReason?: string;
   injury?: boolean;
+  injuryReason?: string;
   freeText?: string;
   shareWithStaff?: boolean;
   summary?: string; // AI generated summary for the day
