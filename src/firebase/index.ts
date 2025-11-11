@@ -2,6 +2,7 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAnalytics, type Analytics } from 'firebase/analytics';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore'
 
@@ -9,9 +10,9 @@ import { getFirestore, type Firestore } from 'firebase/firestore'
  * Initializes a Firebase app instance, handling both client-side and server-side
  * environments, as well as automatic configuration from Firebase Hosting.
  *
- * @returns An object containing the initialized FirebaseApp, Auth, and Firestore instances.
+ * @returns An object containing the initialized FirebaseApp, Auth, Firestore, and Analytics instances.
  */
-export function initializeFirebase(): { firebaseApp: FirebaseApp; auth: Auth; firestore: Firestore } {
+export function initializeFirebase(): { firebaseApp: FirebaseApp; auth: Auth; firestore: Firestore, analytics: Analytics | null } {
   // If no apps are initialized, create a new one.
   if (!getApps().length) {
     let firebaseApp: FirebaseApp;
@@ -44,10 +45,16 @@ export function initializeFirebase(): { firebaseApp: FirebaseApp; auth: Auth; fi
  * @returns An object containing the Auth and Firestore SDKs.
  */
 function getSdks(firebaseApp: FirebaseApp) {
+  let analytics: Analytics | null = null;
+  if (typeof window !== 'undefined') {
+    // Analytics is only available in the browser
+    analytics = getAnalytics(firebaseApp);
+  }
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
+    firestore: getFirestore(firebaseApp),
+    analytics,
   };
 }
 
