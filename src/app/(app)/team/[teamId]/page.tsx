@@ -62,10 +62,11 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
 }
 
 export default function TeamMembersPage({
-  params: { teamId },
+  params,
 }: {
   params: { teamId: string };
 }) {
+  const { teamId } = params;
   const { userProfile } = useUser();
   const db = useFirestore();
   
@@ -77,6 +78,12 @@ export default function TeamMembersPage({
   useEffect(() => {
     if (!db || !userProfile?.clubId || !teamId) {
       console.log("Not fetching: db, userProfile.clubId, or teamId is missing.", { db, userProfile, teamId });
+      // Set loading to false if we can't fetch, to prevent infinite spinner
+      if (!userProfile?.clubId && !isLoading) {
+        // Only set error if we are not already in a loading state, and clubId is the issue
+        setError("Gebruikersprofiel is nog niet geladen of bevat geen club ID.");
+      }
+      if (isLoading) setIsLoading(false);
       return;
     }
 
@@ -86,7 +93,7 @@ export default function TeamMembersPage({
       console.log(`Starting data fetch for teamId: ${teamId} in club: ${userProfile.clubId}`);
       
       try {
-        // Step 1: Fetch team details
+        // Step 1: Fetch team details to display the team name
         const teamRef = doc(db, `clubs/${userProfile.clubId}/teams/${teamId}`);
         console.log("Fetching team document from path:", teamRef.path);
         const teamSnap = await getDoc(teamRef);
@@ -100,9 +107,9 @@ export default function TeamMembersPage({
           throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
         }
 
-        // Step 2: Fetch members for that team
+        // Step 2: Fetch members for that team. This is the query that requires permission.
         const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
-        console.log("Executing members query:", membersQuery);
+        console.log("Executing members query for teamId:", teamId);
 
         const membersSnapshot = await getDocs(membersQuery);
         console.log(`Query completed. Found ${membersSnapshot.docs.length} members.`);
@@ -116,12 +123,12 @@ export default function TeamMembersPage({
 
       } catch (e: any) {
         console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
-        if (e.code === 'permission-denied' || e instanceof FirestorePermissionError) {
+        if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
-                path: 'users',
+                path: 'users', // This is the path we are querying
                 operation: 'list',
             });
-            console.log("Emitting permission-error via errorEmitter.");
+            console.log("Emitting permission-error via errorEmitter for a 'list' operation on 'users'.");
             errorEmitter.emit('permission-error', permissionError);
             setError(permissionError.message);
         } else {
@@ -134,7 +141,7 @@ export default function TeamMembersPage({
     };
 
     fetchData();
-  }, [db, userProfile?.clubId, teamId]);
+  }, [db, userProfile, teamId, isLoading]);
 
 
   return (
