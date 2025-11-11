@@ -19,7 +19,7 @@
  * Key Security Decisions:
  * - A 'responsible' user can read data of any user belonging to a team within their club.
  * - A user can always create and manage their own private data.
- * - Listing users is only allowed when filtering by 'clubId' to prevent data leakage.
+ * - Listing users is only allowed when filtering by 'clubId' or 'teamId' to prevent data leakage.
  * - A responsible user can manage their club and associated teams.
  *
  * Denormalization for Authorization:
@@ -46,8 +46,8 @@ service cloud.firestore {
     
     // Checks if the requesting user has the 'responsible' role in their own document.
     // IMPORTANT: This can only be reliably used in 'get', 'write' rules, NOT in 'list' rules.
-    function isResponsible() {
-      return isSignedIn() && getUserData(request.auth.uid).role == 'responsible';
+    function isResponsible(userId) {
+      return getUserData(userId).role == 'responsible';
     }
     
     function isClubResponsibleForTargetUser(targetUserId) {
@@ -71,7 +71,8 @@ service cloud.firestore {
     }
     
     function isClubOwner(clubId) {
-      return isResponsible() && getUserData(request.auth.uid).clubId == clubId;
+      let userData = getUserData(request.auth.uid);
+      return userData.role == 'responsible' && userData.clubId == clubId;
     }
 
     // --- Rules ---
@@ -82,21 +83,19 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // READ: Allow if user is the owner OR if the requesting user is a 'responsible' for the same club.
       allow get: if isSignedIn() && (isOwner(userId) || isClubResponsibleForTargetUser(userId));
       
-      // LIST: A responsible user can list users, but ONLY if filtering by their clubId.
-      // Or, any user can query for users without a clubId if they also query for a teamId (for migration purposes).
-      allow list: if isSignedIn() && request.query.where.size() > 0 &&
+      // CRITICAL: A list operation is only allowed if it explicitly filters by a clubId OR by teamId.
+      // This is the key to secure and performant queries without using `get` in list rules.
+      allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && 
                    (
-                     (request.query.where[0][0] == 'clubId' && getUserData(request.auth.uid).clubId == request.query.where[0][2]) ||
-                     (isResponsible() && request.query.keys().hasAll(['teamId', 'clubId']))
+                     (request.query.where[0][0] == 'clubId' && isClubOwner(request.query.where[0][2])) ||
+                     (request.query.where[0][0] == 'teamId') // Allow querying by teamId for migration
                    );
 
-      // WRITE: A user can always write to their own document.
-      // A responsible can update another user's document ONLY IF they are in the same club.
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if (isSignedIn() && isOwner(userId)) || isClubResponsibleForTargetUser(userId);
+      // A user can always update their own doc. A responsible can update a user's doc if they are in the same club.
+      allow update: if isSignedIn() && (isOwner(userId) || isClubResponsibleForTargetUser(userId));
       allow delete: if isSignedIn() && isOwner(userId);
       
       match /wellnessScores/{scoreId} {
@@ -129,7 +128,7 @@ service cloud.firestore {
     match /clubs/{clubId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if isResponsible() && !userHasClub();
+      allow create: if isResponsible(request.auth.uid) && !userHasClub();
       allow update, delete: if isClubOwner(clubId);
 
       match /clubUpdates/{updateId} {

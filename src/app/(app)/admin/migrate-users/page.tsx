@@ -56,57 +56,54 @@ export default function MigrateUsersPage() {
     setError(null);
 
     try {
-      // Stap 1: Haal ALLE gebruikers op die bij DEZE club horen.
-      // Dit is een veilige query die voldoet aan de nieuwe security rules.
-      const clubUsersQuery = query(collection(db, "users"), where("clubId", "==", userProfile.clubId));
-      const usersSnapshot = await getDocs(clubUsersQuery);
+      // Step 1: Get all teams for the current club.
+      const teamsRef = collection(db, `clubs/${userProfile.clubId}/teams`);
+      const teamsSnapshot = await getDocs(teamsRef);
+      const teamIds = teamsSnapshot.docs.map(doc => doc.id);
 
-      const allUsersInClub = usersSnapshot.docs.map(
-        (d) => ({ ...d.data(), id: d.id } as WithId<UserProfile>)
-      );
-
-      // In deze context filteren we de gebruikers die gerepareerd moeten worden.
-      // Een gebruiker heeft reparatie nodig als ze een teamId hebben, maar GEEN clubId.
-      // Omdat we al op clubId filteren, is deze logica hier nu voor toekomstige reparaties,
-      // maar we breiden dit uit voor het "Maxime Rupus"-scenario.
-      
-      const usersToProcess = allUsersInClub.filter(u => !u.clubId && u.teamId);
-      const skipped = allUsersInClub.filter(u => u.clubId);
-      
-      setSkippedUsers(skipped.map(u => `${u.name} (Reden: Heeft al een clubId)`));
-
-      // HET "MAXIME RUPUS" SCENARIO: Vind gebruikers die wel een teamId hebben maar geen clubId.
-      // Dit vereist een collectionGroup query, wat we in een eerdere stap hebben geprobeerd.
-      // Nu lossen we het anders op: We nemen aan dat een 'responsible' weet welke teams bij de club horen.
-      // We halen alle gebruikers zonder clubId op.
-      
-      // Let's try to find users without a clubId but with a teamId we might know about.
-      // This is difficult without being able to list all users.
-      // The best approach here is to fix Maxime Rupus manually or to ensure the query catches him.
-      // The previous query was correct but the rules were wrong. Let's retry that logic with the CORRECT rules.
-      
-      // Since we can't query for "not exists", we query for users WITHIN the club
-      // and check their state. Maxime was not found because he had NO clubId.
-      
-      // New strategy: fetch all teams for the club, then fetch users for each team. This is inefficient.
-      // The most direct way is to fix the query on THIS page.
-
-      // We will assume for now that the main goal is to fix users that are *discoverable*.
-      // Let's find Maxime by querying teams first.
-
-      if (usersToProcess.length === 0 && allUsersInClub.length > 0) {
-        // If no one in the club needs processing, it implies they are all ok.
-        // The problem is finding users NOT IN THE CLUB yet.
+      if (teamIds.length === 0) {
         setStatus("success");
-        setUpdatedUsers(["Geen direct te repareren gebruikers gevonden in de club. Als er nog spelers missen, controleer hun profiel handmatig in Firestore."]);
+        setUpdatedUsers(["Geen teams gevonden in uw club. Er zijn geen gebruikers om te migreren."]);
+        return;
+      }
+
+      // Step 2: For each team, find users that have this teamId but no clubId.
+      const usersToUpdate: WithId<UserProfile>[] = [];
+      
+      const usersRef = collection(db, "users");
+      // Firestore does not support '!= null' or 'not-in' queries on different fields.
+      // So we query for users with a teamId and then filter client-side.
+      // We can query for users in chunks of 10 teamIds.
+      const CHUNK_SIZE = 10;
+      for (let i = 0; i < teamIds.length; i += CHUNK_SIZE) {
+        const teamIdChunk = teamIds.slice(i, i + CHUNK_SIZE);
+        const usersQuery = query(usersRef, where("teamId", "in", teamIdChunk));
+        const usersSnapshot = await getDocs(usersQuery);
+        
+        usersSnapshot.forEach(userDoc => {
+          const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
+          // This is the user we need to fix!
+          if (!userData.clubId) {
+            usersToUpdate.push(userData);
+          } else {
+             skippedUsers.push(`${userData.name} (Reden: Heeft al een clubId)`);
+          }
+        });
+      }
+
+      setSkippedUsers(skippedUsers);
+      
+      if (usersToUpdate.length === 0) {
+        setStatus("success");
+        setUpdatedUsers(["Geen gebruikers gevonden die een `clubId` missen."]);
         return;
       }
       
+      // Step 3: Create a batch write to update all found users.
       const batch = writeBatch(db);
       const updatedNames: string[] = [];
 
-      for (const user of usersToProcess) {
-        // Omdat de 'responsible' deze actie uitvoert, gebruiken we diens clubId.
+      for (const user of usersToUpdate) {
         const userRef = doc(db, "users", user.id);
         batch.update(userRef, { clubId: userProfile.clubId });
         updatedNames.push(`${user.name} (ID: ${user.id}) gekoppeld aan club ${userProfile.clubId}`);
@@ -120,11 +117,11 @@ export default function MigrateUsersPage() {
       console.error("Migratiefout:", e);
        if (e.code === 'permission-denied' || (e.message && e.message.includes('permission'))) {
         const permissionError = new FirestorePermissionError({
-                path: `users (querying on clubId: ${userProfile.clubId})`,
+                path: `users (querying on teamIds)`,
                 operation: 'list',
             });
         errorEmitter.emit('permission-error', permissionError);
-        setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De 'responsible' rol moet het recht hebben om alle gebruikers te listen.");
+        setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De regels moeten een query op 'teamId' toestaan.");
       } else {
         setError(e.message || "Er is een onbekende fout opgetreden.");
       }
@@ -141,7 +138,7 @@ export default function MigrateUsersPage() {
             Gebruikersmigratie (Club ID's)
           </CardTitle>
           <CardDescription>
-            Dit script controleert alle gebruikers die aan jouw club zijn gekoppeld en voegt een `clubId` toe als deze ontbreekt. Voer dit uit om bestaande gebruikers te repareren.
+            Dit script vindt alle gebruikers in uw teams die nog geen 'clubId' hebben en voegt deze toe. Voer dit eenmalig uit om bestaande gebruikers te repareren.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -163,7 +160,7 @@ export default function MigrateUsersPage() {
           {status === "loading" && (
             <div className="flex items-center justify-center p-8 text-muted-foreground">
               <Spinner size="large" />
-              <p className="ml-4">Gebruikers controleren en bijwerken...</p>
+              <p className="ml-4">Teams doorzoeken en gebruikers bijwerken...</p>
             </div>
           )}
 
@@ -175,16 +172,14 @@ export default function MigrateUsersPage() {
               </AlertTitle>
               <AlertDescription className="text-green-700">
                 <p className="font-bold mb-2">
-                  {updatedUsers.length} gebruiker(s) succesvol bijgewerkt:
+                  {updatedUsers.length > 0 ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Geen gebruikers te updaten.'}
                 </p>
-                {updatedUsers.length > 0 ? (
-                  <ul className="list-disc pl-5 text-sm">
+                {updatedUsers.length > 0 && (
+                  <ul className="list-disc pl-5 text-sm max-h-40 overflow-y-auto">
                     {updatedUsers.map((name) => (
                       <li key={name}>{name}</li>
                     ))}
                   </ul>
-                ) : (
-                  <p>Geen gebruikers in deze club gevonden die een update nodig hadden.</p>
                 )}
                  <p className="font-bold mt-4 mb-2">
                   {skippedUsers.length} gebruiker(s) overgeslagen:
