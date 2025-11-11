@@ -94,6 +94,15 @@ export default function TeamU12Page() {
     if (isUserLoading || !db) {
       return;
     }
+    
+    // Wacht tot userProfile met de cruciale clubId geladen is.
+    if (!userProfile?.clubId) {
+        if (!isUserLoading) { // Toon alleen als het laden echt klaar is.
+            setError("Gebruikersprofiel is niet volledig geladen of bevat geen club ID. Kan de query niet uitvoeren.");
+            setIsLoading(false);
+        }
+        return;
+    }
 
     const fetchTeamMembers = async () => {
       setIsLoading(true);
@@ -105,17 +114,9 @@ export default function TeamU12Page() {
       const teamName = "U12";
 
       try {
-        // Stap 1: Vind de club ID voor "SK Beveren"
-        console.log(`Query Stap 1: Club '${clubName}' zoeken...`);
-        const clubsRef = collection(db, 'clubs');
-        const clubsQuery = query(clubsRef, where('name', '==', clubName));
-        const clubSnapshot = await getDocs(clubsQuery);
-
-        if (clubSnapshot.empty) {
-          throw new Error(`Club '${clubName}' niet gevonden.`);
-        }
-        const clubId = clubSnapshot.docs[0].id;
-        console.log(`Club gevonden met ID: ${clubId}`);
+        // We gebruiken nu de clubId van de ingelogde gebruiker, dit is veel robuuster.
+        const clubId = userProfile.clubId;
+        console.log(`Query Stap 1 & 2: Club ID '${clubId}' gebruiken van ingelogde gebruiker.`);
 
         // Stap 2: Vind de team ID voor "U12" binnen de gevonden club
         console.log(`Query Stap 2: Team '${teamName}' zoeken in club '${clubId}'...`);
@@ -130,11 +131,11 @@ export default function TeamU12Page() {
         const teamId = teamSnapshot.docs[0].id;
         console.log(`Team gevonden met ID: ${teamId}`);
 
-        // Stap 3: Haal leden op met een samengestelde query
+        // Stap 3: Haal leden op met een samengestelde query die nu voldoet aan de security rules
         console.log(`Query Stap 3: Leden ophalen met clubId='${clubId}' EN teamId='${teamId}'...`);
         const membersQuery = query(
             collection(db, 'users'), 
-            where('clubId', '==', clubId),
+            where('clubId', '==', clubId), // <-- Essentiële toevoeging om te voldoen aan de regel
             where('teamId', '==', teamId)
         );
         const membersSnapshot = await getDocs(membersQuery);
@@ -156,8 +157,20 @@ export default function TeamU12Page() {
 
         if (errorMessage.toLowerCase().includes("index")) {
             setIsIndexError(true);
-        } else if (e.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({ path: 'users', operation: 'list' });
+        }
+        
+        // Specifieke error voor permissies
+        if (e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: 'users',
+                operation: 'list',
+                requestResourceData: {
+                  query: {
+                    clubId: userProfile.clubId,
+                    teamName: teamName
+                  }
+                }
+            });
             errorEmitter.emit('permission-error', permissionError);
             setError(`Permissiefout: ${permissionError.message}. Zorg ervoor dat de regels een query met clubId en teamId toestaan.`);
         }
@@ -202,7 +215,7 @@ export default function TeamU12Page() {
                        <div>
                          <HelpCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                          <p className="font-bold">Query geslaagd, maar geen resultaten</p>
-                         <p className="text-muted-foreground">Er zijn geen gebruikersdocumenten gevonden die voldoen aan<br/> `clubId` == 'SK Beveren' AND `teamId` == 'U12'.</p>
+                         <p className="text-muted-foreground">Er zijn geen gebruikersdocumenten gevonden die voldoen aan<br/> `clubId` == '{userProfile?.clubId}' AND `teamId` == 'U12'.</p>
                        </div>
                     </div>
                 )}

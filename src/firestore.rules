@@ -45,10 +45,23 @@ service cloud.firestore {
     }
     
     function isResponsible() {
-      // Rely on custom claims for performance and security.
-      // The role in the user document can be used for UI purposes, but rules should use claims.
-      return request.auth.token.role == 'responsible';
+      // FIX: Check role from the user's document in Firestore, NOT from a custom claim that is missing.
+      return isSignedIn() && getUserData(request.auth.uid).role == 'responsible';
     }
+    
+    function isClubResponsibleForTargetUser(targetUserId) {
+        let responsibleData = getUserData(request.auth.uid);
+        let targetUserData = getUserData(targetUserId);
+
+        // A responsible must have a clubId. A target user must have a clubId to be checked.
+        if (responsibleData.clubId == null || targetUserData.clubId == null) {
+            return false;
+        }
+
+        // The club IDs must match.
+        return isResponsible() && responsibleData.clubId == targetUserData.clubId;
+    }
+
 
     function userHasClub() {
       let userData = getUserData(request.auth.uid);
@@ -56,37 +69,26 @@ service cloud.firestore {
     }
     
     function isClubOwner(clubId) {
-      return isResponsible() && getUserData(request.auth.uid).clubId == clubId;
-    }
-    
-    // Checks if the responsible user is authorized to access the target user's data.
-    // This is true if the target user's clubId matches the responsible user's clubId.
-    function isClubResponsibleForTargetUser(targetUserId) {
-        let responsibleData = getUserData(request.auth.uid);
-        let targetUserData = getUserData(targetUserId);
-
-        if (responsibleData.clubId == null || targetUserData.clubId == null) {
-            return false;
-        }
-        
-        return isResponsible() && responsibleData.clubId == targetUserData.clubId;
+      let user = getUserData(request.auth.uid);
+      return isSignedIn() 
+        && user.role == 'responsible'
+        && user.clubId == clubId;
     }
 
     /**
      * @description Logs debug information for failed requests.
      * Always returns false so it can be used in a rule chain.
      */
-    function debug(message, details) {
+    function debug(message) {
       return debug({
         "rule_message": message,
-        "details": details,
-        "request": {
-          "auth_uid": request.auth.uid,
-          "auth_role_claim": request.auth.token.role,
-          "method": request.method,
-          "path": request.path,
-          "query": request.query
-        }
+        "request_auth_uid": request.auth.uid,
+        "request_auth_role_from_doc": getUserData(request.auth.uid).role,
+        "request_method": request.method,
+        "request_path": request.path,
+        "resource_data": resource.data,
+        "request_query": request.query,
+        "requesting_user_clubId": getUserData(request.auth.uid).clubId,
       });
     }
 
@@ -94,74 +96,77 @@ service cloud.firestore {
 
     match /{path=**}/teams/{teamId} {
       // This is a collection group query, be careful. Only allow reads if there is a where clause on invitationCode.
-      allow get: if isSignedIn() || debug("Allow any signed in user to get team", null);
-      allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode' || debug("Allow any signed in user to find a team by code", null);
+      allow get: if isSignedIn() || debug("Allow any signed in user to get team");
+      allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode' || debug("Allow any signed in user to find a team by code");
     }
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isClubResponsibleForTargetUser(userId) || debug("Allow owner or club responsible to get user", {"targetUserId": userId});
+      allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
       
-      // Allow a responsible user to list users, but ONLY if they filter by a clubId that matches their own.
-      // This is the CRUCIAL rule for the team members page.
-      allow list: if isResponsible()
+      // FIX: This rule now correctly requires a filter on 'clubId' for any list operation by a responsible user.
+      allow list: if isResponsible() 
                     && getUserData(request.auth.uid).clubId != null
-                    && request.query.keys().hasAny(['where'])
+                    && request.query.keys().hasAny(['where']) 
                     && request.query.where.map(w => w[0] == 'clubId' && w[2] == getUserData(request.auth.uid).clubId).hasAny([true])
-                    || debug("Allow responsible to list users ONLY when filtered by their own clubId", null);
-      
-      allow create: if isOwner(userId) || debug("Allow owner to create user doc", null);
-      allow update: if isOwner(userId) || debug("Allow owner to update user doc", null);
-      allow delete: if isOwner(userId) || debug("Allow owner to delete user doc", null);
+                    || debug("Allow responsible to list users ONLY when filtered by their own clubId");
+
+      allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
+      allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
+      allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       
       match /wellnessScores/{scoreId} {
-        allow read, write: if isOwner(userId) || isClubResponsibleForTargetUser(userId) || debug("Allow owner or club responsible to read/write wellness", {"targetUserId": userId});
+        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write wellness");
       }
 
       match /trainings/{trainingId} {
-        allow read, write: if isOwner(userId) || isClubResponsibleForTargetUser(userId) || debug("Allow owner or club responsible to read/write trainings", {"targetUserId": userId});
+        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write trainings");
       }
       
       match /chats/{chatId} {
-        allow read, write: if isOwner(userId) || isClubResponsibleForTargetUser(userId) || debug("Allow owner or club responsible to read/write chats", {"targetUserId": userId});
+        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write chats");
         
         match /messages/{messageId} {
-          allow read, write: if isOwner(userId) || isClubResponsibleForTargetUser(userId) || debug("Allow owner or club responsible to read/write chat messages", {"targetUserId": userId});
+          allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write chat messages");
         }
       }
 
       match /alerts/{alertId} {
-        allow create: if isOwner(userId) || debug("Allow owner to create alerts", null);
-        allow read, update, delete: if isClubResponsibleForTargetUser(userId) || debug("Allow club responsible to manage alerts", {"targetUserId": userId}); 
+        // Users can create their own alerts (via the AI)
+        allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create alerts");
+        // Reading alerts will be restricted to staff/responsible.
+        allow read, update, delete: if (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow club responsible to manage alerts"); 
       }
 
       match /updates/{updateId} {
-        allow read: if isOwner(userId) || debug("Allow owner to read their updates", null);
+        // Users can read their own updates.
+        allow read: if isSignedIn() && isOwner(userId) || debug("Allow owner to read their updates");
+        // Updates are created by a backend process, not directly by users.
         allow write: if false;
       }
     }
 
     match /clubs/{clubId} {
-      allow get: if isSignedIn() || debug("Allow any signed in user to get club", null);
-      allow list: if isSignedIn() || debug("Allow any signed in user to list clubs", null);
-      allow create: if isResponsible() && !userHasClub() || debug("Allow responsible without a club to create one", null);
-      allow update, delete: if isClubOwner(clubId) || debug("Allow club owner to update/delete club", {"clubId": clubId});
+      allow get: if isSignedIn() || debug("Allow any signed in user to get club");
+      allow list: if isSignedIn() || debug("Allow any signed in user to list clubs");
+      allow create: if isSignedIn() && isResponsible() && !userHasClub() || debug("Allow responsible without a club to create one");
+      allow update, delete: if isClubOwner(clubId) || debug("Allow club owner to update/delete club");
 
       match /clubUpdates/{updateId} {
-        allow read: if isClubOwner(clubId) || debug("Allow club owner to read club updates", {"clubId": clubId});
-        allow write: if false;
+        allow read: if isClubOwner(clubId) || debug("Allow club owner to read club updates");
+        allow write: if false; // Only backend processes can write
       }
 
       match /teams/{teamId} {
-        allow get: if isSignedIn() || debug("Allow signed in users to get team", null);
-        allow list: if isClubOwner(clubId) || debug("Allow club owner to list their own teams", {"clubId": clubId});
-        allow create, update, delete: if isClubOwner(clubId) || debug("Allow club owner to manage teams", {"clubId": clubId});
+        allow get: if isSignedIn() || debug("Allow signed in users to get team");
+        allow list: if isClubOwner(clubId) || debug("Allow club owner to list their own teams");
+        allow create, update, delete: if isClubOwner(clubId) || debug("Allow club owner to manage teams");
 
         match /summaries/{summaryId} {
-            allow read, write: if isClubOwner(clubId) || debug("Allow club owner to r/w summaries", {"clubId": clubId});
+            allow read, write: if isClubOwner(clubId) || debug("Allow club owner to r/w summaries");
         }
 
         match /staffUpdates/{updateId} {
-            allow read: if isClubOwner(clubId) || debug("Allow club owner to read staff updates", {"clubId": clubId});
+            allow read: if isClubOwner(clubId) || debug("Allow club owner to read staff updates");
             allow write: if false;
         }
       }
