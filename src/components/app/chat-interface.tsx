@@ -23,6 +23,8 @@ import {
   limit,
   doc,
   updateDoc,
+  setDoc,
+  Firestore,
 } from "firebase/firestore";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -76,6 +78,25 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
   );
 }
 
+// Helper function to create/update the parent Chat document
+async function saveChatSummary(
+  db: Firestore,
+  userId: string,
+  date: string,
+  summary: string
+) {
+  const chatDocRef = doc(db, "users", userId, "chats", date);
+  const chatData = {
+    id: date,
+    userId: userId,
+    date: date,
+    summary: summary,
+    updatedAt: serverTimestamp(),
+  };
+  // Use setDoc with merge to create or update the summary
+  await setDoc(chatDocRef, chatData, { merge: true });
+}
+
 export function ChatInterface() {
   const { userProfile, user } = useUser();
   const db = useFirestore();
@@ -125,6 +146,8 @@ export function ChatInterface() {
                 timestamp: serverTimestamp(),
             }
         );
+        
+        await saveChatSummary(db, user.uid, today, adaptedResponse);
 
         const userRef = doc(db, "users", user.uid);
         const updates: any = {};
@@ -138,7 +161,6 @@ export function ChatInterface() {
         if(Object.keys(updates).length > 0) {
             await updateDoc(userRef, updates);
         }
-
 
     } catch (error) {
         console.error("Error fetching initial buddy message:", error);
@@ -218,6 +240,8 @@ export function ChatInterface() {
           timestamp: serverTimestamp(),
         }
       );
+      
+      await saveChatSummary(db, user.uid, today, adaptedResponse);
 
       const userRef = doc(db, "users", user.uid);
       const updates: any = {};
@@ -240,7 +264,7 @@ export function ChatInterface() {
           db,
           userId: user.uid,
           scores,
-          summary: adaptedResponse,
+          summary: adaptedResponse, // Use the same summary for the wellness score
         });
       }
 
