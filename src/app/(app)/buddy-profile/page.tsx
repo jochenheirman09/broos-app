@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -15,6 +15,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Sparkles, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "@/components/app/predefined-avatars";
+import { useUser } from "@/context/user-context";
+import { useFirestore } from "@/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { Spinner } from "@/components/ui/spinner";
+
 
 const predefinedAvatars = [
   { id: 'logo', component: LogoAvatar },
@@ -23,22 +28,48 @@ const predefinedAvatars = [
 ];
 
 export default function BuddyProfilePage() {
+  const { userProfile, user } = useUser();
+  const db = useFirestore();
   const { toast } = useToast();
-  // These will be loaded from the user's profile in the future
+  
   const [buddyName, setBuddyName] = useState("Broos");
-  const [selectedAvatar, setSelectedAvatar] = useState<string | null>('logo');
-  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
+  const [selectedAvatar, setSelectedAvatar] = useState<string>('logo');
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (userProfile) {
+      setBuddyName(userProfile.buddyName || "Broos");
+      setSelectedAvatar(userProfile.buddyAvatar || 'logo');
+    }
+  }, [userProfile]);
 
-  const handleSave = () => {
-    // In a real app, you would save the buddyName and the selected avatar
-    // (either the ID of the predefined one, or the URL of the uploaded one)
-    // to the user's profile in Firestore.
-    toast({
-      title: "Opgeslagen!",
-      description: "De gegevens van je buddy zijn bijgewerkt.",
-    });
+
+  const handleSave = async () => {
+    if (!user) {
+      toast({ variant: "destructive", title: "Niet ingelogd" });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      const updates = {
+        buddyName,
+        buddyAvatar: selectedAvatar,
+      };
+      await updateDoc(userDocRef, updates);
+      
+      toast({
+        title: "Opgeslagen!",
+        description: "De gegevens van je buddy zijn bijgewerkt.",
+      });
+    } catch (error) {
+      console.error("Error updating buddy profile:", error);
+      toast({ variant: "destructive", title: "Fout", description: "Kon de buddy-gegevens niet opslaan." });
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,8 +78,7 @@ export default function BuddyProfilePage() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        setCustomAvatar(result);
-        setSelectedAvatar(result);
+        setSelectedAvatar(result); // Set the data URL as the selected avatar
       };
       reader.readAsDataURL(file);
     }
@@ -59,13 +89,14 @@ export default function BuddyProfilePage() {
   };
 
   const renderSelectedAvatar = () => {
-    if (selectedAvatar && customAvatar === selectedAvatar) {
-         return <img src={customAvatar} alt="Gek選舉n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
+    if (selectedAvatar && selectedAvatar.startsWith('data:image')) {
+         return <img src={selectedAvatar} alt="Gek選舉n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
     }
     const PredefinedComponent = predefinedAvatars.find(a => a.id === selectedAvatar)?.component;
     if (PredefinedComponent) {
         return <PredefinedComponent className="h-32 w-32" />;
     }
+    // Fallback to default if nothing is selected or found
     return <LogoAvatar className="h-32 w-32" />;
   }
 
@@ -104,8 +135,9 @@ export default function BuddyProfilePage() {
             <div className="grid grid-cols-3 gap-4">
                 {predefinedAvatars.map(avatar => {
                     const AvatarComponent = avatar.component;
+                    const isSelected = selectedAvatar === avatar.id;
                     return (
-                        <div key={avatar.id} onClick={() => setSelectedAvatar(avatar.id)} className={cn("cursor-pointer p-2 rounded-2xl border-2 transition-all", selectedAvatar === avatar.id ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted")}>
+                        <div key={avatar.id} onClick={() => setSelectedAvatar(avatar.id)} className={cn("cursor-pointer p-2 rounded-2xl border-2 transition-all", isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted")}>
                            <AvatarComponent className="w-full h-auto" />
                         </div>
                     )
@@ -123,8 +155,8 @@ export default function BuddyProfilePage() {
 
           </div>
 
-          <Button onClick={handleSave} className="w-full !mt-8" size="lg">
-            Wijzigingen Opslaan
+          <Button onClick={handleSave} className="w-full !mt-8" size="lg" disabled={isLoading}>
+            {isLoading ? <Spinner size="small" className="mr-2" /> : "Wijzigingen Opslaan"}
           </Button>
         </CardContent>
       </Card>
