@@ -41,6 +41,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
+import { WeekSchedule } from "@/components/app/week-schedule";
+import { AddTrainingDialog } from "@/components/app/add-training-dialog";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -58,6 +60,8 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAddTrainingOpen, setIsAddTrainingOpen] = useState(false);
+  const [refreshSchedule, setRefreshSchedule] = useState(0);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -93,8 +97,6 @@ export default function ProfilePage() {
         updates.name = data.name;
       }
       if (newPhoto) {
-        // In a real app, you would upload the file to Firebase Storage
-        // and get a URL. For this prototype, we'll use the data URL.
         updates.photoURL = newPhoto;
       }
 
@@ -129,15 +131,25 @@ export default function ProfilePage() {
     }
   };
 
+  const onTrainingAdded = () => {
+    setIsAddTrainingOpen(false);
+    setRefreshSchedule(prev => prev + 1); // Trigger a refresh
+    toast({
+        title: "Training toegevoegd!",
+        description: "Je individuele training is opgeslagen in je schema."
+    });
+  }
+
   if (!userProfile) return null;
 
   return (
+    <>
     <div className="container py-8 mx-auto">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Jouw Profiel</CardTitle>
           <CardDescription>
-            Bekijk en bewerk hier je persoonlijke gegevens.
+            Bekijk en bewerk hier je persoonlijke gegevens en planning.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
@@ -199,11 +211,9 @@ export default function ProfilePage() {
               <Separator />
               <div className="space-y-4">
                   <h3 className="text-lg font-medium">Planning & Instellingen</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Bekijk je weekschema, voeg trainingen toe en pas je buddy aan.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline">
+                   <WeekSchedule key={refreshSchedule} />
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <Button variant="outline" onClick={() => setIsAddTrainingOpen(true)}>
                         <CalendarPlus className="mr-2 h-4 w-4" />
                         Individuele Training Toevoegen
                     </Button>
@@ -248,5 +258,11 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
     </div>
+    <AddTrainingDialog 
+        isOpen={isAddTrainingOpen}
+        setIsOpen={setIsAddTrainingOpen}
+        onTrainingAdded={onTrainingAdded}
+    />
+    </>
   );
 }
