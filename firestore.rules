@@ -7,6 +7,7 @@
  * Data Structure:
  * - /users/{userId}: Stores private user data, including role, email verification status, and associated club ID (clubId).
  * - /users/{userId}/wellnessScores/{scoreId}: Stores daily wellness scores for a user.
+ * - /users/{userId}/trainings/{trainingId}: Stores individual training sessions for a user.
  * - /users/{userId}/chats/{chatId}**: Stores chat sessions and messages.
  * - /users/{userId}/alerts/{alertId}: Stores alerts triggered by the AI for a user.
  * - /users/{userId}/updates/{updateId}: Stores AI-generated insights for the player.
@@ -55,6 +56,14 @@ service cloud.firestore {
        * @path /users/{userId}/wellnessScores/{scoreId}
        */
       match /wellnessScores/{scoreId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
+
+      /**
+       * @description Enforces access control for user's individual trainings.
+       * @path /users/{userId}/trainings/{trainingId}
+       */
+      match /trainings/{trainingId} {
         allow read, write: if isSignedIn() && isOwner(userId);
       }
       
