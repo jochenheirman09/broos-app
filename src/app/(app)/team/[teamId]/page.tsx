@@ -59,31 +59,20 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
   );
 }
 
-export default function TeamPlayersPage({
+export default function TeamMembersPage({
   params,
 }: {
   params: { teamId: string };
 }) {
   const { teamId } = params;
-  console.log('[TeamPage] 1. Rendering with teamId:', teamId);
-
   const { userProfile } = useUser();
   const db = useFirestore();
   const [team, setTeam] = useState<Team | null>(null);
   const [isTeamLoading, setIsTeamLoading] = useState(true);
 
-  console.log('[TeamPage] 2. Firebase DB and UserProfile status:', {
-    db: !!db,
-    userProfile: !!userProfile,
-  });
-
+  // Correctly query for users that belong to the specific teamId
   const membersQuery = useMemoFirebase(() => {
-    console.log('[TeamPage] 3. useMemoFirebase for membersQuery running.');
-    if (!db || !teamId) {
-      console.log('[TeamPage] 3a. Aborting query creation: db or teamId is missing.');
-      return null;
-    }
-    console.log(`[TeamPage] 3b. Creating query: users where teamId == ${teamId}`);
+    if (!db || !teamId) return null;
     return query(collection(db, 'users'), where('teamId', '==', teamId));
   }, [db, teamId]);
 
@@ -93,16 +82,9 @@ export default function TeamPlayersPage({
     error: membersError,
   } = useCollection<UserProfile>(membersQuery);
 
-  console.log('[TeamPage] 4. Result from useCollection hook:', {
-    members,
-    areMembersLoading,
-    membersError,
-  });
 
   useEffect(() => {
-    console.log('[TeamPage] 5. useEffect for fetching team document running.');
     if (!db || !userProfile?.clubId || !teamId) {
-      console.log('[TeamPage] 5a. Aborting team fetch: missing dependencies.');
       setIsTeamLoading(false);
       return;
     }
@@ -110,20 +92,17 @@ export default function TeamPlayersPage({
     const fetchTeam = async () => {
       setIsTeamLoading(true);
       const teamRefPath = `clubs/${userProfile.clubId}/teams/${teamId}`;
-      console.log(`[TeamPage] 5b. Fetching team document from: ${teamRefPath}`);
       try {
         const teamRef = doc(db, teamRefPath);
         const teamSnap = await getDoc(teamRef);
         if (teamSnap.exists()) {
-          const teamData = teamSnap.data() as Team;
-          console.log('[TeamPage] 5c. Team document found:', teamData);
-          setTeam(teamData);
+          setTeam(teamSnap.data() as Team);
         } else {
-          console.error('[TeamPage] 5c. Team document NOT found at path:', teamRefPath);
+          console.error('[TeamPage] Team document NOT found at path:', teamRefPath);
           setTeam(null);
         }
       } catch (e) {
-        console.error("[TeamPage] 5d. Error fetching team document:", e);
+        console.error("[TeamPage] Error fetching team document:", e);
       } finally {
         setIsTeamLoading(false);
       }
@@ -133,7 +112,6 @@ export default function TeamPlayersPage({
   }, [db, userProfile?.clubId, teamId]);
 
   const isLoading = areMembersLoading || isTeamLoading;
-  console.log('[TeamPage] 6. Final loading state:', { isLoading, areMembersLoading, isTeamLoading });
 
   return (
     <div className="container mx-auto py-8">
