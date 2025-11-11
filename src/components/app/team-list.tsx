@@ -19,6 +19,7 @@ import {
 } from "../ui/card";
 import { EditTeamDialog } from "./edit-team-dialog";
 import { DeleteTeamDialog } from "./delete-team-dialog";
+import Link from "next/link";
 
 function TeamCard({
   clubId,
@@ -69,6 +70,12 @@ function TeamCard({
         <CardHeader className="p-4 flex-row items-center justify-between">
           <CardTitle className="text-lg">{team.name}</CardTitle>
           <div className="flex items-center gap-1">
+             <Link href={`/team/${team.id}`} passHref>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Users className="h-4 w-4" />
+                <span className="sr-only">Bekijk Teamleden</span>
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
