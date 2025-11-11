@@ -26,7 +26,7 @@
         },
         "clubId": {
           "type": "string",
-          "description": "Reference to Club. (Relationship: User 1:1 Club) Nullable if the user is not a 'responsible' or the club has not yet been created."
+          "description": "The ID of the club the user belongs to. For players and staff, this is denormalized from the team. For responsibles, it's their own club."
         },
         "name": {
           "type": "string",

@@ -48,6 +48,20 @@ service cloud.firestore {
       let userData = getUserData(request.auth.uid);
       return userData.role == 'responsible';
     }
+    
+    function isClubResponsibleForTargetUser(targetUserId) {
+        let responsibleData = getUserData(request.auth.uid);
+        let targetUserData = getUserData(targetUserId);
+
+        // A responsible must have a clubId. A target user must have a clubId to be checked.
+        if (responsibleData.clubId == null || targetUserData.clubId == null) {
+            return false;
+        }
+
+        // The club IDs must match.
+        return responsibleData.role == 'responsible' && responsibleData.clubId == targetUserData.clubId;
+    }
+
 
     function userHasClub() {
       let userData = getUserData(request.auth.uid);
@@ -59,20 +73,6 @@ service cloud.firestore {
       return isSignedIn() 
         && user.role == 'responsible'
         && user.clubId == clubId;
-    }
-    
-    function isClubResponsibleForTargetUser(targetUserId) {
-      let responsibleData = getUserData(request.auth.uid);
-      let targetUserData = getUserData(targetUserId);
-
-      // A responsible can only see users that are in a team.
-      if (responsibleData.clubId == null || targetUserData.teamId == null) {
-        return false;
-      }
-      
-      // Check if the target user's team exists within the responsible's club.
-      return responsibleData.role == 'responsible'
-        && exists(/databases/$(database)/documents/clubs/$(responsibleData.clubId)/teams/$(targetUserData.teamId));
     }
 
     /**
@@ -102,13 +102,14 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
-      // Allow a responsible user to list users, BUT ONLY if they are filtering by a teamId that belongs to their club.
+      // Allow a responsible user to list users, BUT ONLY if they are filtering by a clubId that matches their own.
       allow list: if isResponsible() 
                     && request.query.keys().hasAny(['where']) 
-                    && request.query.where[0][0] == 'teamId' 
-                    && exists(/databases/$(database)/documents/clubs/$(getUserData(request.auth.uid).clubId)/teams/$(request.query.where[0][2]))
-                    || debug("Allow responsible to list users ONLY when filtered by a teamId in their club");
+                    && request.query.where[0][0] == 'clubId' 
+                    && request.query.where[0][2] == getUserData(request.auth.uid).clubId
+                    || debug("Allow responsible to list users ONLY when filtered by their own clubId");
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
+      // Allow user to join a team (update teamId and clubId)
       allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       
@@ -171,3 +172,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

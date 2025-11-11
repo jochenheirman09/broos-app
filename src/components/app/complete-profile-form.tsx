@@ -25,6 +25,8 @@ import {
   query,
   updateDoc,
   where,
+  getDoc,
+  DocumentData,
 } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { CalendarIcon } from "lucide-react";
@@ -33,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
+import { Team } from "@/lib/types";
 
 const formSchema = z.object({
   birthDate: z.date({
@@ -81,12 +84,13 @@ export function CompleteProfileForm() {
       }
 
       const teamDoc = teamSnapshot.docs[0];
-      const teamId = teamDoc.id;
+      const teamData = teamDoc.data() as Team;
       
       const userRef = doc(db, "users", user.uid);
       const updatedProfile = {
         birthDate: values.birthDate.toISOString().split("T")[0],
-        teamId: teamId,
+        teamId: teamData.id,
+        clubId: teamData.clubId, // ** This is the crucial addition **
       };
 
       try {
@@ -192,3 +196,5 @@ export function CompleteProfileForm() {
     </Form>
   );
 }
+
+    
