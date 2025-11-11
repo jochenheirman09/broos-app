@@ -107,6 +107,7 @@ export function ChatInterface() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
   const buddyName = userProfile?.buddyName || "Broos";
+  const firstName = userProfile?.name.split(" ")[0];
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -123,13 +124,13 @@ export function ChatInterface() {
     useCollection<ChatMessageType>(messagesQuery);
 
   const handleInitialMessage = async () => {
-    if (!userProfile || !user || !db) return;
+    if (!userProfile || !user || !db || !firstName) return;
     
     setIsLoading(true);
     try {
         const { adaptedResponse, playerInfo, onboardingCompleted } = await chatWithBuddy({
             buddyName: buddyName,
-            userName: userProfile.name,
+            userName: firstName,
             userAge: userProfile.birthDate
                 ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
                 : 18,
@@ -192,7 +193,7 @@ export function ChatInterface() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !userProfile || !user || !db) return;
+    if (!input.trim() || !userProfile || !user || !db || !firstName) return;
 
     const userMessageContent = input;
     // Don't clear input here, clear it only on successful API response
@@ -221,7 +222,7 @@ export function ChatInterface() {
 
       const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await chatWithBuddy({
         buddyName: buddyName,
-        userName: userProfile.name,
+        userName: firstName,
         userAge: userProfile.birthDate
           ? new Date().getFullYear() -
             new Date(userProfile.birthDate).getFullYear()
