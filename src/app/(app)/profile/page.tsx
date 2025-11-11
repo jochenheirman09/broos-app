@@ -97,15 +97,19 @@ export default function ProfilePage() {
         updates.name = data.name;
       }
       if (newPhoto) {
+        // Storing the base64 URL in Firestore.
         updates.photoURL = newPhoto;
       }
 
+      // Check if there are any changes to be made.
       if (Object.keys(updates).length > 0) {
+        // First, update the Firestore document. This is our source of truth.
         await updateDoc(userDocRef, updates);
 
+        // Second, update the Firebase Auth profile, but ONLY for the name.
+        // The photoURL is intentionally omitted here to prevent the "too long" error.
         await updateProfile(auth.currentUser, {
           displayName: updates.name ?? auth.currentUser.displayName,
-          photoURL: updates.photoURL ?? auth.currentUser.photoURL,
         });
 
         toast({
