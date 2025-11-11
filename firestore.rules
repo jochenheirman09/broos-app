@@ -45,9 +45,17 @@ service cloud.firestore {
     }
     
     function isResponsible(userId) {
-      return getUserData(userId).role == 'responsible';
+      let userData = getUserData(userId);
+      return userData.role == 'responsible';
     }
 
+    // Checks if the requesting user is the owner of the specified club.
+    // This is determined by looking up the club document.
+    function isClubOwner(clubId) {
+        return get(/databases/$(database)/documents/clubs/$(clubId)).data.ownerId == request.auth.uid;
+    }
+
+    // Checks if the target user belongs to the same club as the requesting responsible user.
     function isClubResponsibleForTargetUser(targetUserId) {
         let responsibleData = getUserData(request.auth.uid);
         let targetUserData = getUserData(targetUserId);
@@ -67,11 +75,6 @@ service cloud.firestore {
       let userData = getUserData(request.auth.uid);
       return userData.clubId != null && exists(/databases/$(database)/documents/clubs/$(userData.clubId));
     }
-    
-    function isClubOwner(clubId) {
-      let userData = getUserData(request.auth.uid);
-      return userData.role == 'responsible' && userData.clubId == clubId;
-    }
 
     // --- Rules ---
 
@@ -83,14 +86,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (isOwner(userId) || isClubResponsibleForTargetUser(userId));
       
-      // CRITICAL: A list operation is only allowed if it explicitly filters by a clubId OR a teamId.
-      // Filtering by clubId requires the requestor to be the owner of that club.
-      // Filtering by teamId is allowed for any signed-in user (e.g., for the team members page).
-      allow list: if isSignedIn() && 
-                    (
-                      (request.query.where[0][0] == 'clubId' && isClubOwner(request.query.where[0][2])) ||
-                      (request.query.where[0][0] == 'teamId')
-                    );
+      // CRITICAL: A list operation is ONLY allowed if it explicitly filters by a clubId.
+      // The rule then verifies that the logged-in user is the owner of that specific club.
+      // This is a secure and performant way to allow admins to see users of their club.
+      allow list: if isSignedIn() 
+                    && 'clubId' in request.query.where[0] 
+                    && isClubOwner(request.query.where[0][2]);
 
       allow create: if isSignedIn() && isOwner(userId);
       allow update, delete: if isSignedIn() && isOwner(userId);
@@ -124,7 +125,7 @@ service cloud.firestore {
 
     match /clubs/{clubId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow list: if isSignedIn(); // Allow listing clubs, e.g. for a search feature
       allow create: if isResponsible(request.auth.uid) && !userHasClub();
       allow update, delete: if isClubOwner(clubId);
 

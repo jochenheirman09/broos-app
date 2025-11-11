@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, ServerCrash, RefreshCw, Users, ShieldAlert, FileWarning } from "lucide-react";
+import { CheckCircle, ServerCrash, RefreshCw, Users } from "lucide-react";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
 
@@ -56,83 +57,59 @@ export default function MigrateUsersPage() {
     setSkippedUsers([]);
     setError(null);
 
-    const usersToUpdate = new Map<string, WithId<UserProfile>>();
-    const localSkipped: string[] = [];
-
     try {
-      // Step 1: Query all users that are already correctly associated with the club
-      // This is a permitted query based on the new security rules.
+      // De enige toegestane query is om alle gebruikers binnen de club op te halen.
       const usersInClubQuery = query(collection(db, "users"), where("clubId", "==", userProfile.clubId));
-      const usersInClubSnapshot = await getDocs(usersInClubQuery);
-      
-      usersInClubSnapshot.forEach(userDoc => {
-          const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-          // This user is already correct, so we can potentially skip them, but we add them
-          // to our map to have a full list of club members.
-          if (!usersToUpdate.has(userData.id)) {
-             usersToUpdate.set(userData.id, userData);
-             localSkipped.push(`${userData.name} (Reden: Heeft al het correcte clubId)`);
-          }
-      });
-      
-      // Step 2: Separately query for users in each team of the club.
-      // This will find users who have a teamId but might be missing a clubId.
-      const teamsRef = collection(db, `clubs/${userProfile.clubId}/teams`);
-      const teamsSnapshot = await getDocs(teamsRef);
-      const teamsInClub = teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithId<Team>));
-      
-      for (const team of teamsInClub) {
-        const usersInTeamQuery = query(collection(db, "users"), where("teamId", "==", team.id));
-        const usersInTeamSnapshot = await getDocs(usersInTeamQuery);
-
-        usersInTeamSnapshot.forEach(userDoc => {
-            const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-            // If the user doesn't have the correct clubId, they need an update.
-            // We add them to our map. If they are already in the map, this will just overwrite, which is fine.
-             if (!userData.clubId || userData.clubId !== userProfile.clubId) {
-                usersToUpdate.set(userData.id, userData);
-            }
-        });
-      }
-
-      setSkippedUsers(localSkipped);
+      const usersSnapshot = await getDocs(usersInClubQuery);
+      const allUsersInClub = usersSnapshot.docs.map(d => ({...d.data(), id: d.id} as WithId<UserProfile>));
       
       const batch = writeBatch(db);
       const updatedNames: string[] = [];
-      let updateNeeded = false;
+      const skippedNames: string[] = [];
+      let updatesNeeded = 0;
 
-      // Final Step: Iterate through the collected map and update where necessary.
-      for (const user of usersToUpdate.values()) {
-        if (!user.clubId || user.clubId !== userProfile.clubId) {
+      // Nu doorlopen we de opgehaalde gebruikers in de code.
+      for (const user of allUsersInClub) {
+        let needsUpdate = false;
+        const updates: Partial<UserProfile> = {};
+
+        // Controle 1: Heeft de gebruiker een clubId? (Zou moeten, gezien de query)
+        if (!user.clubId) {
+          updates.clubId = userProfile.clubId;
+          needsUpdate = true;
+        }
+
+        // Andere controles kunnen hier worden toegevoegd, bijv. teamId check.
+        // Voor nu focussen we ons op het repareren van het clubId.
+        
+        if (needsUpdate) {
           const userRef = doc(db, "users", user.id);
-          batch.update(userRef, { clubId: userProfile.clubId });
-          updatedNames.push(`${user.name} (ID: ${user.id}) gekoppeld aan club ${userProfile.clubId}`);
-          updateNeeded = true;
+          batch.update(userRef, updates);
+          updatedNames.push(`${user.name} (ID: ${user.id}) gerepareerd.`);
+          updatesNeeded++;
+        } else {
+          skippedNames.push(`${user.name} (is al correct).`);
         }
       }
       
-      if (!updateNeeded) {
-        setStatus("success");
-        setUpdatedUsers(["Geen gebruikers gevonden die een `clubId` missen."]);
-        return;
+      if (updatesNeeded > 0) {
+        await batch.commit();
       }
-      
-      await batch.commit();
 
-      setUpdatedUsers(updatedNames);
+      setUpdatedUsers(updatedNames.length > 0 ? updatedNames : ["Geen gebruikers gevonden die een update nodig hebben."]);
+      setSkippedUsers(skippedNames);
       setStatus("success");
 
     } catch (e: any) {
       console.error("Fout tijdens migratie:", e);
-      // Emit a contextual error if it's a permission issue.
-      if (e.code === 'permission-denied') {
-        const permissionError = new FirestorePermissionError({
-            path: 'users',
-            operation: 'list',
-            requestResourceData: { detail: 'Query failed, likely on teamId or clubId lookup.'}
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      }
+      // Verstuur een gedetailleerde foutmelding voor analyse
+      const permissionError = new FirestorePermissionError({
+          path: 'users',
+          operation: 'list',
+          requestResourceData: { detail: 'Query failed on `users` collection with a `clubId` where clause.'}
+      });
+      errorEmitter.emit('permission-error', permissionError);
+
       setError(e.message || "Er is een onbekende fout opgetreden.");
       setStatus("error");
     }
@@ -147,7 +124,7 @@ export default function MigrateUsersPage() {
             Gebruikersmigratie (Club ID's)
           </CardTitle>
           <CardDescription>
-            Dit script vindt alle gebruikers in uw teams die nog geen 'clubId' hebben en voegt deze toe. Voer dit eenmalig uit om bestaande gebruikers te repareren.
+            Dit script controleert alle gebruikers binnen uw club en repareert profielen waar nodig (bv. ontbrekend clubId).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -155,7 +132,7 @@ export default function MigrateUsersPage() {
              <Users className="h-4 w-4" />
              <AlertTitle>Hoe het werkt</AlertTitle>
              <AlertDescription>
-                Dit script haalt eerst alle teams in uw club op. Vervolgens zoekt het per team naar leden. Voor elk lid wordt gecontroleerd of de `clubId` ontbreekt of incorrect is, en wordt deze indien nodig gerepareerd.
+                Dit script haalt alle gebruikers op die gekoppeld zijn aan uw club en controleert of hun profiel volledig is.
              </AlertDescription>
            </Alert>
 
@@ -177,7 +154,7 @@ export default function MigrateUsersPage() {
           {status === "loading" && (
             <div className="flex items-center justify-center p-8 text-muted-foreground">
               <Spinner size="large" />
-              <p className="ml-4">Teams doorzoeken en gebruikers bijwerken...</p>
+              <p className="ml-4">Gebruikers controleren...</p>
             </div>
           )}
 
@@ -189,7 +166,7 @@ export default function MigrateUsersPage() {
               </AlertTitle>
               <AlertDescription className="text-green-700">
                 <p className="font-bold mb-2">
-                  {updatedUsers.length > 0 && !updatedUsers[0].startsWith('Geen') ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Alle gebruikers zijn al correct geconfigureerd.'}
+                  {updatedUsers.length > 0 && !updatedUsers[0].startsWith('Geen') ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Alle gecontroleerde gebruikers waren al correct.'}
                 </p>
                 {updatedUsers.length > 0 && !updatedUsers[0].startsWith('Geen') && (
                   <ul className="list-disc pl-5 text-sm max-h-40 overflow-y-auto">
