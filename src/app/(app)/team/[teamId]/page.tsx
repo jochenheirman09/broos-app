@@ -49,19 +49,22 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full shadow-clay-inset">
-        {roleIcons[member.role]}
-        <span className="capitalize">{member.role}</span>
-      </div>
+      {roleIcons[member.role] && (
+        <div className="flex items-center gap-2 text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full shadow-clay-inset">
+          {roleIcons[member.role]}
+          <span className="capitalize">{member.role}</span>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function TeamPlayersPage({
-  params: { teamId },
+  params,
 }: {
   params: { teamId: string };
 }) {
+  const { teamId } = params;
   const { userProfile } = useUser();
   const db = useFirestore();
   const [team, setTeam] = useState<Team | null>(null);
@@ -83,14 +86,19 @@ export default function TeamPlayersPage({
 
     const fetchTeam = async () => {
       setIsTeamLoading(true);
-      const teamRef = doc(db, 'clubs', userProfile.clubId!, 'teams', teamId);
-      const teamSnap = await getDoc(teamRef);
-      if (teamSnap.exists()) {
-        setTeam(teamSnap.data() as Team);
-      } else {
-        console.error('Team niet gevonden');
+      try {
+        const teamRef = doc(db, 'clubs', userProfile.clubId!, 'teams', teamId);
+        const teamSnap = await getDoc(teamRef);
+        if (teamSnap.exists()) {
+          setTeam(teamSnap.data() as Team);
+        } else {
+          console.error('Team niet gevonden');
+        }
+      } catch (e) {
+        console.error("Fout bij het ophalen van teamgegevens:", e);
+      } finally {
+        setIsTeamLoading(false);
       }
-      setIsTeamLoading(false);
     };
 
     fetchTeam();
@@ -126,9 +134,10 @@ export default function TeamPlayersPage({
             </div>
           )}
           {!isLoading && error && (
-            <div className="text-destructive p-4 border border-destructive/50 rounded-lg">
+            <div className="text-destructive p-4 border border-destructive/50 rounded-lg bg-destructive/10">
               <p className="font-bold">Fout bij het laden van teamleden</p>
-              <p className="text-xs">{error.message}</p>
+              <p className="text-xs max-w-full overflow-x-auto">{error.message}</p>
+              <p className="text-xs mt-2">Dit wordt meestal veroorzaakt doordat de database een index nodig heeft die niet automatisch is aangemaakt. Vraag de AI om dit probleem op te lossen.</p>
             </div>
           )}
           {!isLoading && !error && members && members.length > 0 && (
