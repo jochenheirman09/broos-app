@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import type { UserProfile, WithId } from '@/lib/types';
+import type { Team, WithId } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -11,50 +11,26 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Spinner } from '@/components/ui/spinner';
-import { AlertCircle, TestTube2, User as UserIcon, Shield, DatabaseZap, HelpCircle, Building } from 'lucide-react';
+import { AlertCircle, HelpCircle, Building, Users } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useUser } from '@/context/user-context';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
-const roleIcons: { [key: string]: React.ReactNode } = {
-  player: <UserIcon className="h-4 w-4" />,
-  staff: <Shield className="h-4 w-4" />,
-  responsible: <Shield className="h-4 w-4 text-primary" />,
-};
-
-
-function MemberCard({ member }: { member: WithId<UserProfile> }) {
-  const getInitials = (name: string = '') => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase();
-  };
-
+function TeamCard({ team }: { team: WithId<Team> }) {
   return (
     <div className="flex items-center justify-between p-4 border-b last:border-b-0">
       <div className="flex items-center gap-4">
-        <Avatar className="h-12 w-12">
-          <AvatarImage src={member.photoURL} />
-          <AvatarFallback className="bg-primary/20 text-primary font-bold">
-            {getInitials(member.name)}
-          </AvatarFallback>
-        </Avatar>
+        <Users className="h-6 w-6 text-primary" />
         <div>
-          <p className="font-bold">{member.name}</p>
-          <p className="text-sm text-muted-foreground">{member.email}</p>
+          <p className="font-bold">{team.name}</p>
+          <p className="text-sm text-muted-foreground font-mono">{team.id}</p>
         </div>
       </div>
-       {roleIcons[member.role] && (
-        <div className="flex items-center gap-2 text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full">
-          {roleIcons[member.role]}
-          <span className="capitalize">{member.role}</span>
-        </div>
-      )}
+       <div className="text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full">
+          Team
+       </div>
     </div>
   );
 }
@@ -65,15 +41,8 @@ function ErrorDisplay({ error, isIndexError }: { error: string, isIndexError: bo
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Er is een fout opgetreden</AlertTitle>
             <AlertDescription>
-                {isIndexError ? (
-                    <div>
-                        <p className="font-bold mb-2">Een vereiste Firestore-index ontbreekt.</p>
-                        <p>Voor deze query, die op 'clubId' filtert, is een index nodig. De foutmelding in de browserconsole bevat normaal een directe link om deze index aan te maken.</p>
-                        <p className="mt-2 text-xs">Zoek in de console naar een bericht dat begint met: "The query requires an index..."</p>
-                    </div>
-                ) : (
-                    <p>De query is mislukt. Dit komt meestal door beveiligingsregels ('Missing or insufficient permissions').</p>
-                )}
+                <p>De query om de teams op te halen is mislukt. Dit komt meestal door beveiligingsregels ('Missing or insufficient permissions').</p>
+                <p className="mt-2 text-xs">Uw `firestore.rules` staan waarschijnlijk niet toe dat de ingelogde gebruiker de teams voor deze club mag oplijsten.</p>
                 <details className="mt-4 text-xs bg-black/20 p-2 rounded">
                     <summary>Technische Foutdetails</summary>
                     <pre className="whitespace-pre-wrap mt-2">{error}</pre>
@@ -86,29 +55,19 @@ function ErrorDisplay({ error, isIndexError }: { error: string, isIndexError: bo
 export default function TeamU12Page() {
   const db = useFirestore();
   const { userProfile, loading: isUserLoading } = useUser();
-  const [members, setMembers] = useState<WithId<UserProfile>[]>([]);
+  const [teams, setTeams] = useState<WithId<Team>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isIndexError, setIsIndexError] = useState(false);
 
   useEffect(() => {
-    if (isUserLoading || !db) {
+    if (isUserLoading || !db || !userProfile) {
       return;
     }
     
-    if (!userProfile?.clubId) {
-        if (!isUserLoading) {
-            setError("Gebruikersprofiel is niet volledig geladen of bevat geen club ID. Kan de query niet uitvoeren.");
-            setIsLoading(false);
-        }
-        return;
-    }
-
-    const fetchClubMembers = async () => {
+    const fetchClubTeams = async () => {
       setIsLoading(true);
       setError(null);
-      setIsIndexError(false);
-      setMembers([]);
+      setTeams([]);
 
       const clubName = "SK Beveren";
 
@@ -123,53 +82,46 @@ export default function TeamU12Page() {
           throw new Error(`Club '${clubName}' niet gevonden. Controleer of de club bestaat en de naam correct is gespeld.`);
         }
         
-        const clubId = clubSnapshot.docs[0].id;
+        const clubDoc = clubSnapshot.docs[0];
+        const clubId = clubDoc.id;
         console.log(`Club gevonden met ID: ${clubId}`);
 
-        // Stap 2: Haal alle leden op die bij deze club horen
-        console.log(`Query Stap 2: Leden ophalen met clubId='${clubId}'...`);
-        const membersQuery = query(
-            collection(db, 'users'), 
-            where('clubId', '==', clubId)
+        // Stap 2: Haal alle teams op die bij deze club horen
+        console.log(`Query Stap 2: Teams ophalen van pad 'clubs/${clubId}/teams'...`);
+        const teamsQuery = query(
+            collection(db, 'clubs', clubId, 'teams')
         );
-        const membersSnapshot = await getDocs(membersQuery);
+        const teamsSnapshot = await getDocs(teamsQuery);
 
-        if (membersSnapshot.empty) {
-          console.log(`Geen leden gevonden voor de query.`);
+        if (teamsSnapshot.empty) {
+          console.log(`Geen teams gevonden voor de query.`);
         } else {
-            const membersData = membersSnapshot.docs.map(doc => ({
-                ...(doc.data() as UserProfile),
+            const teamsData = teamsSnapshot.docs.map(doc => ({
+                ...(doc.data() as Team),
                 id: doc.id
             }));
-            console.log(`Query succesvol! ${membersData.length} leden gevonden:`, membersData);
-            setMembers(membersData);
+            console.log(`Query succesvol! ${teamsData.length} teams gevonden:`, teamsData);
+            setTeams(teamsData);
         }
       } catch (e: any) {
         console.error("Fout bij het uitvoeren van de query:", e);
         const errorMessage = e.message || "Onbekende fout";
         setError(errorMessage);
-
-        if (errorMessage.toLowerCase().includes("index")) {
-            setIsIndexError(true);
-        }
         
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
-                path: 'users',
+                path: `clubs/${clubName}/teams`,
                 operation: 'list',
-                requestResourceData: {
-                  query: `clubId == '${clubName}'`
-                }
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError(`Permissiefout: ${permissionError.message}. Zorg ervoor dat uw beveiligingsregels een query op 'users' met een 'clubId'-filter toestaan.`);
+            setError(`Permissiefout: ${permissionError.message}. Controleer of uw beveiligingsregels een 'list' operatie op de 'teams' subcollectie toestaan.`);
         }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchClubMembers();
+    fetchClubTeams();
   }, [db, userProfile, isUserLoading]);
 
   return (
@@ -178,10 +130,10 @@ export default function TeamU12Page() {
         <CardHeader>
           <CardTitle className="flex items-center text-2xl">
             <Building className="h-6 w-6 mr-3 text-primary"/>
-            Database Query: Alle Leden van SK Beveren
+            Database Query: Alle Teams van SK Beveren
           </CardTitle>
           <CardDescription>
-            Deze pagina voert een query uit om alle gebruikers te vinden die bij club 'SK Beveren' horen. Dit test de beveiligingsregels en vereist mogelijk een Firestore-index.
+            Deze pagina voert een query uit om alle teams te vinden die bij de club 'SK Beveren' horen. Dit test de beveiligingsregels voor subcollecties.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -192,20 +144,20 @@ export default function TeamU12Page() {
             </div>
           )}
           {error && !isLoading && (
-            <ErrorDisplay error={error} isIndexError={isIndexError} />
+            <ErrorDisplay error={error} isIndexError={false} />
           )}
           {!isLoading && !error && (
             <div className="border rounded-lg">
-                {members.length > 0 ? (
-                    members.map((member) => (
-                        <MemberCard key={member.id} member={member} />
+                {teams.length > 0 ? (
+                    teams.map((team) => (
+                        <TeamCard key={team.id} team={team} />
                     ))
                 ) : (
                     <div className="h-40 flex items-center justify-center text-center">
                        <div>
                          <HelpCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                          <p className="font-bold">Query geslaagd, maar geen resultaten</p>
-                         <p className="text-muted-foreground">Er zijn geen gebruikersdocumenten gevonden die voldoen aan<br/> `clubId` == 'ID-van-SK-Beveren'.</p>
+                         <p className="text-muted-foreground">Er zijn geen teams gevonden onder de club 'SK Beveren'.</p>
                        </div>
                     </div>
                 )}
