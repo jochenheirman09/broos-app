@@ -196,7 +196,7 @@ export function ChatInterface() {
     if (!input.trim() || !userProfile || !user || !db || !firstName) return;
 
     const userMessageContent = input;
-    setInput(""); // Optimistically clear input, but will restore on error
+    setInput("");
 
     setIsLoading(true);
 
