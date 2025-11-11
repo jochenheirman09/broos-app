@@ -44,8 +44,6 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
     
-    // FINAL FIX: Rely consistently on the role stored in the user's Firestore document.
-    // This removes the dependency on custom claims which are difficult to set in this environment.
     function isResponsible() {
       return isSignedIn() && getUserData(request.auth.uid).role == 'responsible';
     }
@@ -102,14 +100,17 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
       
-      allow list: if isResponsible() 
+      // A responsible can list users ONLY if they are filtering by their own clubId AND a specific teamId.
+      // This prevents listing all users in a club at once.
+      allow list: if isResponsible()
                     && getUserData(request.auth.uid).clubId != null
-                    && request.query.keys().hasAny(['where']) 
-                    && request.query.where.map(w => w[0] == 'clubId' && w[2] == getUserData(request.auth.uid).clubId).hasAny([true])
-                    || debug("Allow responsible to list users ONLY when filtered by their own clubId");
+                    && request.query.where[0][0] == 'clubId'
+                    && request.query.where[0][2] == getUserData(request.auth.uid).clubId
+                    && request.query.where[1][0] == 'teamId'
+                    || debug("Allow responsible to list users ONLY when filtered by their own clubId AND a teamId");
 
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
-      // A user can update their own doc. A responsible can update a user in their club (needed for migration).
+      // A user can update their own doc. A responsible can update a user in their club.
       allow update: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       

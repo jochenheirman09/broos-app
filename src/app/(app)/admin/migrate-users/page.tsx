@@ -1,151 +1,28 @@
-'use client';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
 
-import { useState } from 'react';
-import { useFirestore } from '@/firebase';
-import { collection, doc, getDocs, writeBatch, query, where } from 'firebase/firestore';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { User, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import type { UserProfile } from '@/lib/types';
-import { useUser } from '@/context/user-context';
+export default function DeprecatedPage() {
 
-export default function MigrateUsersPage() {
-  const { userProfile } = useUser();
-  const db = useFirestore();
-  const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState<{ updated: string[]; skipped: string[], errors: string[] } | null>(null);
-
-  const handleMigration = async () => {
-    if (!db || !userProfile?.clubId) {
-        alert("Fout: U moet een clubverantwoordelijke zijn met een gekoppelde club.");
-        return;
-    }
-    setIsLoading(true);
-    setResults({ updated: [], skipped: [], errors: [] });
-
-    const batch = writeBatch(db);
-    const usersQuery = query(collection(db, 'users'), where('clubId', '==', userProfile.clubId));
-
-    const updated: string[] = [];
-    const skipped: string[] = [];
-    const errors: string[] = [];
-    
-    try {
-        console.log(`Query uitvoeren voor gebruikers met clubId: ${userProfile.clubId}`);
-        const usersSnapshot = await getDocs(usersQuery);
-        console.log(`${usersSnapshot.docs.length} gebruikers gevonden in club.`);
-
-        for (const userDoc of usersSnapshot.docs) {
-            const user = { ...userDoc.data() as UserProfile, id: userDoc.id };
-
-            if (user.teamId && !user.clubId) {
-                const userToUpdateRef = doc(db, 'users', user.id);
-                batch.update(userToUpdateRef, { clubId: userProfile.clubId });
-                updated.push(`Gerepareerd: ${user.email} (clubId toegevoegd)`);
-            } else if (!user.teamId) {
-                 skipped.push(`Overgeslagen: ${user.email} (heeft geen teamId)`);
-            } else if (user.clubId) {
-                 skipped.push(`Overgeslagen: ${user.email} (clubId was al correct)`);
-            }
-        }
-
-        if (updated.length > 0) {
-            await batch.commit();
-        }
-        
-        setResults({ updated, skipped, errors });
-
-    } catch (e: any) {
-      console.error("Fout tijdens migratie:", e);
-      errors.push(`QUERY MISLUKT: ${e.message}. Controleer of u de juiste rechten heeft om gebruikers te zien.`);
-      setResults({ updated, skipped, errors });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-   if (userProfile?.role !== 'responsible') {
     return (
-      <div className="container mx-auto py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Geen Toegang</AlertTitle>
-          <AlertDescription>
-            U moet een 'responsible' zijn om deze pagina te kunnen bekijken.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  return (
     <div className="container mx-auto py-8">
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle className="flex items-center text-2xl">
-            <RefreshCw className="h-6 w-6 mr-3" />
-            Gebruikersmigratie: `clubId` Toevoegen
-          </CardTitle>
+          <CardTitle>Pagina Gearchiveerd</CardTitle>
           <CardDescription>
-            Deze tool repareert bestaande gebruikersprofielen door de ontbrekende `clubId` toe te voegen. Dit is een noodzakelijke stap om te zorgen dat u alle teamleden kunt zien.
+            Deze migratiepagina is niet langer nodig.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Belangrijke instructie</AlertTitle>
-            <AlertDescription>
-              Klik op de knop om de migratie te starten. Het proces scant de gebruikers die al een `teamId` hebben binnen uw club en voegt de `clubId` toe waar deze ontbreekt.
-            </AlertDescription>
-          </Alert>
-          <Button onClick={handleMigration} disabled={isLoading} className="w-full" size="lg">
-            {isLoading ? <Spinner size="small" className="mr-2" /> : <User className="mr-2 h-4 w-4" />}
-            {isLoading ? 'Migratie bezig...' : 'Start Gebruikersmigratie'}
-          </Button>
-
-          {results && (
-            <Card className="mt-6 bg-muted/50 max-h-96 overflow-y-auto">
-              <CardHeader>
-                <CardTitle>Migratieresultaten</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm font-mono p-4">
-                {results.updated.length > 0 && (
-                  <div>
-                    <h4 className="font-bold flex items-center gap-2 mb-2 text-green-600"><CheckCircle />Bijgewerkt ({results.updated.length})</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {results.updated.map((res, i) => <li key={`upd-${i}`}>{res}</li>)}
-                    </ul>
-                  </div>
-                )}
-                 {results.errors.length > 0 && (
-                  <div>
-                    <h4 className="font-bold flex items-center gap-2 mb-2 text-red-600"><AlertCircle />Fouten ({results.errors.length})</h4>
-                    <ul className="list-disc pl-5 space-y-1 text-destructive">
-                      {results.errors.map((res, i) => <li key={`err-${i}`}>{res}</li>)}
-                    </ul>
-                  </div>
-                )}
-                {results.skipped.length > 0 && (
-                   <div>
-                    <h4 className="font-bold mb-2 text-muted-foreground">Overgeslagen ({results.skipped.length})</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                        {results.skipped.map((res, i) => <li key={`skip-${i}`}>{res}</li>)}
-                    </ul>
-                  </div>
-                )}
-                 {results.updated.length === 0 && results.errors.length === 0 && results.skipped.length === 0 && !isLoading && (
-                    <p className="text-muted-foreground">Klik op 'Start Gebruikersmigratie' om te beginnen.</p>
-                 )}
-                  {results.updated.length === 0 && results.errors.length === 0 && results.skipped.length > 0 && !isLoading && (
-                    <p className="text-muted-foreground mt-4">Migratie voltooid. Alle gescande gebruikers hadden al een correcte `clubId`.</p>
-                 )}
-              </CardContent>
-            </Card>
-          )}
+        <CardContent>
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Verouderd</AlertTitle>
+                <AlertDescription>
+                    Deze pagina was een tijdelijke oplossing en is nu vervangen door een betere team-management flow. U kunt deze pagina veilig negeren.
+                </AlertDescription>
+            </Alert>
         </CardContent>
       </Card>
     </div>
-  );
+    )
 }

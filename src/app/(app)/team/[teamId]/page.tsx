@@ -133,7 +133,7 @@ export default function TeamMembersPage({
                 }
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. Controleer de Firestore-regels.");
+            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. Controleer de Firestore-regels. Zorg ervoor dat de query zowel 'clubId' als 'teamId' bevat en dat je de rol 'responsible' hebt in je club.");
         } else {
             setError(e.message || "Er is een onbekende fout opgetreden.");
         }
@@ -180,7 +180,7 @@ export default function TeamMembersPage({
                 <AlertTriangle className="h-6 w-6 mr-3" />
                 Fout bij het laden van teamleden
               </div>
-              <p className="text-sm">Dit duidt meestal op een permissieprobleem of een foutieve query. Controleer de console voor gedetailleerde foutinformatie.</p>
+              <p className="text-sm">Dit duidt meestal op een permissieprobleem of een foutieve query. Controleer de console voor gedetailleerde foutinformatie. **Belangrijke opmerking:** Firestore vereist mogelijk een samengestelde index voor deze query. De foutmelding in de ontwikkelaarsconsole van uw browser bevat een directe link om deze index aan te maken.</p>
               <details className="mt-2 text-xs bg-black/10 p-2 rounded">
                   <summary>Technische Details</summary>
                   <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">

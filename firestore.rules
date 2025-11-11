@@ -44,11 +44,9 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
     
-    //
     // FINAL FIX: This now relies on the custom claim 'role' in the auth token.
     // This is more secure and performant than reading from the database in a rule.
     // A manual action is required to set this claim for the user.
-    //
     function isResponsible() {
       return isSignedIn() && request.auth.token.role == 'responsible';
     }
@@ -105,6 +103,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
       
+      // THIS IS THE CRITICAL RULE. 'isResponsible()' will now use the custom claim.
       allow list: if isResponsible() 
                     && getUserData(request.auth.uid).clubId != null
                     && request.query.keys().hasAny(['where']) 
