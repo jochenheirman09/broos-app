@@ -87,10 +87,13 @@ export function CompleteProfileForm() {
       const teamData = teamDoc.data() as Team;
       
       const userRef = doc(db, "users", user.uid);
+      
+      // *** FIX: Dit is de cruciale toevoeging ***
+      // We slaan nu zowel het teamId als de clubId van dat team op.
       const updatedProfile = {
         birthDate: values.birthDate.toISOString().split("T")[0],
         teamId: teamData.id,
-        clubId: teamData.clubId, // ** This is the crucial addition **
+        clubId: teamData.clubId, 
       };
 
       try {
@@ -99,7 +102,7 @@ export function CompleteProfileForm() {
           title: "Profiel Bijgewerkt",
           description: "Je bent succesvol aan het team toegevoegd!",
         });
-        // The layout will handle redirection
+        // De layout zal de gebruiker automatisch doorsturen
       } catch (updateError) {
         const permissionError = new FirestorePermissionError({
           path: userRef.path,
@@ -111,7 +114,6 @@ export function CompleteProfileForm() {
         setIsLoading(false);
       }
     } catch (queryError) {
-      // This is now likely to be the index error
       console.error("Error executing teams query:", queryError);
       const permissionError = new FirestorePermissionError({
         path: "teams", // collection group query
@@ -196,5 +198,3 @@ export function CompleteProfileForm() {
     </Form>
   );
 }
-
-    

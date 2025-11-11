@@ -45,8 +45,8 @@ service cloud.firestore {
     }
     
     function isResponsible() {
-      let userData = getUserData(request.auth.uid);
-      return userData.role == 'responsible';
+      // FIX: Check role from the user's document in Firestore, NOT from a custom claim that is missing.
+      return isSignedIn() && getUserData(request.auth.uid).role == 'responsible';
     }
     
     function isClubResponsibleForTargetUser(targetUserId) {
@@ -59,7 +59,7 @@ service cloud.firestore {
         }
 
         // The club IDs must match.
-        return responsibleData.role == 'responsible' && responsibleData.clubId == targetUserData.clubId;
+        return isResponsible() && responsibleData.clubId == targetUserData.clubId;
     }
 
 
@@ -83,7 +83,7 @@ service cloud.firestore {
       return debug({
         "rule_message": message,
         "request_auth_uid": request.auth.uid,
-        "request_auth_role": getUserData(request.auth.uid).role,
+        "request_auth_role_from_doc": getUserData(request.auth.uid).role,
         "request_method": request.method,
         "request_path": request.path,
         "resource_data": resource.data,
@@ -102,14 +102,17 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
-      // Allow a responsible user to list users, BUT ONLY if they are filtering by a clubId that matches their own.
+      
+      // FIX: This rule now correctly requires a filter on 'clubId' for any list operation by a responsible user.
+      // This ensures a 'responsible' can only query for users within their own club.
       allow list: if isResponsible() 
+                    && getUserData(request.auth.uid).clubId != null
                     && request.query.keys().hasAny(['where']) 
-                    && request.query.where[0][0] == 'clubId' 
-                    && request.query.where[0][2] == getUserData(request.auth.uid).clubId
+                    && request.query.where.map(w => w[0] == 'clubId' && w[2] == getUserData(request.auth.uid).clubId).hasAny([true])
                     || debug("Allow responsible to list users ONLY when filtered by their own clubId");
+
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
-      // Allow user to join a team (update teamId and clubId)
+      // This allows a user to update their own document, including joining a team by setting teamId and clubId.
       allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       
