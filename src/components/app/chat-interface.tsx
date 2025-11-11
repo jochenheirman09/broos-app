@@ -22,13 +22,13 @@ import {
   orderBy,
   limit,
   doc,
-  updateDoc,
   setDoc,
   Firestore,
 } from "firebase/firestore";
 import { format } from "date-fns";
 import Link from "next/link";
 import { BuddyAvatar } from "./buddy-avatar";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
 
 function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
   const { userProfile } = useUser();
@@ -93,8 +93,8 @@ async function saveChatSummary(
     summary: summary,
     updatedAt: serverTimestamp(),
   };
-  // Use setDoc with merge to create or update the summary
-  await setDoc(chatDocRef, chatData, { merge: true });
+  // Use setDoc with merge to create or update the summary (non-blocking)
+  setDoc(chatDocRef, chatData, { merge: true });
 }
 
 export function ChatInterface() {
@@ -139,6 +139,7 @@ export function ChatInterface() {
             onboardingCompleted: !!userProfile.onboardingCompleted,
         });
 
+        // This can be awaited as it's the first message
         await addDoc(
             collection(db, "users", user.uid, "chats", today, "messages"),
             {
@@ -148,9 +149,8 @@ export function ChatInterface() {
             }
         );
         
-        await saveChatSummary(db, user.uid, today, adaptedResponse);
+        saveChatSummary(db, user.uid, today, adaptedResponse);
 
-        const userRef = doc(db, "users", user.uid);
         const updates: any = {};
         if (playerInfo) {
             Object.assign(updates, playerInfo);
@@ -160,7 +160,7 @@ export function ChatInterface() {
         }
 
         if(Object.keys(updates).length > 0) {
-            await updateDoc(userRef, updates);
+            updateUserProfile({ db, userId: user.uid, data: updates });
         }
 
     } catch (error) {
@@ -198,18 +198,19 @@ export function ChatInterface() {
     const userMessageContent = input;
     setInput("");
 
+    // Add user message optimistically (non-blocking)
+    addDoc(
+      collection(db, "users", user.uid, "chats", today, "messages"),
+      {
+        role: "user",
+        content: userMessageContent,
+        timestamp: serverTimestamp(),
+      }
+    );
+
     setIsLoading(true);
 
     try {
-      await addDoc(
-        collection(db, "users", user.uid, "chats", today, "messages"),
-        {
-          role: "user",
-          content: userMessageContent,
-          timestamp: serverTimestamp(),
-        }
-      );
-
       const chatHistory = (messages || [])
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
@@ -219,6 +220,7 @@ export function ChatInterface() {
           ? messages[messages.length - 1].content
           : "";
 
+      // Await the AI response as we need it to proceed
       const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await chatWithBuddy({
         buddyName: buddyName,
         userName: firstName,
@@ -232,7 +234,8 @@ export function ChatInterface() {
         onboardingCompleted: !!userProfile.onboardingCompleted,
       });
 
-      await addDoc(
+      // Add assistant message (non-blocking)
+      addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
         {
           role: "assistant",
@@ -241,36 +244,32 @@ export function ChatInterface() {
         }
       );
       
-      await saveChatSummary(db, user.uid, today, adaptedResponse);
+      // All subsequent writes are non-blocking for a snappy UI feel.
+      saveChatSummary(db, user.uid, today, adaptedResponse);
 
-      const userRef = doc(db, "users", user.uid);
       const updates: any = {};
-      
       if (playerInfo) {
           Object.assign(updates, playerInfo);
       }
-      
-      // If the AI signals that onboarding is now complete, update the user profile
       if (onboardingCompleted && !userProfile.onboardingCompleted) {
           updates.onboardingCompleted = true;
       }
-      
       if (Object.keys(updates).length > 0) {
-          await updateDoc(userRef, updates);
+          updateUserProfile({ db, userId: user.uid, data: updates });
       }
 
       if (scores && Object.keys(scores).length > 0) {
-        await saveWellnessScores({
+        saveWellnessScores({
           db,
           userId: user.uid,
           scores,
-          summary: adaptedResponse, // Use the same summary for the wellness score
+          summary: adaptedResponse,
         });
       }
 
       if (alerts && alerts.length > 0) {
         for (const alert of alerts) {
-          await saveAlert({ db, userId: user.uid, alert });
+          saveAlert({ db, userId: user.uid, alert });
         }
       }
     } catch (error) {

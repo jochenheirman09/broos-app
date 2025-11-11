@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "@/components/app/predefined-avatars";
 import { useUser } from "@/context/user-context";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
 
 
@@ -45,36 +45,42 @@ export default function BuddyProfilePage() {
   }, [userProfile]);
 
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!user) {
       toast({ variant: "destructive", title: "Niet ingelogd" });
       return;
     }
 
     setIsLoading(true);
-    try {
-      const userDocRef = doc(db, "users", user.uid);
-      const updates = {
-        buddyName,
-        buddyAvatar: selectedAvatar,
-      };
-      await updateDoc(userDocRef, updates);
-      
-      toast({
-        title: "Opgeslagen!",
-        description: "De gegevens van je buddy zijn bijgewerkt.",
-      });
-    } catch (error) {
-      console.error("Error updating buddy profile:", error);
-      toast({ variant: "destructive", title: "Fout", description: "Kon de buddy-gegevens niet opslaan." });
-    } finally {
-      setIsLoading(false);
-    }
+    
+    const updates = {
+      buddyName,
+      buddyAvatar: selectedAvatar,
+    };
+
+    // Use non-blocking write for snappy UI
+    updateUserProfile({ db, userId: user.uid, data: updates });
+    
+    toast({
+      title: "Opgeslagen!",
+      description: "De gegevens van je buddy zijn bijgewerkt.",
+    });
+
+    setIsLoading(false);
   };
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Basic size check (e.g., 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+          toast({
+              variant: "destructive",
+              title: "Bestand te groot",
+              description: "Kies een afbeelding die kleiner is dan 2MB."
+          });
+          return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
@@ -90,7 +96,7 @@ export default function BuddyProfilePage() {
 
   const renderSelectedAvatar = () => {
     if (selectedAvatar && selectedAvatar.startsWith('data:image')) {
-         return <img src={selectedAvatar} alt="Gek选举n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
+         return <img src={selectedAvatar} alt="Gek選舉n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
     }
     const PredefinedComponent = predefinedAvatars.find(a => a.id === selectedAvatar)?.component;
     if (PredefinedComponent) {
@@ -126,12 +132,10 @@ export default function BuddyProfilePage() {
           <div className="space-y-4">
             <Label>Avatar van je Buddy</Label>
             
-            {/* Huidige selectie */}
             <div className="flex justify-center my-4">
               {renderSelectedAvatar()}
             </div>
 
-            {/* Voorgedefinieerde opties */}
             <div className="grid grid-cols-3 gap-4">
                 {predefinedAvatars.map(avatar => {
                     const AvatarComponent = avatar.component;
@@ -144,7 +148,6 @@ export default function BuddyProfilePage() {
                 })}
             </div>
             
-            {/* Upload knop */}
             <div className="!mt-6">
                 <Button variant="outline" className="w-full" onClick={handleCustomUploadClick}>
                     <Upload className="mr-2 h-4 w-4" />

@@ -3,6 +3,8 @@
 import { DashboardContent } from "@/components/app/dashboard-content";
 import { useUser } from "@/context/user-context";
 import { Spinner } from "@/components/ui/spinner";
+import Link from 'next/link';
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { userProfile, loading } = useUser();

@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "@/components/app/predefined-avatars";
 import { useUser } from "@/context/user-context";
 import { useFirestore } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
 
 
@@ -53,12 +53,12 @@ export default function BuddyProfilePage() {
 
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, "users", user.uid);
       const updates = {
         buddyName,
         buddyAvatar: selectedAvatar,
       };
-      await updateDoc(userDocRef, updates);
+
+      updateUserProfile({ db, userId: user.uid, data: updates });
       
       toast({
         title: "Opgeslagen!",
@@ -66,6 +66,7 @@ export default function BuddyProfilePage() {
       });
     } catch (error) {
       console.error("Error updating buddy profile:", error);
+      // The updateUserProfile function handles emitting the detailed error
       toast({ variant: "destructive", title: "Fout", description: "Kon de buddy-gegevens niet opslaan." });
     } finally {
       setIsLoading(false);
@@ -75,6 +76,15 @@ export default function BuddyProfilePage() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Basic size check (e.g., 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+          toast({
+              variant: "destructive",
+              title: "Bestand te groot",
+              description: "Kies een afbeelding die kleiner is dan 2MB."
+          });
+          return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
@@ -126,12 +136,10 @@ export default function BuddyProfilePage() {
           <div className="space-y-4">
             <Label>Avatar van je Buddy</Label>
             
-            {/* Huidige selectie */}
             <div className="flex justify-center my-4">
               {renderSelectedAvatar()}
             </div>
 
-            {/* Voorgedefinieerde opties */}
             <div className="grid grid-cols-3 gap-4">
                 {predefinedAvatars.map(avatar => {
                     const AvatarComponent = avatar.component;
@@ -144,7 +152,6 @@ export default function BuddyProfilePage() {
                 })}
             </div>
             
-            {/* Upload knop */}
             <div className="!mt-6">
                 <Button variant="outline" className="w-full" onClick={handleCustomUploadClick}>
                     <Upload className="mr-2 h-4 w-4" />

@@ -57,17 +57,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Error fetching user profile:", profileError);
     }
   }, [profileError]);
-  
-  useEffect(() => {
-    // When user object changes, merge auth profile info into our userProfile state
-    if (user && userProfile) {
-        if (user.photoURL && user.photoURL !== userProfile.photoURL) {
-            // This is a bit of a hack to keep the user profile up to date
-            // A better solution would be to refetch the profile or have a single source of truth
-            (userProfile as any).photoURL = user.photoURL;
-        }
-    }
-  }, [user, userProfile]);
 
   const logout = async () => {
     setIsLoggingOut(true);

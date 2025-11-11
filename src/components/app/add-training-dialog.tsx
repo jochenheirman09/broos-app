@@ -41,7 +41,7 @@ export function AddTrainingDialog({
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!user) {
         toast({ variant: "destructive", title: "Niet ingelogd"});
         return;
@@ -56,25 +56,18 @@ export function AddTrainingDialog({
     }
 
     setIsLoading(true);
-    try {
-      await addPlayerTraining({
-        db,
-        userId: user.uid,
-        date,
-        description,
-      });
-      onTrainingAdded();
-    } catch (error) {
-      console.error("Fout bij toevoegen training:", error);
-      // The firestore function already emits a detailed error.
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: "Kon de training niet toevoegen. Probeer het opnieuw.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    
+    // Non-blocking write
+    addPlayerTraining({
+      db,
+      userId: user.uid,
+      date,
+      description,
+    });
+
+    // Optimistic UI update
+    onTrainingAdded();
+    setIsLoading(false);
   };
 
   return (

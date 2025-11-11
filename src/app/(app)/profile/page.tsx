@@ -24,8 +24,8 @@ import {
 import { useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useFirestore } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
-import { updateProfile } from "firebase/auth";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
+import { updateProfile as updateAuthProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
 import { Camera, LogOut, Sparkles, CalendarPlus } from "lucide-react";
 import {
@@ -77,6 +77,15 @@ export default function ProfilePage() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Basic size check (e.g., 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+          toast({
+              variant: "destructive",
+              title: "Bestand te groot",
+              description: "Kies een afbeelding die kleiner is dan 2MB."
+          });
+          return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         setNewPhoto(e.target?.result as string);
@@ -90,31 +99,31 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      const userDocRef = doc(firestore, "users", user.uid);
       const updates: { name?: string; photoURL?: string } = {};
+      let authUpdates: { displayName?: string; photoURL?: string } = {};
 
       if (data.name !== userProfile?.name) {
         updates.name = data.name;
+        authUpdates.displayName = data.name;
       }
       if (newPhoto) {
-        // Storing the base64 URL in Firestore.
         updates.photoURL = newPhoto;
+        // Firebase Auth's updateProfile can't handle long base64 strings.
+        // We will store the photoURL only in Firestore and our context will handle it.
       }
 
-      // Check if there are any changes to be made.
       if (Object.keys(updates).length > 0) {
-        // First, update the Firestore document. This is our source of truth.
-        await updateDoc(userDocRef, updates);
+        // Update Firestore document first (non-blocking)
+        updateUserProfile({ db: firestore, userId: user.uid, data: updates });
 
-        // Second, update the Firebase Auth profile, but ONLY for the name.
-        // The photoURL is intentionally omitted here to prevent the "too long" error.
-        await updateProfile(auth.currentUser, {
-          displayName: updates.name ?? auth.currentUser.displayName,
-        });
+        // If there's a name change, update Firebase Auth profile
+        if (Object.keys(authUpdates).length > 0) {
+            await updateAuthProfile(auth.currentUser, authUpdates);
+        }
 
         toast({
           title: "Profiel bijgewerkt",
-          description: "Je profiel is succesvol bijgewerkt.",
+          description: "Je profiel wordt bijgewerkt. Het kan even duren voordat de wijzigingen overal zichtbaar zijn.",
         });
         setNewPhoto(null);
       } else {

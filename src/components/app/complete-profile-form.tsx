@@ -30,12 +30,13 @@ import {
 } from "firebase/firestore";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { CalendarIcon } from "lucide-react";
-import { Calendar } from "../ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { Team } from "@/lib/types";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
+import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
 
 const formSchema = z.object({
   birthDate: z.date({
@@ -86,31 +87,25 @@ export function CompleteProfileForm() {
       const teamDoc = teamSnapshot.docs[0];
       const teamData = teamDoc.data() as Team;
       
-      const userRef = doc(db, "users", user.uid);
-      
       const updatedProfile = {
         birthDate: values.birthDate.toISOString().split("T")[0],
         teamId: teamData.id,
         clubId: teamData.clubId, 
       };
 
-      try {
-        await updateDoc(userRef, updatedProfile);
-        toast({
-          title: "Profiel Bijgewerkt",
-          description: "Je bent succesvol aan het team toegevoegd!",
-        });
-        // De layout zal de gebruiker automatisch doorsturen
-      } catch (updateError) {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: "update",
-          requestResourceData: updatedProfile,
-        });
-        errorEmitter.emit("permission-error", permissionError);
-      } finally {
-        setIsLoading(false);
-      }
+      // Use the centralized update function
+      updateUserProfile({
+        db,
+        userId: user.uid,
+        data: updatedProfile,
+      });
+
+      toast({
+        title: "Profiel Bijgewerkt",
+        description: "Je bent succesvol aan het team toegevoegd!",
+      });
+      // The layout will automatically redirect the user upon context update
+      
     } catch (queryError) {
       console.error("Error executing teams query:", queryError);
       const permissionError = new FirestorePermissionError({
@@ -118,7 +113,8 @@ export function CompleteProfileForm() {
         operation: "list",
       });
       errorEmitter.emit("permission-error", permissionError);
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   }
 
@@ -151,11 +147,8 @@ export function CompleteProfileForm() {
                   </FormControl>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
+                  <DatePickerWithDropdowns
                     mode="single"
-                    captionLayout="dropdown-buttons"
-                    fromYear={1950}
-                    toYear={new Date().getFullYear()}
                     selected={field.value}
                     onSelect={field.onChange}
                     disabled={(date) =>

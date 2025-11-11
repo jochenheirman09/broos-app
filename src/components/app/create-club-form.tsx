@@ -38,6 +38,8 @@ export function CreateClubForm() {
 
     setIsLoading(true);
 
+    // This is a critical operation, so we await it.
+    // The non-blocking approach is more for frequent, less critical UI updates.
     try {
       await createClub(firestore, user.uid, clubName);
       toast({
