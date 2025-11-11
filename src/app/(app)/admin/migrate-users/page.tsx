@@ -56,50 +56,33 @@ export default function MigrateUsersPage() {
     setError(null);
 
     try {
-      // Step 1: Get all teams for the current club.
+      // Get all teams for the current club to map teamId to clubId.
       const teamsRef = collection(db, `clubs/${userProfile.clubId}/teams`);
       const teamsSnapshot = await getDocs(teamsRef);
-      const teamIds = teamsSnapshot.docs.map(doc => doc.id);
+      const teamIdsInClub = teamsSnapshot.docs.map(doc => doc.id);
 
-      if (teamIds.length === 0) {
+      if (teamIdsInClub.length === 0) {
         setStatus("success");
         setSkippedUsers(["Geen teams gevonden in uw club. Er zijn geen gebruikers om te migreren."]);
         return;
       }
-
-      // Step 2: For each team, find users that have this teamId but no clubId.
-      const usersToUpdate: WithId<UserProfile>[] = [];
-      const usersRef = collection(db, "users");
-      const CHUNK_SIZE = 10; // Firestore 'in' query limit
-      const localSkipped: string[] = [];
       
-      for (let i = 0; i < teamIds.length; i += CHUNK_SIZE) {
-        const teamIdChunk = teamIds.slice(i, i + CHUNK_SIZE);
-        const usersQuery = query(usersRef, where("teamId", "in", teamIdChunk));
-        
-        try {
-            const usersSnapshot = await getDocs(usersQuery);
-            usersSnapshot.forEach(userDoc => {
-                const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-                if (!userData.clubId) {
-                    usersToUpdate.push(userData);
-                } else {
-                    localSkipped.push(`${userData.name} (Reden: Heeft al een clubId)`);
-                }
-            });
-        } catch (e: any) {
-            // This is where the permission error happens.
-            console.error("Fout bij getDocs voor users met teamId in chunk:", e);
-            const permissionError = new FirestorePermissionError({
-                path: `users (query with where('teamId', 'in', [${teamIdChunk.join(', ')}]))`,
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            setError("Permissiefout gedetecteerd. De details worden gelogd.");
-            setStatus("error");
-            return; // Stop the migration process
-        }
-      }
+      const usersToUpdate: WithId<UserProfile>[] = [];
+      const localSkipped: string[] = [];
+
+      // Query for users that belong to one of the club's teams
+      const usersQuery = query(collection(db, "users"), where("teamId", "in", teamIdsInClub));
+      const usersSnapshot = await getDocs(usersQuery);
+
+      usersSnapshot.forEach(userDoc => {
+          const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
+          // Check if clubId is missing
+          if (!userData.clubId) {
+              usersToUpdate.push(userData);
+          } else {
+              localSkipped.push(`${userData.name} (Reden: Heeft al een clubId)`);
+          }
+      });
 
       setSkippedUsers(localSkipped);
       
@@ -111,7 +94,6 @@ export default function MigrateUsersPage() {
         return;
       }
       
-      // Step 3: Create a batch write to update all found users.
       const batch = writeBatch(db);
       const updatedNames: string[] = [];
 
@@ -127,12 +109,12 @@ export default function MigrateUsersPage() {
       setStatus("success");
 
     } catch (e: any) {
-      console.error("Algemene migratiefout:", e);
-      // This will catch other errors, like the getDocs on the teams collection
+      console.error("Fout tijdens migratie:", e);
+      // Emit a contextual error
       const permissionError = new FirestorePermissionError({
-                path: `clubs/${userProfile.clubId}/teams`,
-                operation: 'list',
-            });
+          path: `users (querying where 'teamId' is in your club's teams)`,
+          operation: 'list',
+      });
       errorEmitter.emit('permission-error', permissionError);
       setError(e.message || "Er is een onbekende fout opgetreden.");
       setStatus("error");

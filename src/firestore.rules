@@ -19,7 +19,7 @@
  * Key Security Decisions:
  * - A 'responsible' user can read data of any user belonging to a team within their club.
  * - A user can always create and manage their own private data.
- * - Listing users is only allowed when filtering by 'clubId' or 'teamId' to prevent data leakage.
+ * - Listing users is only allowed when filtering by 'clubId' to prevent data leakage.
  * - A responsible user can manage their club and associated teams.
  *
  * Denormalization for Authorization:
@@ -44,12 +44,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
     
-    // Checks if the requesting user has the 'responsible' role in their own document.
-    // IMPORTANT: This can only be reliably used in 'get', 'write' rules, NOT in 'list' rules.
     function isResponsible(userId) {
       return getUserData(userId).role == 'responsible';
     }
-    
+
     function isClubResponsibleForTargetUser(targetUserId) {
         let responsibleData = getUserData(request.auth.uid);
         let targetUserData = getUserData(targetUserId);
@@ -85,18 +83,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (isOwner(userId) || isClubResponsibleForTargetUser(userId));
       
-      // CRITICAL: A list operation is only allowed if it explicitly filters by a clubId OR by teamId.
-      // This is the key to secure and performant queries without using `get` in list rules.
-      allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && 
-                   (
-                     (request.query.where[0][0] == 'clubId' && isClubOwner(request.query.where[0][2])) ||
-                     (request.query.where[0][0] == 'teamId') // Allow querying by teamId for migration
-                   );
+      // A list operation is only allowed if it filters by clubId.
+      allow list: if isSignedIn() && request.query.where[0][0] == 'clubId';
 
       allow create: if isSignedIn() && isOwner(userId);
-      // A user can always update their own doc. A responsible can update a user's doc if they are in the same club.
-      allow update: if isSignedIn() && (isOwner(userId) || isClubResponsibleForTargetUser(userId));
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow update, delete: if isSignedIn() && isOwner(userId);
       
       match /wellnessScores/{scoreId} {
         allow read, write: if (isSignedIn() && isOwner(userId)) || isClubResponsibleForTargetUser(userId);
