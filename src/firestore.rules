@@ -19,7 +19,7 @@
  * Key Security Decisions:
  * - A 'responsible' user can read data of any user belonging to a team within their club.
  * - A user can always create and manage their own private data.
- * - Listing all users globally is forbidden to prevent data leakage.
+ * - Listing all users globally is forbidden to prevent data leakage, EXCEPT for a 'responsible' user.
  * - A responsible user can manage their club and associated teams.
  *
  * Denormalization for Authorization:
@@ -44,8 +44,6 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
     
-    // DEFINITIVE FIX: isResponsible now checks the user's document. This is fine for GET/UPDATE rules on single documents.
-    // It should NOT be used for LIST rules.
     function isResponsible() {
       return isSignedIn() && getUserData(request.auth.uid).role == 'responsible';
     }
@@ -104,20 +102,20 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if (isSignedIn() && isOwner(userId)) || isClubResponsibleForTargetUser(userId) || debug("Allow owner or club responsible to get user");
+      allow get: if (isSignedIn() && isOwner(userId)) || isClubResponsibleForTargetUser(userId) || isResponsible() || debug("Allow owner, club responsible, or any responsible to get user");
       
-      // DEFINITIVE FIX: The LIST rule is now independent of any `get` calls.
-      // It allows a query if and only if that query contains a `where('clubId', '==', someId)` clause.
-      // The frontend logic is responsible for ensuring that a 'responsible' user can only query for their OWN clubId.
-      allow list: if isSignedIn()
+      // A responsible can list ALL users (for migration).
+      // Other users can list users IF filtered by clubId (for team views).
+      allow list: if isResponsible() || 
+                    (isSignedIn()
                     && request.query.keys().hasAny(['where']) 
-                    && request.query.where.map(w => w[0] == 'clubId').hasAny([true])
-                    || debug("Allow any signed-in user to list users IF filtered by a clubId");
+                    && request.query.where.map(w => w[0] == 'clubId').hasAny([true]))
+                    || debug("Allow responsible to list all users, or others to list if filtered by clubId");
 
 
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
-      // A user can update their own doc. A responsible can update a user in their club.
-      allow update: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to update user doc");
+      // A user can update their own doc. A responsible can update ANY user doc.
+      allow update: if (isSignedIn() && isOwner(userId)) || isResponsible() || debug("Allow owner or responsible to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       
       match /wellnessScores/{scoreId} {

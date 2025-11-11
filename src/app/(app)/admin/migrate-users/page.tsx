@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore } from "@/firebase";
 import {
   collection,
   query,
-  where,
   getDocs,
   doc,
   writeBatch,
@@ -39,10 +38,16 @@ export default function MigrateUsersPage() {
 
   const handleMigration = async () => {
     if (!userProfile || !userProfile.clubId || !db) {
-      setError("Huidige gebruiker is geen clubverantwoordelijke.");
+      setError("Huidige gebruiker is geen clubverantwoordelijke of heeft geen club.");
       setStatus("error");
       return;
     }
+     if (userProfile.role !== 'responsible') {
+        setError("Alleen een clubverantwoordelijke kan deze actie uitvoeren.");
+        setStatus("error");
+        return;
+    }
+
 
     setStatus("loading");
     setUpdatedUsers([]);
@@ -50,27 +55,19 @@ export default function MigrateUsersPage() {
     setError(null);
 
     try {
-      // Stap 1: Haal alle gebruikers op die tot de club van de verantwoordelijke behoren.
-      // Deze query is nu toegestaan door de nieuwe, correcte beveiligingsregel.
-      const usersQuery = query(
-        collection(db, "users"),
-        where("clubId", "==", userProfile.clubId)
-      );
+      // Stap 1: Haal ALLE gebruikers op. Dit vereist een specifieke security rule.
+      const usersQuery = query(collection(db, "users"));
       const usersSnapshot = await getDocs(usersQuery);
-      const usersToProcess = usersSnapshot.docs.map(
+      const allUsers = usersSnapshot.docs.map(
         (d) => ({ ...d.data(), id: d.id } as WithId<UserProfile>)
       );
 
-      // Filter de gebruikers die al een clubId hebben.
-      const usersNeedingUpdate = usersToProcess.filter(
-        (u) => u.teamId && !u.clubId
-      );
-      const usersNotNeedingUpdate = usersToProcess.filter(
-        (u) => !u.teamId || u.clubId
-      );
-      setSkippedUsers(usersNotNeedingUpdate.map(u => `${u.name} (ID: ${u.id})`));
+      const usersToProcess = allUsers.filter(u => !u.clubId && u.teamId);
+      const skipped = allUsers.filter(u => !!u.clubId || !u.teamId);
+      setSkippedUsers(skipped.map(u => `${u.name} (Reden: ${u.clubId ? 'Heeft al clubId' : 'Geen teamId'})`));
 
-      if (usersNeedingUpdate.length === 0) {
+
+      if (usersToProcess.length === 0) {
         setStatus("success");
         return;
       }
@@ -78,12 +75,13 @@ export default function MigrateUsersPage() {
       const batch = writeBatch(db);
       const updatedNames: string[] = [];
 
-      for (const user of usersNeedingUpdate) {
+      for (const user of usersToProcess) {
         if (user.teamId) {
-            // De clubId is al bekend, we hoeven het team niet meer op te zoeken.
+            // Dit is de cruciale stap: we koppelen de gebruiker aan de club van de *huidige* verantwoordelijke.
+            // Dit is een aanname die we maken in dit migratiescript.
             const userRef = doc(db, "users", user.id);
             batch.update(userRef, { clubId: userProfile.clubId });
-            updatedNames.push(`${user.name} (ID: ${user.id})`);
+            updatedNames.push(`${user.name} (ID: ${user.id}) gekoppeld aan club ${userProfile.clubId}`);
         }
       }
 
@@ -94,7 +92,7 @@ export default function MigrateUsersPage() {
     } catch (e: any) {
       console.error("Migratiefout:", e);
       if (e.code === 'permission-denied') {
-        setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld om gebruikers per clubId op te lijsten.");
+        setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De 'responsible' rol moet het recht hebben om alle gebruikers te listen.");
       } else {
         setError(e.message || "Er is een onbekende fout opgetreden.");
       }
@@ -111,10 +109,7 @@ export default function MigrateUsersPage() {
             Gebruikersmigratie (Club ID's)
           </CardTitle>
           <CardDescription>
-            Dit script repareert bestaande gebruikersprofielen door de
-            ontbrekende `clubId` toe te voegen. Dit is nodig zodat een
-            clubverantwoordelijke alle leden van zijn/haar club kan zien. Voer
-            dit eenmalig uit.
+            Dit script haalt alle gebruikers in de database op en voegt de `clubId` van jouw club toe aan gebruikers die wel een `teamId` hebben maar nog geen `clubId`. Voer dit eenmalig uit om bestaande gebruikers te repareren.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -136,7 +131,7 @@ export default function MigrateUsersPage() {
           {status === "loading" && (
             <div className="flex items-center justify-center p-8 text-muted-foreground">
               <Spinner size="large" />
-              <p className="ml-4">Gebruikers controleren en bijwerken...</p>
+              <p className="ml-4">Alle gebruikers controleren en bijwerken...</p>
             </div>
           )}
 
@@ -157,13 +152,13 @@ export default function MigrateUsersPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p>Alle gebruikers waren al correct geconfigureerd.</p>
+                  <p>Geen gebruikers gevonden die een update nodig hadden.</p>
                 )}
                  <p className="font-bold mt-4 mb-2">
-                  {skippedUsers.length} gebruiker(s) overgeslagen (al correct):
+                  {skippedUsers.length} gebruiker(s) overgeslagen:
                 </p>
                 {skippedUsers.length > 0 && (
-                     <ul className="list-disc pl-5 text-sm">
+                     <ul className="list-disc pl-5 text-sm max-h-40 overflow-y-auto">
                         {skippedUsers.map((name) => (
                         <li key={name}>{name}</li>
                         ))}
