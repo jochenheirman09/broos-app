@@ -92,19 +92,23 @@ service cloud.firestore {
         "request_method": request.method,
         "request_path": request.path,
         "resource_data": resource.data,
-        "request_query": request.query
+        "request_query": request.query,
+        "requesting_user_clubId": getUserData(request.auth.uid).clubId,
       });
     }
 
     // --- Rules ---
 
     match /{path=**}/teams/{teamId} {
-      allow get, list: if isSignedIn() || debug("Allow any signed in user to find a team by code");
+      // This is a collection group query, be careful. Only allow reads if there is a where clause on invitationCode.
+      allow get: if isSignedIn() || debug("Allow any signed in user to get team");
+      allow list: if request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode' || debug("Allow any signed in user to find a team by code");
     }
 
     match /users/{userId} {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to get user");
-      allow list: if isResponsible() || debug("Allow responsible to list users (with where clause)");
+      // Allow a responsible user to list users, BUT ONLY if they are filtering by a teamId.
+      allow list: if isResponsible() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'teamId' || debug("Allow responsible to list users ONLY when filtered by teamId");
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
       allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
@@ -153,6 +157,7 @@ service cloud.firestore {
 
       match /teams/{teamId} {
         allow get: if isSignedIn() || debug("Allow signed in users to get team");
+        allow list: if isClubOwner(clubId) || debug("Allow club owner to list their own teams");
         allow create, update, delete: if isClubOwner(clubId) || debug("Allow club owner to manage teams");
 
         match /summaries/{summaryId} {
