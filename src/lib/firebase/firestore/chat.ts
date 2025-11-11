@@ -6,6 +6,7 @@ import {
   writeBatch,
   getDocs,
   query,
+  Firestore,
 } from "firebase/firestore";
 
 /**
@@ -15,7 +16,7 @@ import {
  * @param userId The ID of the user whose chats should be deleted.
  */
 export async function deleteAllUserChats(
-  db: ReturnType<typeof useFirestore>,
+  db: Firestore,
   userId: string
 ) {
   if (!db || !userId) {
