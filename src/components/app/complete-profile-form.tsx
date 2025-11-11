@@ -88,8 +88,6 @@ export function CompleteProfileForm() {
       
       const userRef = doc(db, "users", user.uid);
       
-      // *** FIX: Dit is de cruciale toevoeging ***
-      // We slaan nu zowel het teamId als de clubId van dat team op.
       const updatedProfile = {
         birthDate: values.birthDate.toISOString().split("T")[0],
         teamId: teamData.id,
