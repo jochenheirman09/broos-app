@@ -61,13 +61,18 @@ service cloud.firestore {
         && user.clubId == clubId;
     }
     
-    function isRequestingUserClubResponsible(targetUserId) {
-      let requestingUserData = getUserData(request.auth.uid);
+    function isClubResponsibleForTargetUser(targetUserId) {
+      let responsibleData = getUserData(request.auth.uid);
       let targetUserData = getUserData(targetUserId);
-      if (requestingUserData.clubId == null || targetUserData.teamId == null) {
-          return false;
+
+      // A responsible can only see users that are in a team.
+      if (responsibleData.clubId == null || targetUserData.teamId == null) {
+        return false;
       }
-      return requestingUserData.role == 'responsible' && exists(/databases/$(database)/documents/clubs/$(requestingUserData.clubId)/teams/$(targetUserData.teamId));
+      
+      // Check if the target user's team exists within the responsible's club.
+      return responsibleData.role == 'responsible'
+        && exists(/databases/$(database)/documents/clubs/$(responsibleData.clubId)/teams/$(targetUserData.teamId));
     }
 
     /**
@@ -96,26 +101,30 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to get user");
+      allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
       // Allow a responsible user to list users, BUT ONLY if they are filtering by a teamId that belongs to their club.
-      allow list: if isResponsible() && request.query.where[0][0] == 'teamId' && exists(/databases/$(database)/documents/clubs/$(getUserData(request.auth.uid).clubId)/teams/$(request.query.where[0][2])) || debug("Allow responsible to list users ONLY when filtered by a teamId in their club");
+      allow list: if isResponsible() 
+                    && request.query.keys().hasAny(['where']) 
+                    && request.query.where[0][0] == 'teamId' 
+                    && exists(/databases/$(database)/documents/clubs/$(getUserData(request.auth.uid).clubId)/teams/$(request.query.where[0][2]))
+                    || debug("Allow responsible to list users ONLY when filtered by a teamId in their club");
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
       allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       
       match /wellnessScores/{scoreId} {
-        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to read/write wellness");
+        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write wellness");
       }
 
       match /trainings/{trainingId} {
-        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to read/write trainings");
+        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write trainings");
       }
       
       match /chats/{chatId} {
-        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to read/write chats");
+        allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write chats");
         
         match /messages/{messageId} {
-          allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to read/write chat messages");
+          allow read, write: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to read/write chat messages");
         }
       }
 
@@ -123,7 +132,7 @@ service cloud.firestore {
         // Users can create their own alerts (via the AI)
         allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create alerts");
         // Reading alerts will be restricted to staff/responsible.
-        allow read, update, delete: if (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow club responsible to manage alerts"); 
+        allow read, update, delete: if (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow club responsible to manage alerts"); 
       }
 
       match /updates/{updateId} {

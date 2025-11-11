@@ -76,25 +76,36 @@ export default function TeamMembersPage({
 
   useEffect(() => {
     if (!db || !userProfile?.clubId || !teamId) {
+      console.log("Not fetching: db, userProfile.clubId, or teamId is missing.", { db, userProfile, teamId });
       return;
     }
 
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+      console.log(`Starting data fetch for teamId: ${teamId} in club: ${userProfile.clubId}`);
       
       try {
+        // Step 1: Fetch team details
         const teamRef = doc(db, `clubs/${userProfile.clubId}/teams/${teamId}`);
+        console.log("Fetching team document from path:", teamRef.path);
         const teamSnap = await getDoc(teamRef);
         
         if (teamSnap.exists()) {
-          setTeam(teamSnap.data() as Team);
+          const teamData = teamSnap.data() as Team;
+          console.log("Team data found:", teamData);
+          setTeam(teamData);
         } else {
+          console.error(`Team with ID "${teamId}" not found in club "${userProfile.clubId}".`);
           throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
         }
 
+        // Step 2: Fetch members for that team
         const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
+        console.log("Executing members query:", membersQuery);
+
         const membersSnapshot = await getDocs(membersQuery);
+        console.log(`Query completed. Found ${membersSnapshot.docs.length} members.`);
         
         const membersData = membersSnapshot.docs.map(doc => ({
           ...doc.data() as UserProfile,
@@ -104,18 +115,20 @@ export default function TeamMembersPage({
         setMembers(membersData);
 
       } catch (e: any) {
-        if (e.code === 'permission-denied') {
+        console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
+        if (e.code === 'permission-denied' || e instanceof FirestorePermissionError) {
             const permissionError = new FirestorePermissionError({
                 path: 'users',
                 operation: 'list',
             });
+            console.log("Emitting permission-error via errorEmitter.");
             errorEmitter.emit('permission-error', permissionError);
             setError(permissionError.message);
         } else {
-            console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
             setError(e.message || "Er is een onbekende fout opgetreden.");
         }
       } finally {
+        console.log("Finished fetching data, setting isLoading to false.");
         setIsLoading(false);
       }
     };
