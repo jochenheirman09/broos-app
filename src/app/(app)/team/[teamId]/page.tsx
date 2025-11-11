@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Mail, Shield, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <UserIcon className="h-4 w-4" />,
@@ -73,61 +75,53 @@ export default function TeamMembersPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Wait until all necessary data is available before fetching.
     if (!db || !userProfile?.clubId || !teamId) {
-      // If we're not ready, we shouldn't attempt to fetch.
-      // The initial `isLoading` state will show a spinner.
       return;
     }
 
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      console.log(`[TEAM_PAGE] Starting data fetch for teamId: ${teamId} in club: ${userProfile.clubId}`);
       
       try {
-        // --- Step 1: Fetch Team Details (for team name) ---
-        const teamRefPath = `clubs/${userProfile.clubId}/teams/${teamId}`;
-        console.log(`[TEAM_PAGE] Fetching team document from path: ${teamRefPath}`);
-        const teamRef = doc(db, teamRefPath);
+        const teamRef = doc(db, `clubs/${userProfile.clubId}/teams/${teamId}`);
         const teamSnap = await getDoc(teamRef);
         
         if (teamSnap.exists()) {
-          const teamData = teamSnap.data() as Team;
-          console.log(`[TEAM_PAGE] Successfully fetched team data:`, teamData);
-          setTeam(teamData);
+          setTeam(teamSnap.data() as Team);
         } else {
           throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
         }
 
-        // --- Step 2: Fetch Team Members using a correct, filtered query ---
-        console.log(`[TEAM_PAGE] Building query for users with teamId: ${teamId}`);
         const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
         const membersSnapshot = await getDocs(membersQuery);
-        
-        if (membersSnapshot.empty) {
-          console.log(`[TEAM_PAGE] Query executed successfully, but no members found for team ${teamId}.`);
-        }
         
         const membersData = membersSnapshot.docs.map(doc => ({
           ...doc.data() as UserProfile,
           id: doc.id,
         }));
 
-        console.log(`[TEAM_PAGE] Successfully fetched ${membersData.length} members:`, membersData);
         setMembers(membersData);
 
       } catch (e: any) {
-        console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
-        setError(e.message || "Er is een onbekende fout opgetreden.");
+        if (e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: 'users',
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setError(permissionError.message);
+        } else {
+            console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
+            setError(e.message || "Er is een onbekende fout opgetreden.");
+        }
       } finally {
         setIsLoading(false);
-        console.log(`[TEAM_PAGE] Data fetching process finished.`);
       }
     };
 
     fetchData();
-  }, [db, userProfile?.clubId, teamId]); // This effect re-runs if any of these dependencies change.
+  }, [db, userProfile?.clubId, teamId]);
 
 
   return (
