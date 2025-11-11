@@ -17,6 +17,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { AlertCircle, TestTube2, User as UserIcon, Shield } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useUser } from '@/context/user-context';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <UserIcon className="h-4 w-4" />,
@@ -65,13 +67,7 @@ export default function TeamU12Page() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Explicitly wait until both the user profile and the database instance are available.
-    if (isUserLoading || !db || !userProfile?.clubId) {
-      // If we are still loading user data, or if the db/clubId is not ready, do nothing yet.
-      // The loading state is handled by the main return block.
-      if (!isUserLoading) {
-        setIsLoading(false);
-      }
+    if (isUserLoading || !db) {
       return;
     }
 
@@ -80,23 +76,42 @@ export default function TeamU12Page() {
       setError(null);
       setMembers([]);
 
+      const clubName = "SK Beveren";
+      const teamName = "U12";
+
       try {
-        // Stap 1: Vind de team ID voor "U12" binnen de club
-        console.log(`Zoeken naar team 'U12' in club '${userProfile.clubId}'...`);
-        const teamsRef = collection(db, 'clubs', userProfile.clubId, 'teams');
-        const teamsQuery = query(teamsRef, where('name', '==', 'U12'));
+        // Stap 1: Vind de club ID voor "SK Beveren"
+        console.log(`Zoeken naar club '${clubName}'...`);
+        const clubsRef = collection(db, 'clubs');
+        const clubsQuery = query(clubsRef, where('name', '==', clubName));
+        const clubSnapshot = await getDocs(clubsQuery);
+
+        if (clubSnapshot.empty) {
+          throw new Error(`Club '${clubName}' niet gevonden.`);
+        }
+        const clubId = clubSnapshot.docs[0].id;
+        console.log(`Club '${clubName}' gevonden met ID: ${clubId}`);
+
+        // Stap 2: Vind de team ID voor "U12" binnen de gevonden club
+        console.log(`Zoeken naar team '${teamName}' in club '${clubId}'...`);
+        const teamsRef = collection(db, 'clubs', clubId, 'teams');
+        const teamsQuery = query(teamsRef, where('name', '==', teamName));
         const teamSnapshot = await getDocs(teamsQuery);
 
         if (teamSnapshot.empty) {
-          throw new Error("Team 'U12' niet gevonden in uw club.");
+          throw new Error(`Team '${teamName}' niet gevonden in club '${clubName}'.`);
         }
         
         const teamId = teamSnapshot.docs[0].id;
-        console.log(`Team 'U12' gevonden met ID: ${teamId}`);
+        console.log(`Team '${teamName}' gevonden met ID: ${teamId}`);
 
-        // Stap 2: Haal leden op gebaseerd op de gevonden team ID
-        console.log(`Leden ophalen voor teamId: ${teamId}`);
-        const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
+        // Stap 3: Haal leden op gebaseerd op de GEVONDEN clubId en teamId
+        console.log(`Leden ophalen voor clubId: ${clubId} en teamId: ${teamId}`);
+        const membersQuery = query(
+            collection(db, 'users'), 
+            where('clubId', '==', clubId),
+            where('teamId', '==', teamId)
+        );
         const membersSnapshot = await getDocs(membersQuery);
 
         if (membersSnapshot.empty) {
@@ -111,7 +126,16 @@ export default function TeamU12Page() {
         }
       } catch (e: any) {
         console.error("Fout bij het ophalen van team U12 data:", e);
-        setError(`Fout: ${e.message}. Controleer de browser console voor de volledige foutmelding.`);
+        if (e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: 'users',
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setError(`Permissiefout: ${permissionError.message}. Controleer de security rules en of de custom claim 'role' correct is ingesteld voor de gebruiker.`);
+        } else {
+             setError(`Fout: ${e.message}. Controleer de browser console voor de volledige foutmelding.`);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -126,10 +150,10 @@ export default function TeamU12Page() {
         <CardHeader>
           <CardTitle className="flex items-center text-2xl">
             <TestTube2 className="h-6 w-6 mr-3 text-primary"/>
-            Testpagina: Leden van Team U12
+            Testpagina: Leden van SK Beveren - U12
           </CardTitle>
           <CardDescription>
-            Dit is een statische pagina om het ophalen van teamleden te testen.
+            Dit is een statische pagina om het ophalen van teamleden voor een specifieke club en team te testen.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -144,7 +168,7 @@ export default function TeamU12Page() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Er is een fout opgetreden</AlertTitle>
               <AlertDescription>
-                {error}
+                <pre className="whitespace-pre-wrap">{error}</pre>
               </AlertDescription>
             </Alert>
           )}
@@ -156,7 +180,7 @@ export default function TeamU12Page() {
                     ))
                 ) : (
                     <div className="h-40 flex items-center justify-center">
-                        <p className="text-muted-foreground">Geen leden gevonden voor team 'U12'.</p>
+                        <p className="text-muted-foreground">Geen leden gevonden voor team 'U12' in club 'SK Beveren'.</p>
                     </div>
                 )}
             </div>
