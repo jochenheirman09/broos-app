@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, PlusCircle, TestTube2 } from "lucide-react";
+import { Building, PlusCircle, RefreshCw } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
@@ -69,10 +69,10 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-           <Link href="/team-u12" passHref>
+           <Link href="/admin/migrate-users" passHref>
              <Button variant="outline">
-                <TestTube2 className="mr-2 h-4 w-4" />
-                Testpagina Team U12
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Repareer Bestaande Gebruikers
              </Button>
            </Link>
           <Separator/>
