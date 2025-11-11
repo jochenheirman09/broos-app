@@ -84,6 +84,8 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  const buddyName = userProfile?.buddyName || "Broos";
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -105,7 +107,7 @@ export function ChatInterface() {
     setIsLoading(true);
     try {
         const { adaptedResponse, playerInfo, onboardingCompleted } = await chatWithBuddy({
-            buddyName: "Broos",
+            buddyName: buddyName,
             userName: userProfile.name,
             userAge: userProfile.birthDate
                 ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
@@ -143,7 +145,7 @@ export function ChatInterface() {
         toast({
             variant: "destructive",
             title: "Oh nee!",
-            description: "Kon het gesprek met Broos niet starten. Probeer het opnieuw.",
+            description: "Kon het gesprek niet starten. Probeer het opnieuw.",
         });
     } finally {
         setIsLoading(false);
@@ -172,6 +174,7 @@ export function ChatInterface() {
 
     const userMessageContent = input;
     // Don't clear input here, clear it only on successful API response
+    setInput(""); // Optimistic clearing of input
 
     await addDoc(
       collection(db, "users", user.uid, "chats", today, "messages"),
@@ -195,7 +198,7 @@ export function ChatInterface() {
           : "";
 
       const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await chatWithBuddy({
-        buddyName: "Broos",
+        buddyName: buddyName,
         userName: userProfile.name,
         userAge: userProfile.birthDate
           ? new Date().getFullYear() -
@@ -206,9 +209,6 @@ export function ChatInterface() {
         agentResponse: agentResponse,
         onboardingCompleted: !!userProfile.onboardingCompleted,
       });
-
-      // AI responded, now we can clear the input
-      setInput("");
 
       await addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
@@ -251,13 +251,14 @@ export function ChatInterface() {
       }
     } catch (error) {
       console.error("Error chatting with buddy:", error);
+      // Restore input on error
+      setInput(userMessageContent);
       toast({
         variant: "destructive",
         title: "Oh nee!",
         description:
-          "Er is iets misgegaan bij het praten met Broos. Probeer het opnieuw.",
+          "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
       });
-      // Do not clear input on error, so the user can retry sending.
     } finally {
       setIsLoading(false);
     }
@@ -285,7 +286,7 @@ export function ChatInterface() {
               <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
                 <Spinner size="small" />
                 <span className="text-muted-foreground italic">
-                  Broos denkt na...
+                  {buddyName} denkt na...
                 </span>
               </div>
             </div>
@@ -314,5 +315,3 @@ export function ChatInterface() {
     </div>
   );
 }
-
-    

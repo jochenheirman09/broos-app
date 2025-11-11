@@ -1,44 +1,41 @@
 "use client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/context/user-context";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "./predefined-avatars";
 import { useMemo } from "react";
 
-const predefinedAvatars = [
-  { id: 'logo', component: LogoAvatar },
-  { id: 'tsubasa', component: TsubasaAvatar },
-  { id: 'robot', component: RobotAvatar },
-];
+const predefinedAvatars: { [key: string]: React.FC<any> } = {
+  logo: LogoAvatar,
+  tsubasa: TsubasaAvatar,
+  robot: RobotAvatar,
+};
 
 export function BuddyAvatar({ className }: { className?: string }) {
-  // In a real app, this would be loaded from a specific buddy profile setting.
-  // For now, we'll imagine it's stored on the main user profile for simplicity.
   const { userProfile } = useUser();
-  const buddyName = "Broos";
+  const buddyName = userProfile?.buddyName || "Broos";
+  const buddyAvatar = userProfile?.buddyAvatar || 'logo';
 
   const SelectedAvatar = useMemo(() => {
-    // This is a placeholder for where you would fetch the buddy's specific profile
-    const selectedAvatarId = "logo"; // Let's assume 'logo' is the default
-    const customAvatarUrl = null; // Let's assume no custom URL for now
-
-    if (customAvatarUrl) {
-      return <AvatarImage src={customAvatarUrl} alt={buddyName} />;
+    // Case 1: Custom uploaded avatar (data URL)
+    if (buddyAvatar.startsWith('data:image')) {
+      return <img src={buddyAvatar} alt={buddyName} className="h-full w-full object-cover" />;
     }
 
-    const PredefinedComponent = predefinedAvatars.find(a => a.id === selectedAvatarId)?.component;
-
+    // Case 2: Predefined avatar
+    const PredefinedComponent = predefinedAvatars[buddyAvatar];
     if (PredefinedComponent) {
       return <PredefinedComponent className="h-full w-full" size="normal" />;
     }
 
-    // Fallback to logo
+    // Fallback to default logo avatar
     return <LogoAvatar className="h-full w-full" size="normal" />;
-  }, []);
+  }, [buddyAvatar, buddyName]);
 
   return (
     <Avatar className={cn(className)}>
-      <AvatarFallback className="bg-muted">
+      {/* AvatarImage is meant for external URLs, so we render the content directly or inside the fallback */}
+      <AvatarFallback className={cn("bg-muted", buddyAvatar.startsWith('data:image') ? 'p-0' : '')}>
         {SelectedAvatar}
       </AvatarFallback>
     </Avatar>
