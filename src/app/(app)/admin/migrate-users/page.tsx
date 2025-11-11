@@ -10,7 +10,7 @@ import {
   doc,
   writeBatch,
   where,
-  collectionGroup,
+  getDoc,
 } from "firebase/firestore";
 import type { UserProfile, WithId, Team } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -63,35 +63,51 @@ export default function MigrateUsersPage() {
 
       if (teamIds.length === 0) {
         setStatus("success");
-        setUpdatedUsers(["Geen teams gevonden in uw club. Er zijn geen gebruikers om te migreren."]);
+        setSkippedUsers(["Geen teams gevonden in uw club. Er zijn geen gebruikers om te migreren."]);
         return;
       }
 
       // Step 2: For each team, find users that have this teamId but no clubId.
       const usersToUpdate: WithId<UserProfile>[] = [];
       const usersRef = collection(db, "users");
-      const CHUNK_SIZE = 10;
+      const CHUNK_SIZE = 10; // Firestore 'in' query limit
+      const localSkipped: string[] = [];
       
       for (let i = 0; i < teamIds.length; i += CHUNK_SIZE) {
         const teamIdChunk = teamIds.slice(i, i + CHUNK_SIZE);
         const usersQuery = query(usersRef, where("teamId", "in", teamIdChunk));
-        const usersSnapshot = await getDocs(usersQuery);
         
-        usersSnapshot.forEach(userDoc => {
-          const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-          if (!userData.clubId) {
-            usersToUpdate.push(userData);
-          } else {
-             skippedUsers.push(`${userData.name} (Reden: Heeft al een clubId)`);
-          }
-        });
+        try {
+            const usersSnapshot = await getDocs(usersQuery);
+            usersSnapshot.forEach(userDoc => {
+                const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
+                if (!userData.clubId) {
+                    usersToUpdate.push(userData);
+                } else {
+                    localSkipped.push(`${userData.name} (Reden: Heeft al een clubId)`);
+                }
+            });
+        } catch (e: any) {
+            // This is where the permission error happens.
+            console.error("Fout bij getDocs voor users met teamId in chunk:", e);
+            const permissionError = new FirestorePermissionError({
+                path: `users (query with where('teamId', 'in', [${teamIdChunk.join(', ')}]))`,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setError("Permissiefout gedetecteerd. De details worden gelogd.");
+            setStatus("error");
+            return; // Stop the migration process
+        }
       }
 
-      setSkippedUsers(prev => [...prev, ...skippedUsers]);
+      setSkippedUsers(localSkipped);
       
       if (usersToUpdate.length === 0) {
         setStatus("success");
-        setUpdatedUsers(["Geen gebruikers gevonden die een `clubId` missen."]);
+        if (localSkipped.length > 0) {
+            setUpdatedUsers(["Geen gebruikers gevonden die een `clubId` missen."]);
+        }
         return;
       }
       
@@ -104,25 +120,21 @@ export default function MigrateUsersPage() {
         batch.update(userRef, { clubId: userProfile.clubId });
         updatedNames.push(`${user.name} (ID: ${user.id}) gekoppeld aan club ${userProfile.clubId}`);
       }
-
+      
       await batch.commit();
+
       setUpdatedUsers(updatedNames);
       setStatus("success");
 
     } catch (e: any) {
-      console.error("Migratiefout:", e);
-      let errorMessage = "Er is een onbekende fout opgetreden.";
-       if (e.code === 'permission-denied' || (e.message && e.message.includes('permission'))) {
-        errorMessage = "QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De 'responsible' rol moet het recht hebben om alle gebruikers te listen.";
-        const permissionError = new FirestorePermissionError({
-                path: `users (querying on teamIds)`,
+      console.error("Algemene migratiefout:", e);
+      // This will catch other errors, like the getDocs on the teams collection
+      const permissionError = new FirestorePermissionError({
+                path: `clubs/${userProfile.clubId}/teams`,
                 operation: 'list',
             });
-        errorEmitter.emit('permission-error', permissionError);
-      } else {
-        errorMessage = e.message;
-      }
-      setError(errorMessage);
+      errorEmitter.emit('permission-error', permissionError);
+      setError(e.message || "Er is een onbekende fout opgetreden.");
       setStatus("error");
     }
   };
