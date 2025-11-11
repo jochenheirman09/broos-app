@@ -7,7 +7,7 @@ import { chatWithBuddy } from "@/ai/flows/buddy-flow";
 import { saveWellnessScores, saveAlert } from "@/lib/firebase/firestore/wellness";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SendHorizonal } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -104,7 +104,7 @@ export function ChatInterface() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   
   const buddyName = userProfile?.buddyName || "Broos";
   const firstName = userProfile?.name.split(" ")[0];
@@ -183,9 +183,9 @@ export function ChatInterface() {
   }, [messagesLoading, messages]);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
+    if (viewportRef.current) {
+      viewportRef.current.scrollTo({
+        top: viewportRef.current.scrollHeight,
         behavior: "smooth",
       });
     }
@@ -196,21 +196,20 @@ export function ChatInterface() {
     if (!input.trim() || !userProfile || !user || !db || !firstName) return;
 
     const userMessageContent = input;
-    // Don't clear input here, clear it only on successful API response
-    setInput(""); // Optimistic clearing of input
-
-    await addDoc(
-      collection(db, "users", user.uid, "chats", today, "messages"),
-      {
-        role: "user",
-        content: userMessageContent,
-        timestamp: serverTimestamp(),
-      }
-    );
+    setInput(""); // Optimistically clear input, but will restore on error
 
     setIsLoading(true);
 
     try {
+      await addDoc(
+        collection(db, "users", user.uid, "chats", today, "messages"),
+        {
+          role: "user",
+          content: userMessageContent,
+          timestamp: serverTimestamp(),
+        }
+      );
+
       const chatHistory = (messages || [])
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
@@ -299,24 +298,26 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-grow" ref={scrollAreaRef}>
-        <div className="px-4">
-          {messages &&
-            messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-          {isLoading && (
-            <div className="flex items-start gap-3 my-4 justify-start">
-              <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-              <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
-                <Spinner size="small" />
-                <span className="text-muted-foreground italic">
-                  {buddyName} denkt na...
-                </span>
+      <ScrollArea className="flex-grow">
+        <ScrollViewport ref={viewportRef} className="h-full">
+          <div className="px-4">
+            {messages &&
+              messages.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+            {isLoading && (
+              <div className="flex items-start gap-3 my-4 justify-start">
+                <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
+                <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
+                  <Spinner size="small" />
+                  <span className="text-muted-foreground italic">
+                    {buddyName} denkt na...
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </ScrollViewport>
       </ScrollArea>
 
       <div className="p-4 border-t">
