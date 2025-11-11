@@ -90,7 +90,7 @@ export default function BuddyProfilePage() {
 
   const renderSelectedAvatar = () => {
     if (selectedAvatar && selectedAvatar.startsWith('data:image')) {
-         return <img src={selectedAvatar} alt="Gek選舉n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
+         return <img src={selectedAvatar} alt="Gek选举n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
     }
     const PredefinedComponent = predefinedAvatars.find(a => a.id === selectedAvatar)?.component;
     if (PredefinedComponent) {
