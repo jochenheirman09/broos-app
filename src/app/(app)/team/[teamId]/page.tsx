@@ -71,7 +71,7 @@ export default function TeamPlayersPage({
   const [isTeamLoading, setIsTeamLoading] = useState(true);
 
   const membersQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !teamId) return null;
     return query(collection(db, 'users'), where('teamId', '==', teamId));
   }, [db, teamId]);
 
