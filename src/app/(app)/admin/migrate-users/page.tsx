@@ -10,6 +10,8 @@ import {
   doc,
   writeBatch,
   where,
+  getDoc,
+  DocumentData
 } from "firebase/firestore";
 import type { UserProfile, WithId, Team } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -54,72 +56,65 @@ export default function MigrateUsersPage() {
     setSkippedUsers([]);
     setError(null);
 
+    const usersToUpdate = new Map<string, WithId<UserProfile>>();
+    const localSkipped: string[] = [];
+
     try {
-      // Step 1: Get all teams for the current user's club.
+      // Step 1: Query all users that are already correctly associated with the club
+      // This is a permitted query based on the new security rules.
+      const usersInClubQuery = query(collection(db, "users"), where("clubId", "==", userProfile.clubId));
+      const usersInClubSnapshot = await getDocs(usersInClubQuery);
+      
+      usersInClubSnapshot.forEach(userDoc => {
+          const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
+          // This user is already correct, so we can potentially skip them, but we add them
+          // to our map to have a full list of club members.
+          if (!usersToUpdate.has(userData.id)) {
+             usersToUpdate.set(userData.id, userData);
+             localSkipped.push(`${userData.name} (Reden: Heeft al het correcte clubId)`);
+          }
+      });
+      
+      // Step 2: Separately query for users in each team of the club.
+      // This will find users who have a teamId but might be missing a clubId.
       const teamsRef = collection(db, `clubs/${userProfile.clubId}/teams`);
       const teamsSnapshot = await getDocs(teamsRef);
       const teamsInClub = teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithId<Team>));
       
-      if (teamsInClub.length === 0) {
-        setStatus("success");
-        setSkippedUsers(["Geen teams gevonden in uw club. Er zijn geen gebruikers om te migreren."]);
-        return;
-      }
-
-      const usersToUpdate: WithId<UserProfile>[] = [];
-      const localSkipped: string[] = [];
-
-      // Step 2: For each team, query for its members.
       for (const team of teamsInClub) {
-        const usersQuery = query(collection(db, "users"), where("teamId", "==", team.id));
-        
-        try {
-            const usersSnapshot = await getDocs(usersQuery);
-            usersSnapshot.forEach(userDoc => {
-                const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-                // Check if clubId is missing or incorrect.
-                if (!userData.clubId || userData.clubId !== userProfile.clubId) {
-                    // Only add if not already in the list to avoid duplicates
-                    if (!usersToUpdate.some(u => u.id === userData.id)) {
-                        usersToUpdate.push(userData);
-                    }
-                } else {
-                     if (!localSkipped.some(u => u.startsWith(userData.name))) {
-                        localSkipped.push(`${userData.name} (Reden: Heeft al het correcte clubId)`);
-                    }
-                }
-            });
-        } catch (e: any) {
-            console.error(`Fout bij ophalen van gebruikers voor team ${team.name}:`, e);
-            // This is where we create and emit the contextual error
-            const permissionError = new FirestorePermissionError({
-                path: `users (querying where teamId == ${team.id})`,
-                operation: 'list',
-                requestResourceData: { query: { teamId: team.id } },
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            // We throw the error to stop the migration and display it.
-            throw e;
-        }
+        const usersInTeamQuery = query(collection(db, "users"), where("teamId", "==", team.id));
+        const usersInTeamSnapshot = await getDocs(usersInTeamQuery);
+
+        usersInTeamSnapshot.forEach(userDoc => {
+            const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
+            // If the user doesn't have the correct clubId, they need an update.
+            // We add them to our map. If they are already in the map, this will just overwrite, which is fine.
+             if (!userData.clubId || userData.clubId !== userProfile.clubId) {
+                usersToUpdate.set(userData.id, userData);
+            }
+        });
       }
 
       setSkippedUsers(localSkipped);
       
-      if (usersToUpdate.length === 0) {
-        setStatus("success");
-        if (localSkipped.length > 0) {
-            setUpdatedUsers(["Geen gebruikers gevonden die een `clubId` missen."]);
-        }
-        return;
-      }
-      
       const batch = writeBatch(db);
       const updatedNames: string[] = [];
+      let updateNeeded = false;
 
-      for (const user of usersToUpdate) {
-        const userRef = doc(db, "users", user.id);
-        batch.update(userRef, { clubId: userProfile.clubId });
-        updatedNames.push(`${user.name} (ID: ${user.id}) gekoppeld aan club ${userProfile.clubId}`);
+      // Final Step: Iterate through the collected map and update where necessary.
+      for (const user of usersToUpdate.values()) {
+        if (!user.clubId || user.clubId !== userProfile.clubId) {
+          const userRef = doc(db, "users", user.id);
+          batch.update(userRef, { clubId: userProfile.clubId });
+          updatedNames.push(`${user.name} (ID: ${user.id}) gekoppeld aan club ${userProfile.clubId}`);
+          updateNeeded = true;
+        }
+      }
+      
+      if (!updateNeeded) {
+        setStatus("success");
+        setUpdatedUsers(["Geen gebruikers gevonden die een `clubId` missen."]);
+        return;
       }
       
       await batch.commit();
@@ -129,6 +124,15 @@ export default function MigrateUsersPage() {
 
     } catch (e: any) {
       console.error("Fout tijdens migratie:", e);
+      // Emit a contextual error if it's a permission issue.
+      if (e.code === 'permission-denied') {
+        const permissionError = new FirestorePermissionError({
+            path: 'users',
+            operation: 'list',
+            requestResourceData: { detail: 'Query failed, likely on teamId or clubId lookup.'}
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      }
       setError(e.message || "Er is een onbekende fout opgetreden.");
       setStatus("error");
     }
@@ -185,9 +189,9 @@ export default function MigrateUsersPage() {
               </AlertTitle>
               <AlertDescription className="text-green-700">
                 <p className="font-bold mb-2">
-                  {updatedUsers.length > 0 ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Alle gebruikers zijn al correct geconfigureerd.'}
+                  {updatedUsers.length > 0 && !updatedUsers[0].startsWith('Geen') ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Alle gebruikers zijn al correct geconfigureerd.'}
                 </p>
-                {updatedUsers.length > 0 && (
+                {updatedUsers.length > 0 && !updatedUsers[0].startsWith('Geen') && (
                   <ul className="list-disc pl-5 text-sm max-h-40 overflow-y-auto">
                     {updatedUsers.map((name) => (
                       <li key={name}>{name}</li>
