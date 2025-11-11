@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, getDoc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { collection, query, where, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import type { UserProfile, Team, WithId } from '@/lib/types';
 import {
@@ -67,78 +67,56 @@ export default function TeamMembersPage({
   const { teamId } = params;
   const { userProfile } = useUser();
   const db = useFirestore();
+  
   const [team, setTeam] = useState<Team | null>(null);
-  const [isTeamLoading, setIsTeamLoading] = useState(true);
+  const [members, setMembers] = useState<WithId<UserProfile>[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // BREAKPOINT 1: Log initial props and state
-  console.log(`[TeamPage] Rendering page for teamId: ${teamId}`);
-  console.log(`[TeamPage] User profile loaded:`, userProfile ? 'Yes' : 'No');
-  console.log(`[TeamPage] Firestore instance available:`, db ? 'Yes' : 'No');
-
-
-  // BREAKPOINT 2: Create a specific, constrained query for team members.
-  const membersQuery = useMemoFirebase(() => {
-    if (!db || !teamId) {
-        console.warn('[TeamPage] Cannot create members query: db or teamId is missing.');
-        return null;
-    }
-    console.log(`[TeamPage] Creating members query where 'teamId' == '${teamId}'`);
-    return query(collection(db, 'users'), where('teamId', '==', teamId));
-  }, [db, teamId]);
-
-  const {
-    data: members,
-    isLoading: areMembersLoading,
-    error: membersError,
-  } = useCollection<UserProfile>(membersQuery);
-
-  // BREAKPOINT 3: Log the direct output from the useCollection hook.
-  useEffect(() => {
-    console.log('[TeamPage] Member data from useCollection:', {
-        members,
-        areMembersLoading,
-        membersError,
-    });
-  }, [members, areMembersLoading, membersError]);
-
-
-  // BREAKPOINT 4: Fetch the team document separately for detailed logging.
   useEffect(() => {
     if (!db || !userProfile?.clubId || !teamId) {
-      console.warn('[TeamPage] Cannot fetch team document: missing db, clubId, or teamId.');
-      setIsTeamLoading(false);
+      // Don't run if essential data is missing.
+      // Loading state will be handled by the initial state.
       return;
     }
 
-    const fetchTeam = async () => {
-      setIsTeamLoading(true);
-      const teamRefPath = `clubs/${userProfile.clubId}/teams/${teamId}`;
-      console.log(`[TeamPage] Fetching team document from path: ${teamRefPath}`);
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
       try {
+        // --- Step 1: Fetch Team Details ---
+        const teamRefPath = `clubs/${userProfile.clubId}/teams/${teamId}`;
         const teamRef = doc(db, teamRefPath);
         const teamSnap = await getDoc(teamRef);
+        
         if (teamSnap.exists()) {
-          const teamData = teamSnap.data() as Team;
-          console.log('[TeamPage] Successfully fetched team document:', teamData);
-          setTeam(teamData);
+          setTeam(teamSnap.data() as Team);
         } else {
-          console.error('[TeamPage] Team document NOT found at path:', teamRefPath);
-          setTeam(null);
+          throw new Error(`Team met ID "${teamId}" niet gevonden.`);
         }
-      } catch (e) {
-        console.error("[TeamPage] CRITICAL: Error fetching team document:", e);
+
+        // --- Step 2: Fetch Team Members ---
+        const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
+        const membersSnapshot = await getDocs(membersQuery);
+        
+        const membersData = membersSnapshot.docs.map(doc => ({
+          ...doc.data() as UserProfile,
+          id: doc.id,
+        }));
+        setMembers(membersData);
+
+      } catch (e: any) {
+        console.error("Error fetching team data:", e);
+        setError(e.message || "Er is een onbekende fout opgetreden.");
       } finally {
-        setIsTeamLoading(false);
+        setIsLoading(false);
       }
     };
 
-    fetchTeam();
+    fetchData();
   }, [db, userProfile?.clubId, teamId]);
 
-  const isLoading = areMembersLoading || isTeamLoading;
-
-  // BREAKPOINT 5: Log the final state before rendering.
-  console.log('[TeamPage] Final state before render:', { isLoading, members, team, membersError });
 
   return (
     <div className="container mx-auto py-8">
@@ -168,29 +146,29 @@ export default function TeamMembersPage({
               <p className="ml-4 text-muted-foreground">Gegevens laden...</p>
             </div>
           )}
-          {!isLoading && membersError && (
+          {!isLoading && error && (
              <div className="text-destructive p-4 border border-destructive/50 rounded-lg bg-destructive/10 space-y-3">
               <div className="flex items-center font-bold text-lg">
                 <AlertTriangle className="h-6 w-6 mr-3" />
                 Fout bij het laden van teamleden
               </div>
-              <p className="text-sm">Dit duidt op een probleem met de database-query of de beveiligingsregels. Controleer de console voor de gedetailleerde foutmelding van Firestore.</p>
+              <p className="text-sm">Dit kan duiden op een probleem met de database-query of de beveiligingsregels. Controleer de console voor de gedetailleerde foutmelding.</p>
               <details className="mt-2 text-xs bg-black/10 p-2 rounded">
                   <summary>Technische Details</summary>
                   <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">
-                    {membersError.message}
+                    {error}
                   </pre>
               </details>
             </div>
           )}
-          {!isLoading && !membersError && members && members.length > 0 && (
+          {!isLoading && !error && members && members.length > 0 && (
             <div className="border rounded-lg">
               {members.map((member) => (
                 <TeamMemberCard key={member.id} member={member} />
               ))}
             </div>
           )}
-          {!isLoading && !membersError && (!members || members.length === 0) && (
+          {!isLoading && !error && (!members || members.length === 0) && (
             <div className="h-64 border rounded-lg flex items-center justify-center bg-muted/20">
               <p className="text-muted-foreground">
                 Er zijn nog geen spelers of stafleden aan dit team gekoppeld.
