@@ -48,16 +48,6 @@ service cloud.firestore {
       let userData = getUserData(request.auth.uid);
       return userData.role == 'responsible';
     }
-    
-    function isUserClubResponsible() {
-      let userData = getUserData(request.auth.uid);
-      // Check if the user trying to be read belongs to a team, and that team belongs to the responsible's club.
-      let targetUserTeamId = resource.data.teamId;
-      if (targetUserTeamId == null || userData.clubId == null) {
-        return false;
-      }
-      return exists(/databases/$(database)/documents/clubs/$(userData.clubId)/teams/$(targetUserTeamId));
-    }
 
     function userHasClub() {
       let userData = getUserData(request.auth.uid);
@@ -102,13 +92,13 @@ service cloud.firestore {
     match /{path=**}/teams/{teamId} {
       // This is a collection group query, be careful. Only allow reads if there is a where clause on invitationCode.
       allow get: if isSignedIn() || debug("Allow any signed in user to get team");
-      allow list: if request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode' || debug("Allow any signed in user to find a team by code");
+      allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode' || debug("Allow any signed in user to find a team by code");
     }
 
     match /users/{userId} {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isRequestingUserClubResponsible(userId)) || debug("Allow owner or club responsible to get user");
-      // Allow a responsible user to list users, BUT ONLY if they are filtering by a teamId.
-      allow list: if isResponsible() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'teamId' || debug("Allow responsible to list users ONLY when filtered by teamId");
+      // Allow a responsible user to list users, BUT ONLY if they are filtering by a teamId that belongs to their club.
+      allow list: if isResponsible() && request.query.where[0][0] == 'teamId' && exists(/databases/$(database)/documents/clubs/$(getUserData(request.auth.uid).clubId)/teams/$(request.query.where[0][2])) || debug("Allow responsible to list users ONLY when filtered by a teamId in their club");
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
       allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");

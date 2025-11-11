@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, collectionGroup } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { UserProfile, WithId } from '@/lib/types';
 import {
   Card,
@@ -60,73 +60,61 @@ function MemberCard({ member }: { member: WithId<UserProfile> }) {
 export default function TeamU12Page() {
   const db = useFirestore();
   const { userProfile } = useUser();
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const [members, setMembers] = useState<WithId<UserProfile>[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isTeamIdLoading, setIsTeamIdLoading] = useState(true);
 
-  // 1. Find the team ID for team "U12" within the current user's club
   useEffect(() => {
-    if (!db || !userProfile?.clubId) {
-        if (!userProfile) {
-            setError("Gebruikersprofiel wordt geladen... Wacht een moment.");
-        } else if (!userProfile.clubId) {
-            setError("Geen club ID gevonden in uw profiel. Zorg ervoor dat u een 'responsible' gebruiker bent met een club.");
-        }
+    const fetchTeamMembers = async () => {
+      setIsLoading(true);
+      setError(null);
+      setMembers([]);
+
+      if (!db || !userProfile?.clubId) {
+        setError("Database of club ID niet gevonden. Wacht tot het profiel geladen is.");
+        setIsLoading(false);
         return;
-    };
-    
-    const findTeamId = async () => {
-        setIsTeamIdLoading(true);
-        setError(null);
-        try {
-            console.log(`Searching for team 'U12' in club '${userProfile.clubId}'...`);
-            const teamsRef = collection(db, 'clubs', userProfile.clubId, 'teams');
-            const teamsQuery = query(teamsRef, where('name', '==', 'U12'));
-            const querySnapshot = await getDocs(teamsQuery);
-
-            if (querySnapshot.empty) {
-                console.warn("No team found with name 'U12'.");
-                setError("Team 'U12' niet gevonden in uw club.");
-                setTeamId(null);
-            } else {
-                const teamDoc = querySnapshot.docs[0];
-                console.log(`Found team 'U12' with ID: ${teamDoc.id}`);
-                setTeamId(teamDoc.id);
-            }
-        } catch (e: any) {
-            console.error("Error finding team ID for 'U12':", e);
-            setError(`Fout bij het zoeken naar team U12: ${e.message}.`);
-        } finally {
-            setIsTeamIdLoading(false);
-        }
-    };
-
-    findTeamId();
-  }, [db, userProfile]);
-
-
-  // 2. Once we have the team ID, query for users in that team
-  const membersQuery = useMemoFirebase(() => {
-    if (!db || !teamId) return null;
-    console.log(`Creating query for users where teamId == ${teamId}`);
-    return query(collection(db, 'users'), where('teamId', '==', teamId));
-  }, [db, teamId]);
-
-  const {
-    data: members,
-    isLoading: areMembersLoading,
-    error: membersError,
-  } = useCollection<UserProfile>(membersQuery);
-  
-  useEffect(() => {
-      if (membersError) {
-          console.error("Error fetching members:", membersError);
-          setError(`Fout bij het ophalen van teamleden: ${membersError.message}. Dit kan duiden op een missende database-index voor de 'users' collectie.`);
       }
-  }, [membersError]);
 
+      try {
+        // Stap 1: Vind de team ID voor "U12" binnen de club
+        console.log(`Zoeken naar team 'U12' in club '${userProfile.clubId}'...`);
+        const teamsRef = collection(db, 'clubs', userProfile.clubId, 'teams');
+        const teamsQuery = query(teamsRef, where('name', '==', 'U12'));
+        const teamSnapshot = await getDocs(teamsQuery);
 
-  const isLoading = isTeamIdLoading || areMembersLoading;
+        if (teamSnapshot.empty) {
+          throw new Error("Team 'U12' niet gevonden in uw club.");
+        }
+        
+        const teamId = teamSnapshot.docs[0].id;
+        console.log(`Team 'U12' gevonden met ID: ${teamId}`);
+
+        // Stap 2: Haal leden op gebaseerd op de gevonden team ID
+        console.log(`Leden ophalen voor teamId: ${teamId}`);
+        const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
+        const membersSnapshot = await getDocs(membersQuery);
+
+        if (membersSnapshot.empty) {
+          console.log(`Geen leden gevonden voor team ${teamId}.`);
+        } else {
+            const membersData = membersSnapshot.docs.map(doc => ({
+                ...(doc.data() as UserProfile),
+                id: doc.id
+            }));
+            console.log(`Gevonden leden:`, membersData);
+            setMembers(membersData);
+        }
+      } catch (e: any) {
+        console.error("Fout bij het ophalen van team U12 data:", e);
+        setError(`Fout: ${e.message}. Controleer de browser console voor de volledige foutmelding.`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeamMembers();
+  }, [db, userProfile]);
 
   return (
     <div className="container mx-auto py-8">
@@ -153,11 +141,10 @@ export default function TeamU12Page() {
               <AlertTitle>Er is een fout opgetreden</AlertTitle>
               <AlertDescription>
                 {error}
-                <p className="text-xs mt-2">Controleer de browser console voor technische details.</p>
               </AlertDescription>
             </Alert>
           )}
-          {!isLoading && !error && members && (
+          {!isLoading && !error && (
             <div className="border rounded-lg">
                 {members.length > 0 ? (
                     members.map((member) => (
