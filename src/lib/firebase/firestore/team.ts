@@ -2,6 +2,7 @@
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { Schedule } from "@/lib/types";
 import {
   collection,
   deleteDoc,
@@ -24,9 +25,10 @@ interface CreateTeamParams {
   db: ReturnType<typeof useFirestore>;
   clubId: string;
   teamName: string;
+  schedule: Schedule;
 }
 
-export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
+export async function createTeam({ db, clubId, teamName, schedule }: CreateTeamParams) {
   if (!clubId) throw new Error("Club ID is required to create a team.");
   if (!teamName) throw new Error("Team name is required.");
   if (!db) throw new Error("Firestore is not available");
@@ -38,6 +40,7 @@ export async function createTeam({ db, clubId, teamName }: CreateTeamParams) {
     name: teamName,
     clubId: clubId,
     invitationCode: generateCode(), // Generate code on creation
+    schedule: schedule,
   };
 
   try {
@@ -86,30 +89,29 @@ interface UpdateTeamParams {
   db: ReturnType<typeof useFirestore>;
   clubId: string;
   teamId: string;
-  newName: string;
+  teamData: { name: string, schedule: Schedule };
 }
 
 export async function updateTeam({
   db,
   clubId,
   teamId,
-  newName,
+  teamData,
 }: UpdateTeamParams) {
   if (!clubId || !teamId) throw new Error("Club ID and Team ID are required.");
-  if (!newName) throw new Error("New team name is required.");
+  if (!teamData.name) throw new Error("New team name is required.");
   if (!db) throw new Error("Firestore is not available");
 
   const teamRef = doc(db, "clubs", clubId, "teams", teamId);
-  const updateData = { name: newName };
 
   try {
-    await updateDoc(teamRef, updateData);
+    await updateDoc(teamRef, teamData);
   } catch (error) {
     console.error("Error updating team:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "update",
-      requestResourceData: updateData,
+      requestResourceData: teamData,
     });
     errorEmitter.emit("permission-error", permissionError);
     throw permissionError;

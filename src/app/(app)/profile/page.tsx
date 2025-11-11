@@ -27,7 +27,7 @@ import { useAuth, useFirestore } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
-import { Camera, LogOut, Sparkles } from "lucide-react";
+import { Camera, LogOut, Sparkles, CalendarPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -197,18 +197,24 @@ export default function ProfilePage() {
           {userProfile.role === 'player' && (
             <>
               <Separator />
-                <div className="space-y-4">
-                     <h3 className="text-lg font-medium">Buddy Instellingen</h3>
-                     <p className="text-sm text-muted-foreground">
-                        Pas de naam en het uiterlijk van je AI-buddy aan.
-                     </p>
+              <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Planning & Instellingen</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Bekijk je weekschema, voeg trainingen toe en pas je buddy aan.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline">
+                        <CalendarPlus className="mr-2 h-4 w-4" />
+                        Individuele Training Toevoegen
+                    </Button>
                     <Link href="/buddy-profile" passHref>
-                        <Button variant="outline">
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            Buddy Aanpassen
-                        </Button>
+                      <Button variant="outline">
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Buddy Aanpassen
+                      </Button>
                     </Link>
-                </div>
+                  </div>
+              </div>
             </>
           )}
 

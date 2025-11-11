@@ -104,9 +104,36 @@
         "invitationCode": {
           "type": "string",
           "description": "A unique code to join the team."
+        },
+        "schedule": {
+          "type": "object",
+          "description": "Weekly schedule for the team.",
+          "properties": {
+            "monday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "tuesday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "wednesday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "thursday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "friday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "saturday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "sunday": { "type": "string", "enum": ["training", "game", "rest"] }
+          }
         }
       },
       "required": ["id", "name", "clubId"]
+    },
+    "PlayerTraining": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PlayerTraining",
+      "type": "object",
+      "description": "Represents an individual training session added by a player.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the training session." },
+        "userId": { "type": "string", "description": "The ID of the user this training belongs to." },
+        "date": { "type": "string", "format": "date", "description": "The date of the training." },
+        "description": { "type": "string", "description": "A brief description of the training." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "date", "description"]
     },
     "WellnessScore": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -326,6 +353,18 @@
           "params": [
             { "name": "userId", "description": "The user's ID." },
             { "name": "scoreId", "description": "The score's ID (YYYY-MM-DD)." }
+          ]
+        }
+      },
+       {
+        "path": "/users/{userId}/trainings/{trainingId}",
+        "definition": {
+          "entityName": "PlayerTraining",
+          "schema": { "$ref": "#/backend/entities/PlayerTraining" },
+          "description": "Stores individual training sessions for a user.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "trainingId", "description": "The unique ID of the training." }
           ]
         }
       },

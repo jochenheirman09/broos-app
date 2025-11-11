@@ -18,11 +18,19 @@ export interface Club {
   ownerId: string;
 }
 
+export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+export type ScheduleActivity = 'training' | 'game' | 'rest';
+
+export interface Schedule {
+    [key: string]: ScheduleActivity;
+}
+
 export interface Team {
   id: string;
   name: string;
   clubId: string;
   invitationCode?: string;
+  schedule?: Schedule;
 }
 
 export interface WellnessScore {
@@ -116,4 +124,12 @@ export interface TeamSummary {
     averageMotivation?: number;
     injuryCount?: number;
     commonTopics?: string[];
+}
+
+export interface PlayerTraining {
+    id: string;
+    userId: string;
+    date: string; // YYYY-MM-DD
+    description: string;
+    createdAt: any; // Firestore ServerTimestamp
 }
