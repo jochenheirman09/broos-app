@@ -116,7 +116,7 @@ export default function TeamU12Page() {
       try {
         // We gebruiken nu de clubId van de ingelogde gebruiker, dit is veel robuuster.
         const clubId = userProfile.clubId;
-        console.log(`Query Stap 1 & 2: Club ID '${clubId}' gebruiken van ingelogde gebruiker.`);
+        console.log(`Query Stap 1: Club ID '${clubId}' gebruiken van ingelogde gebruiker.`);
 
         // Stap 2: Vind de team ID voor "U12" binnen de gevonden club
         console.log(`Query Stap 2: Team '${teamName}' zoeken in club '${clubId}'...`);
@@ -125,7 +125,7 @@ export default function TeamU12Page() {
         const teamSnapshot = await getDocs(teamsQuery);
 
         if (teamSnapshot.empty) {
-          throw new Error(`Team '${teamName}' niet gevonden in club '${clubName}'.`);
+          throw new Error(`Team '${teamName}' niet gevonden in club '${clubName}'. Controleer of het team bestaat en de naam correct is gespeld.`);
         }
         
         const teamId = teamSnapshot.docs[0].id;
@@ -172,7 +172,7 @@ export default function TeamU12Page() {
                 }
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError(`Permissiefout: ${permissionError.message}. Zorg ervoor dat de regels een query met clubId en teamId toestaan.`);
+            setError(`Permissiefout: ${permissionError.message}. Controleer of de beveiligingsregels een query met 'clubId' en 'teamId' toestaan, en of de benodigde Firestore index is aangemaakt.`);
         }
       } finally {
         setIsLoading(false);
@@ -215,7 +215,7 @@ export default function TeamU12Page() {
                        <div>
                          <HelpCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                          <p className="font-bold">Query geslaagd, maar geen resultaten</p>
-                         <p className="text-muted-foreground">Er zijn geen gebruikersdocumenten gevonden die voldoen aan<br/> `clubId` == '{userProfile?.clubId}' AND `teamId` == 'U12'.</p>
+                         <p className="text-muted-foreground">Er zijn geen gebruikersdocumenten gevonden die voldoen aan<br/> `clubId` == '{userProfile?.clubId}' AND `teamId` == 'team-id-voor-u12'.</p>
                        </div>
                     </div>
                 )}
