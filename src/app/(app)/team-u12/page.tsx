@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import type { Team, WithId } from '@/lib/types';
+import { collection, query, getDocs } from 'firebase/firestore';
+import type { UserProfile, WithId } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -12,37 +12,37 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { AlertCircle, HelpCircle, Building, Users } from 'lucide-react';
+import { AlertCircle, HelpCircle, Database } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useUser } from '@/context/user-context';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
-function TeamCard({ team }: { team: WithId<Team> }) {
+function UserCard({ user }: { user: WithId<UserProfile> }) {
   return (
     <div className="flex items-center justify-between p-4 border-b last:border-b-0">
       <div className="flex items-center gap-4">
-        <Users className="h-6 w-6 text-primary" />
+        <Database className="h-6 w-6 text-primary" />
         <div>
-          <p className="font-bold">{team.name}</p>
-          <p className="text-sm text-muted-foreground font-mono">{team.id}</p>
+          <p className="font-bold">{user.name}</p>
+          <p className="text-sm text-muted-foreground font-mono">{user.email}</p>
         </div>
       </div>
-       <div className="text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full">
-          Team
+       <div className="text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full capitalize">
+          {user.role}
        </div>
     </div>
   );
 }
 
-function ErrorDisplay({ error, isIndexError }: { error: string, isIndexError: boolean }) {
+function ErrorDisplay({ error }: { error: string }) {
     return (
         <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Er is een fout opgetreden</AlertTitle>
+            <AlertTitle>Query Mislukt: Onvoldoende Rechten</AlertTitle>
             <AlertDescription>
-                <p>De query om de teams op te halen is mislukt. Dit komt meestal door beveiligingsregels ('Missing or insufficient permissions').</p>
-                <p className="mt-2 text-xs">Uw `firestore.rules` staan waarschijnlijk niet toe dat de ingelogde gebruiker de teams voor deze club mag oplijsten.</p>
+                <p>De query om alle gebruikers op te halen is mislukt. Dit is verwacht gedrag.</p>
+                <p className="mt-2 text-xs">Uw `firestore.rules` staan niet toe dat de volledige `users` collectie wordt opgevraagd zonder een filter (zoals `where('clubId', '==', ...)`). Dit is een belangrijke beveiligingsmaatregel om data te beschermen.</p>
                 <details className="mt-4 text-xs bg-black/20 p-2 rounded">
                     <summary>Technische Foutdetails</summary>
                     <pre className="whitespace-pre-wrap mt-2">{error}</pre>
@@ -55,7 +55,7 @@ function ErrorDisplay({ error, isIndexError }: { error: string, isIndexError: bo
 export default function TeamU12Page() {
   const db = useFirestore();
   const { userProfile, loading: isUserLoading } = useUser();
-  const [teams, setTeams] = useState<WithId<Team>[]>([]);
+  const [users, setUsers] = useState<WithId<UserProfile>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,64 +64,43 @@ export default function TeamU12Page() {
       return;
     }
     
-    const fetchClubTeams = async () => {
+    const fetchAllUsers = async () => {
       setIsLoading(true);
       setError(null);
-      setTeams([]);
-
-      const clubName = "SK Beveren";
+      setUsers([]);
 
       try {
-        // Stap 1: Vind de club ID voor "SK Beveren"
-        console.log(`Query Stap 1: Club '${clubName}' zoeken...`);
-        const clubsRef = collection(db, 'clubs');
-        const clubsQuery = query(clubsRef, where('name', '==', clubName));
-        const clubSnapshot = await getDocs(clubsQuery);
+        console.log("Query Stap 1: Poging om alle gebruikers op te halen...");
+        const usersQuery = query(collection(db, 'users'));
+        const usersSnapshot = await getDocs(usersQuery);
 
-        if (clubSnapshot.empty) {
-          throw new Error(`Club '${clubName}' niet gevonden. Controleer of de club bestaat en de naam correct is gespeld.`);
-        }
+        const usersData = usersSnapshot.docs.map(doc => ({
+            ...(doc.data() as UserProfile),
+            id: doc.id
+        }));
+        console.log(`Query succesvol! ${usersData.length} gebruikers gevonden.`);
+        setUsers(usersData);
         
-        const clubDoc = clubSnapshot.docs[0];
-        const clubId = clubDoc.id;
-        console.log(`Club gevonden met ID: ${clubId}`);
-
-        // Stap 2: Haal alle teams op die bij deze club horen
-        console.log(`Query Stap 2: Teams ophalen van pad 'clubs/${clubId}/teams'...`);
-        const teamsQuery = query(
-            collection(db, 'clubs', clubId, 'teams')
-        );
-        const teamsSnapshot = await getDocs(teamsQuery);
-
-        if (teamsSnapshot.empty) {
-          console.log(`Geen teams gevonden voor de query.`);
-        } else {
-            const teamsData = teamsSnapshot.docs.map(doc => ({
-                ...(doc.data() as Team),
-                id: doc.id
-            }));
-            console.log(`Query succesvol! ${teamsData.length} teams gevonden:`, teamsData);
-            setTeams(teamsData);
-        }
       } catch (e: any) {
         console.error("Fout bij het uitvoeren van de query:", e);
         const errorMessage = e.message || "Onbekende fout";
-        setError(errorMessage);
         
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
-                path: `clubs/${clubName}/teams`,
+                path: `users`,
                 operation: 'list',
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError(`Permissiefout: ${permissionError.message}. Controleer of uw beveiligingsregels een 'list' operatie op de 'teams' subcollectie toestaan.`);
+            setError(`Permissiefout: ${permissionError.message}. Het is niet toegestaan om alle gebruikers zonder filter op te vragen.`);
+        } else {
+            setError(errorMessage);
         }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchClubTeams();
+    fetchAllUsers();
   }, [db, userProfile, isUserLoading]);
 
   return (
@@ -129,11 +108,11 @@ export default function TeamU12Page() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center text-2xl">
-            <Building className="h-6 w-6 mr-3 text-primary"/>
-            Database Query: Alle Teams van SK Beveren
+            <Database className="h-6 w-6 mr-3 text-primary"/>
+            Database Query: Alle Geregistreerde Gebruikers
           </CardTitle>
           <CardDescription>
-            Deze pagina voert een query uit om alle teams te vinden die bij de club 'SK Beveren' horen. Dit test de beveiligingsregels voor subcollecties.
+            Deze pagina probeert alle gebruikers uit de `users` collectie op te halen. Dit zal (en moet) resulteren in een permissiefout vanwege de beveiligingsregels.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -144,20 +123,20 @@ export default function TeamU12Page() {
             </div>
           )}
           {error && !isLoading && (
-            <ErrorDisplay error={error} isIndexError={false} />
+            <ErrorDisplay error={error} />
           )}
           {!isLoading && !error && (
             <div className="border rounded-lg">
-                {teams.length > 0 ? (
-                    teams.map((team) => (
-                        <TeamCard key={team.id} team={team} />
+                {users.length > 0 ? (
+                    users.map((user) => (
+                        <UserCard key={user.id} user={user} />
                     ))
                 ) : (
                     <div className="h-40 flex items-center justify-center text-center">
                        <div>
                          <HelpCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                          <p className="font-bold">Query geslaagd, maar geen resultaten</p>
-                         <p className="text-muted-foreground">Er zijn geen teams gevonden onder de club 'SK Beveren'.</p>
+                         <p className="text-muted-foreground">Er zijn geen gebruikers gevonden.</p>
                        </div>
                     </div>
                 )}
