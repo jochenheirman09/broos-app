@@ -3,9 +3,11 @@ import { cn } from "@/lib/utils";
 export function Wordmark({
   size = "normal",
   className,
+  children,
 }: {
   size?: "normal" | "large";
   className?: string;
+  children: React.ReactNode;
 }) {
   const isLarge = size === "large";
   return (
@@ -16,9 +18,7 @@ export function Wordmark({
         className
       )}
     >
-      Broos 2.0
+      {children}
     </span>
   );
 }
-
-    

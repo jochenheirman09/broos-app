@@ -14,7 +14,7 @@ export default function AuthLayout({
       </div>
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center justify-center mb-8 gap-2">
-          <Wordmark size="large" />
+          <Wordmark size="large">Broos 2.0</Wordmark>
         </div>
         {children}
       </div>

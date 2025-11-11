@@ -84,7 +84,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center justify-center gap-4">
           <Logo size="large" />
-          <Wordmark size="large" />
+          <Wordmark size="large">Broos 2.0</Wordmark>
           <Spinner size="medium" className="mt-4" />
         </div>
       </div>

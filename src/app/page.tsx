@@ -51,7 +51,7 @@ export default function RoleSelectionPage() {
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center justify-center gap-4">
           <Logo size="large" />
-          <Wordmark size="large" />
+          <Wordmark size="large">Broos 2.0</Wordmark>
           <Spinner size="medium" className="mt-4" />
         </div>
       </div>
@@ -74,7 +74,7 @@ export default function RoleSelectionPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center justify-center mb-8 gap-2">
           <Logo size="large" />
-          <Wordmark size="large" />
+          <Wordmark size="large">Broos 2.0</Wordmark>
         </div>
         <Card>
           <CardHeader className="text-center">

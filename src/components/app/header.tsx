@@ -26,7 +26,7 @@ export function AppHeader() {
         <div className="mr-auto flex items-center space-x-3">
           <Link href="/dashboard" className="flex items-center space-x-3">
             <Logo />
-            <Wordmark />
+            <Wordmark>Broos 2.0</Wordmark>
           </Link>
         </div>
         <div className="flex items-center space-x-2">
