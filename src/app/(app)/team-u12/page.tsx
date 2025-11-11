@@ -59,22 +59,26 @@ function MemberCard({ member }: { member: WithId<UserProfile> }) {
 
 export default function TeamU12Page() {
   const db = useFirestore();
-  const { userProfile } = useUser();
+  const { userProfile, loading: isUserLoading } = useUser();
   const [members, setMembers] = useState<WithId<UserProfile>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Explicitly wait until both the user profile and the database instance are available.
+    if (isUserLoading || !db || !userProfile?.clubId) {
+      // If we are still loading user data, or if the db/clubId is not ready, do nothing yet.
+      // The loading state is handled by the main return block.
+      if (!isUserLoading) {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     const fetchTeamMembers = async () => {
       setIsLoading(true);
       setError(null);
       setMembers([]);
-
-      if (!db || !userProfile?.clubId) {
-        setError("Database of club ID niet gevonden. Wacht tot het profiel geladen is.");
-        setIsLoading(false);
-        return;
-      }
 
       try {
         // Stap 1: Vind de team ID voor "U12" binnen de club
@@ -114,7 +118,7 @@ export default function TeamU12Page() {
     };
 
     fetchTeamMembers();
-  }, [db, userProfile]);
+  }, [db, userProfile, isUserLoading]);
 
   return (
     <div className="container mx-auto py-8">
