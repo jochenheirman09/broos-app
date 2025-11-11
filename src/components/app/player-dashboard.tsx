@@ -22,6 +22,7 @@ export function PlayerDashboard() {
   const db = useFirestore();
 
   const firstName = userProfile?.name.split(" ")[0];
+  const buddyName = userProfile?.buddyName || "Broos";
 
   // Check if there's any chat history to adjust the button text
   const previousChatsQuery = useMemoFirebase(() => {
@@ -41,15 +42,15 @@ export function PlayerDashboard() {
             Jouw Dashboard{firstName ? `, ${firstName}` : ""}
           </CardTitle>
           <CardDescription>
-            Klaar voor je dagelijkse check-in met Broos?
+            Klaar voor je dagelijkse check-in met {buddyName}?
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Link href="/chat">
             <Button size="lg" className="w-full sm:w-auto">
               {hasChatHistory
-                ? "Zet je gesprek verder met Broos"
-                : "Start Gesprek met Broos"}
+                ? `Zet je gesprek verder met ${buddyName}`
+                : `Start Gesprek met ${buddyName}`}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
