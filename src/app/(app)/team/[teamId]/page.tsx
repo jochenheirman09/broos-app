@@ -60,11 +60,10 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
 }
 
 export default function TeamMembersPage({
-  params,
+  params: { teamId },
 }: {
   params: { teamId: string };
 }) {
-  const { teamId } = params;
   const { userProfile } = useUser();
   const db = useFirestore();
   
@@ -74,48 +73,61 @@ export default function TeamMembersPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Wait until all necessary data is available before fetching.
     if (!db || !userProfile?.clubId || !teamId) {
-      // Don't run if essential data is missing.
-      // Loading state will be handled by the initial state.
+      // If we're not ready, we shouldn't attempt to fetch.
+      // The initial `isLoading` state will show a spinner.
       return;
     }
 
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+      console.log(`[TEAM_PAGE] Starting data fetch for teamId: ${teamId} in club: ${userProfile.clubId}`);
       
       try {
-        // --- Step 1: Fetch Team Details ---
+        // --- Step 1: Fetch Team Details (for team name) ---
         const teamRefPath = `clubs/${userProfile.clubId}/teams/${teamId}`;
+        console.log(`[TEAM_PAGE] Fetching team document from path: ${teamRefPath}`);
         const teamRef = doc(db, teamRefPath);
         const teamSnap = await getDoc(teamRef);
         
         if (teamSnap.exists()) {
-          setTeam(teamSnap.data() as Team);
+          const teamData = teamSnap.data() as Team;
+          console.log(`[TEAM_PAGE] Successfully fetched team data:`, teamData);
+          setTeam(teamData);
         } else {
-          throw new Error(`Team met ID "${teamId}" niet gevonden.`);
+          throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
         }
 
-        // --- Step 2: Fetch Team Members ---
+        // --- Step 2: Fetch Team Members using a correct, filtered query ---
+        console.log(`[TEAM_PAGE] Building query for users with teamId: ${teamId}`);
         const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
         const membersSnapshot = await getDocs(membersQuery);
+        
+        if (membersSnapshot.empty) {
+          console.log(`[TEAM_PAGE] Query executed successfully, but no members found for team ${teamId}.`);
+        }
         
         const membersData = membersSnapshot.docs.map(doc => ({
           ...doc.data() as UserProfile,
           id: doc.id,
         }));
+
+        console.log(`[TEAM_PAGE] Successfully fetched ${membersData.length} members:`, membersData);
         setMembers(membersData);
 
       } catch (e: any) {
-        console.error("Error fetching team data:", e);
+        console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
         setError(e.message || "Er is een onbekende fout opgetreden.");
       } finally {
         setIsLoading(false);
+        console.log(`[TEAM_PAGE] Data fetching process finished.`);
       }
     };
 
     fetchData();
-  }, [db, userProfile?.clubId, teamId]);
+  }, [db, userProfile?.clubId, teamId]); // This effect re-runs if any of these dependencies change.
 
 
   return (
@@ -152,7 +164,7 @@ export default function TeamMembersPage({
                 <AlertTriangle className="h-6 w-6 mr-3" />
                 Fout bij het laden van teamleden
               </div>
-              <p className="text-sm">Dit kan duiden op een probleem met de database-query of de beveiligingsregels. Controleer de console voor de gedetailleerde foutmelding.</p>
+              <p className="text-sm">Dit duidt meestal op een permissieprobleem. De beveiligingsregels staan de huidige zoekopdracht niet toe. Controleer de console voor de gedetailleerde foutmelding.</p>
               <details className="mt-2 text-xs bg-black/10 p-2 rounded">
                   <summary>Technische Details</summary>
                   <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">
