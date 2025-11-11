@@ -21,6 +21,8 @@ import {
   query,
   orderBy,
   limit,
+  doc,
+  updateDoc,
 } from "firebase/firestore";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -102,8 +104,7 @@ export function ChatInterface() {
     
     setIsLoading(true);
     try {
-        // We explicitly pass an empty userMessage and chatHistory to signal a new conversation.
-        const { adaptedResponse } = await chatWithBuddy({
+        const { adaptedResponse, playerInfo, onboardingCompleted } = await chatWithBuddy({
             buddyName: "Broos",
             userName: userProfile.name,
             userAge: userProfile.birthDate
@@ -111,6 +112,7 @@ export function ChatInterface() {
                 : 18,
             userMessage: '', 
             chatHistory: '', 
+            onboardingCompleted: !!userProfile.onboardingCompleted,
         });
 
         await addDoc(
@@ -121,12 +123,27 @@ export function ChatInterface() {
                 timestamp: serverTimestamp(),
             }
         );
+
+        const userRef = doc(db, "users", user.uid);
+        const updates: any = {};
+        if (playerInfo) {
+            Object.assign(updates, playerInfo);
+        }
+        if (onboardingCompleted) {
+            updates.onboardingCompleted = true;
+        }
+
+        if(Object.keys(updates).length > 0) {
+            await updateDoc(userRef, updates);
+        }
+
+
     } catch (error) {
         console.error("Error fetching initial buddy message:", error);
         toast({
             variant: "destructive",
             title: "Oh nee!",
-            description: "Kon het gesprek met Broos niet starten.",
+            description: "Kon het gesprek met Broos niet starten. Probeer het opnieuw.",
         });
     } finally {
         setIsLoading(false);
@@ -134,11 +151,9 @@ export function ChatInterface() {
   };
 
   useEffect(() => {
-    // If loading is finished and there are no messages, trigger the initial message flow.
     if (!messagesLoading && messages?.length === 0) {
       handleInitialMessage();
     }
-  // We only want to run this once when the component loads and messages are confirmed empty.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messagesLoading, messages]);
 
@@ -156,7 +171,7 @@ export function ChatInterface() {
     if (!input.trim() || !userProfile || !user || !db) return;
 
     const userMessageContent = input;
-    setInput("");
+    // Don't clear input here, clear it only on successful API response
 
     await addDoc(
       collection(db, "users", user.uid, "chats", today, "messages"),
@@ -179,7 +194,7 @@ export function ChatInterface() {
           ? messages[messages.length - 1].content
           : "";
 
-      const { adaptedResponse, scores, alerts } = await chatWithBuddy({
+      const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await chatWithBuddy({
         buddyName: "Broos",
         userName: userProfile.name,
         userAge: userProfile.birthDate
@@ -189,7 +204,11 @@ export function ChatInterface() {
         userMessage: userMessageContent,
         chatHistory: chatHistory,
         agentResponse: agentResponse,
+        onboardingCompleted: !!userProfile.onboardingCompleted,
       });
+
+      // AI responded, now we can clear the input
+      setInput("");
 
       await addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
@@ -199,6 +218,22 @@ export function ChatInterface() {
           timestamp: serverTimestamp(),
         }
       );
+
+      const userRef = doc(db, "users", user.uid);
+      const updates: any = {};
+      
+      if (playerInfo) {
+          Object.assign(updates, playerInfo);
+      }
+      
+      // If the AI signals that onboarding is now complete, update the user profile
+      if (onboardingCompleted && !userProfile.onboardingCompleted) {
+          updates.onboardingCompleted = true;
+      }
+      
+      if (Object.keys(updates).length > 0) {
+          await updateDoc(userRef, updates);
+      }
 
       if (scores && Object.keys(scores).length > 0) {
         await saveWellnessScores({
@@ -222,6 +257,7 @@ export function ChatInterface() {
         description:
           "Er is iets misgegaan bij het praten met Broos. Probeer het opnieuw.",
       });
+      // Do not clear input on error, so the user can retry sending.
     } finally {
       setIsLoading(false);
     }
@@ -278,3 +314,5 @@ export function ChatInterface() {
     </div>
   );
 }
+
+    

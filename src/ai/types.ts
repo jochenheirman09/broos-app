@@ -10,6 +10,7 @@ export const BuddyInputSchema = z.object({
     .string()
     .optional()
     .describe('The history of the conversation so far.'),
+  onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
 });
 export type BuddyInput = z.infer<typeof BuddyInputSchema>;
 
@@ -38,6 +39,15 @@ export const ScoreSchema = z.object({
   shareWithStaff: z.optional(z.boolean()),
 });
 
+export const PlayerInfoSchema = z.object({
+    familySituation: z.optional(z.string().describe("Summary of the player's family life and composition.")),
+    schoolSituation: z.optional(z.string().describe("Summary of the player's school life and social circle.")),
+    personalGoals: z.optional(z.string().describe("Summary of the player's ambitions in football and life.")),
+    matchPreparation: z.optional(z.string().describe("Summary of the player's match preparation routines.")),
+    recoveryHabits: z.optional(z.string().describe("Summary of how the player recovers after physical activity.")),
+    additionalHobbies: z.optional(z.string().describe("Summary of the player's hobbies and relaxation techniques.")),
+});
+
 export const AlertSchema = z.object({
   alertType: z
     .enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity'])
@@ -54,8 +64,11 @@ export const BuddyOutputSchema = z.object({
     .describe(
       'An empathetic, context-aware, and psychologically sound response.'
     ),
-  scores: ScoreSchema.describe(
+  scores: ScoreSchema.optional().describe(
     'The scores and reasoning generated based on the analysis of the latest user message.'
+  ),
+  playerInfo: PlayerInfoSchema.optional().describe(
+    'Summaries of the player\'s background information, gathered during onboarding.'
   ),
   alerts: z
     .array(AlertSchema)
@@ -63,5 +76,10 @@ export const BuddyOutputSchema = z.object({
     .describe(
       'A list of alerts generated if the user message contains alarming signs.'
     ),
+  onboardingCompleted: z.boolean().optional().describe(
+      "Set to true when the AI determines the initial 'get-to-know-you' phase is complete."
+  )
 });
 export type BuddyOutput = z.infer<typeof BuddyOutputSchema>;
+
+    

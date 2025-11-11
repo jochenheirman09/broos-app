@@ -10,6 +10,13 @@ export interface UserProfile {
   teamId?: string;
   birthDate?: string;
   photoURL?: string;
+  onboardingCompleted?: boolean;
+  familySituation?: string;
+  schoolSituation?: string;
+  personalGoals?: string;
+  matchPreparation?: string;
+  recoveryHabits?: string;
+  additionalHobbies?: string;
 }
 
 export interface Club {
@@ -133,3 +140,5 @@ export interface PlayerTraining {
     description: string;
     createdAt: any; // Firestore ServerTimestamp
 }
+
+    
