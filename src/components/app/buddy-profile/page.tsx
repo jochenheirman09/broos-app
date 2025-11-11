@@ -33,7 +33,7 @@ export default function BuddyProfilePage() {
   const { toast } = useToast();
   
   const [buddyName, setBuddyName] = useState("Broos");
-  const [selectedAvatar, setSelectedAvatar] = useState<string | null>('logo');
+  const [selectedAvatar, setSelectedAvatar] = useState<string>('logo');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
