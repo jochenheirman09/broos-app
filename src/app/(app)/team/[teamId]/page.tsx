@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
@@ -64,9 +64,9 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
 export default function TeamMembersPage({
   params,
 }: {
-  params: { teamId: string };
+  params: Promise<{ teamId: string }>;
 }) {
-  const { teamId } = params;
+  const { teamId } = use(params);
   const { userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   
