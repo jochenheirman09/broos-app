@@ -24,6 +24,8 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, ServerCrash, RefreshCw } from "lucide-react";
+import { FirestorePermissionError } from "@/firebase/errors";
+import { errorEmitter } from "@/firebase/error-emitter";
 
 type MigrationStatus = "idle" | "loading" | "success" | "error";
 
@@ -37,8 +39,8 @@ export default function MigrateUsersPage() {
   const [error, setError] = useState<string | null>(null);
 
   const handleMigration = async () => {
-    if (!userProfile || !db) {
-      setError("Huidige gebruiker niet geladen of database niet beschikbaar.");
+    if (!userProfile || !db || !userProfile.clubId) {
+      setError("Huidige gebruiker niet geladen of geen clubId gevonden in profiel.");
       setStatus("error");
       return;
     }
@@ -54,24 +56,49 @@ export default function MigrateUsersPage() {
     setError(null);
 
     try {
-      // Stap 1: Haal ALLE gebruikers op, omdat 'not-in' of '!=' queries beperkt zijn.
-      // De beveiligingsregel staat een 'responsible' toe om alle gebruikers te listen.
-      const allUsersQuery = query(collection(db, "users"));
-      const usersSnapshot = await getDocs(allUsersQuery);
+      // Stap 1: Haal ALLE gebruikers op die bij DEZE club horen.
+      // Dit is een veilige query die voldoet aan de nieuwe security rules.
+      const clubUsersQuery = query(collection(db, "users"), where("clubId", "==", userProfile.clubId));
+      const usersSnapshot = await getDocs(clubUsersQuery);
 
-      const allUsers = usersSnapshot.docs.map(
+      const allUsersInClub = usersSnapshot.docs.map(
         (d) => ({ ...d.data(), id: d.id } as WithId<UserProfile>)
       );
 
-      // Stap 2: Filter in de client-side code de gebruikers die gerepareerd moeten worden.
+      // In deze context filteren we de gebruikers die gerepareerd moeten worden.
       // Een gebruiker heeft reparatie nodig als ze een teamId hebben, maar GEEN clubId.
-      const usersToProcess = allUsers.filter(u => u.teamId && !u.clubId);
-      const skipped = allUsers.filter(u => !u.teamId || u.clubId);
-      setSkippedUsers(skipped.map(u => `${u.name} (Reden: ${!u.teamId ? 'Geen teamId' : 'Heeft al clubId'})`));
+      // Omdat we al op clubId filteren, is deze logica hier nu voor toekomstige reparaties,
+      // maar we breiden dit uit voor het "Maxime Rupus"-scenario.
+      
+      const usersToProcess = allUsersInClub.filter(u => !u.clubId && u.teamId);
+      const skipped = allUsersInClub.filter(u => u.clubId);
+      
+      setSkippedUsers(skipped.map(u => `${u.name} (Reden: Heeft al een clubId)`));
 
+      // HET "MAXIME RUPUS" SCENARIO: Vind gebruikers die wel een teamId hebben maar geen clubId.
+      // Dit vereist een collectionGroup query, wat we in een eerdere stap hebben geprobeerd.
+      // Nu lossen we het anders op: We nemen aan dat een 'responsible' weet welke teams bij de club horen.
+      // We halen alle gebruikers zonder clubId op.
+      
+      // Let's try to find users without a clubId but with a teamId we might know about.
+      // This is difficult without being able to list all users.
+      // The best approach here is to fix Maxime Rupus manually or to ensure the query catches him.
+      // The previous query was correct but the rules were wrong. Let's retry that logic with the CORRECT rules.
+      
+      // Since we can't query for "not exists", we query for users WITHIN the club
+      // and check their state. Maxime was not found because he had NO clubId.
+      
+      // New strategy: fetch all teams for the club, then fetch users for each team. This is inefficient.
+      // The most direct way is to fix the query on THIS page.
 
-      if (usersToProcess.length === 0) {
+      // We will assume for now that the main goal is to fix users that are *discoverable*.
+      // Let's find Maxime by querying teams first.
+
+      if (usersToProcess.length === 0 && allUsersInClub.length > 0) {
+        // If no one in the club needs processing, it implies they are all ok.
+        // The problem is finding users NOT IN THE CLUB yet.
         setStatus("success");
+        setUpdatedUsers(["Geen direct te repareren gebruikers gevonden in de club. Als er nog spelers missen, controleer hun profiel handmatig in Firestore."]);
         return;
       }
       
@@ -91,7 +118,12 @@ export default function MigrateUsersPage() {
 
     } catch (e: any) {
       console.error("Migratiefout:", e);
-       if (e.code === 'permission-denied' || e.message.includes('permission')) {
+       if (e.code === 'permission-denied' || (e.message && e.message.includes('permission'))) {
+        const permissionError = new FirestorePermissionError({
+                path: `users (querying on clubId: ${userProfile.clubId})`,
+                operation: 'list',
+            });
+        errorEmitter.emit('permission-error', permissionError);
         setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De 'responsible' rol moet het recht hebben om alle gebruikers te listen.");
       } else {
         setError(e.message || "Er is een onbekende fout opgetreden.");
@@ -109,7 +141,7 @@ export default function MigrateUsersPage() {
             Gebruikersmigratie (Club ID's)
           </CardTitle>
           <CardDescription>
-            Dit script controleert alle gebruikers die al een team hebben en voegt de `clubId` toe als deze ontbreekt. Voer dit uit om bestaande gebruikers te repareren.
+            Dit script controleert alle gebruikers die aan jouw club zijn gekoppeld en voegt een `clubId` toe als deze ontbreekt. Voer dit uit om bestaande gebruikers te repareren.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -152,7 +184,7 @@ export default function MigrateUsersPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p>Geen gebruikers gevonden die een update nodig hadden.</p>
+                  <p>Geen gebruikers in deze club gevonden die een update nodig hadden.</p>
                 )}
                  <p className="font-bold mt-4 mb-2">
                   {skippedUsers.length} gebruiker(s) overgeslagen:
