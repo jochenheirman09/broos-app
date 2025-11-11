@@ -69,12 +69,9 @@ export default function MigrateUsersPage() {
 
       // Step 2: For each team, find users that have this teamId but no clubId.
       const usersToUpdate: WithId<UserProfile>[] = [];
-      
       const usersRef = collection(db, "users");
-      // Firestore does not support '!= null' or 'not-in' queries on different fields.
-      // So we query for users with a teamId and then filter client-side.
-      // We can query for users in chunks of 10 teamIds.
       const CHUNK_SIZE = 10;
+      
       for (let i = 0; i < teamIds.length; i += CHUNK_SIZE) {
         const teamIdChunk = teamIds.slice(i, i + CHUNK_SIZE);
         const usersQuery = query(usersRef, where("teamId", "in", teamIdChunk));
@@ -82,7 +79,6 @@ export default function MigrateUsersPage() {
         
         usersSnapshot.forEach(userDoc => {
           const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-          // This is the user we need to fix!
           if (!userData.clubId) {
             usersToUpdate.push(userData);
           } else {
@@ -91,7 +87,7 @@ export default function MigrateUsersPage() {
         });
       }
 
-      setSkippedUsers(skippedUsers);
+      setSkippedUsers(prev => [...prev, ...skippedUsers]);
       
       if (usersToUpdate.length === 0) {
         setStatus("success");
@@ -115,16 +111,18 @@ export default function MigrateUsersPage() {
 
     } catch (e: any) {
       console.error("Migratiefout:", e);
+      let errorMessage = "Er is een onbekende fout opgetreden.";
        if (e.code === 'permission-denied' || (e.message && e.message.includes('permission'))) {
+        errorMessage = "QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De 'responsible' rol moet het recht hebben om alle gebruikers te listen.";
         const permissionError = new FirestorePermissionError({
                 path: `users (querying on teamIds)`,
                 operation: 'list',
             });
         errorEmitter.emit('permission-error', permissionError);
-        setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld. De regels moeten een query op 'teamId' toestaan.");
       } else {
-        setError(e.message || "Er is een onbekende fout opgetreden.");
+        errorMessage = e.message;
       }
+      setError(errorMessage);
       setStatus("error");
     }
   };
@@ -182,7 +180,7 @@ export default function MigrateUsersPage() {
                   </ul>
                 )}
                  <p className="font-bold mt-4 mb-2">
-                  {skippedUsers.length} gebruiker(s) overgeslagen:
+                  {skippedUsers.length > 0 ? `${skippedUsers.length} gebruiker(s) overgeslagen:` : 'Geen gebruikers overgeslagen.'}
                 </p>
                 {skippedUsers.length > 0 && (
                      <ul className="list-disc pl-5 text-sm max-h-40 overflow-y-auto">
