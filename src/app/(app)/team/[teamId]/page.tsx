@@ -65,37 +65,65 @@ export default function TeamPlayersPage({
   params: { teamId: string };
 }) {
   const { teamId } = params;
+  console.log('[TeamPage] 1. Rendering with teamId:', teamId);
+
   const { userProfile } = useUser();
   const db = useFirestore();
   const [team, setTeam] = useState<Team | null>(null);
   const [isTeamLoading, setIsTeamLoading] = useState(true);
 
+  console.log('[TeamPage] 2. Firebase DB and UserProfile status:', {
+    db: !!db,
+    userProfile: !!userProfile,
+  });
+
   const membersQuery = useMemoFirebase(() => {
-    if (!db || !teamId) return null;
+    console.log('[TeamPage] 3. useMemoFirebase for membersQuery running.');
+    if (!db || !teamId) {
+      console.log('[TeamPage] 3a. Aborting query creation: db or teamId is missing.');
+      return null;
+    }
+    console.log(`[TeamPage] 3b. Creating query: users where teamId == ${teamId}`);
     return query(collection(db, 'users'), where('teamId', '==', teamId));
   }, [db, teamId]);
 
   const {
     data: members,
     isLoading: areMembersLoading,
-    error,
+    error: membersError,
   } = useCollection<UserProfile>(membersQuery);
 
+  console.log('[TeamPage] 4. Result from useCollection hook:', {
+    members,
+    areMembersLoading,
+    membersError,
+  });
+
   useEffect(() => {
-    if (!db || !userProfile?.clubId || !teamId) return;
+    console.log('[TeamPage] 5. useEffect for fetching team document running.');
+    if (!db || !userProfile?.clubId || !teamId) {
+      console.log('[TeamPage] 5a. Aborting team fetch: missing dependencies.');
+      setIsTeamLoading(false);
+      return;
+    }
 
     const fetchTeam = async () => {
       setIsTeamLoading(true);
+      const teamRefPath = `clubs/${userProfile.clubId}/teams/${teamId}`;
+      console.log(`[TeamPage] 5b. Fetching team document from: ${teamRefPath}`);
       try {
-        const teamRef = doc(db, 'clubs', userProfile.clubId!, 'teams', teamId);
+        const teamRef = doc(db, teamRefPath);
         const teamSnap = await getDoc(teamRef);
         if (teamSnap.exists()) {
-          setTeam(teamSnap.data() as Team);
+          const teamData = teamSnap.data() as Team;
+          console.log('[TeamPage] 5c. Team document found:', teamData);
+          setTeam(teamData);
         } else {
-          console.error('Team niet gevonden');
+          console.error('[TeamPage] 5c. Team document NOT found at path:', teamRefPath);
+          setTeam(null);
         }
       } catch (e) {
-        console.error("Fout bij het ophalen van teamgegevens:", e);
+        console.error("[TeamPage] 5d. Error fetching team document:", e);
       } finally {
         setIsTeamLoading(false);
       }
@@ -105,6 +133,7 @@ export default function TeamPlayersPage({
   }, [db, userProfile?.clubId, teamId]);
 
   const isLoading = areMembersLoading || isTeamLoading;
+  console.log('[TeamPage] 6. Final loading state:', { isLoading, areMembersLoading, isTeamLoading });
 
   return (
     <div className="container mx-auto py-8">
@@ -131,23 +160,26 @@ export default function TeamPlayersPage({
           {isLoading && (
             <div className="flex justify-center items-center h-64">
               <Spinner />
+              <p className="ml-4 text-muted-foreground">Gegevens laden...</p>
             </div>
           )}
-          {!isLoading && error && (
+          {!isLoading && membersError && (
              <div className="text-destructive p-4 border border-destructive/50 rounded-lg bg-destructive/10">
               <p className="font-bold">Fout bij het laden van teamleden</p>
-              <p className="text-xs max-w-full overflow-x-auto">{error.message}</p>
-              <p className="text-xs mt-2">Dit wordt meestal veroorzaakt doordat de database een index nodig heeft die niet automatisch is aangemaakt. Vraag de AI om dit probleem op te lossen.</p>
+              <p className="text-xs mt-2">Dit wordt meestal veroorzaakt doordat de database een index nodig heeft die niet automatisch is aangemaakt, of door een probleem met de beveiligingsregels.</p>
+              <pre className="mt-2 p-2 bg-black/50 text-white rounded-md text-xs max-w-full overflow-x-auto whitespace-pre-wrap">
+                {membersError.message}
+              </pre>
             </div>
           )}
-          {!isLoading && !error && members && members.length > 0 && (
+          {!isLoading && !membersError && members && members.length > 0 && (
             <div className="border rounded-lg">
               {members.map((member) => (
                 <TeamMemberCard key={member.id} member={member} />
               ))}
             </div>
           )}
-          {!isLoading && !error && (!members || members.length === 0) && (
+          {!isLoading && !membersError && (!members || members.length === 0) && (
             <div className="h-64 border rounded-lg flex items-center justify-center bg-muted/20">
               <p className="text-muted-foreground">
                 Er zijn nog geen spelers of stafleden aan dit team gekoppeld.
