@@ -30,6 +30,16 @@ const days: DayOfWeek[] = [
   "sunday",
 ];
 
+const dayTranslations: Record<DayOfWeek, string> = {
+    monday: "Maandag",
+    tuesday: "Dinsdag",
+    wednesday: "Woensdag",
+    thursday: "Donderdag",
+    friday: "Vrijdag",
+    saturday: "Zaterdag",
+    sunday: "Zondag",
+};
+
 interface EditTeamDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
@@ -179,9 +189,9 @@ export function EditTeamDialog({
                     />
                     <label
                       htmlFor={`edit-train-${day}`}
-                      className="text-sm font-medium capitalize"
+                      className="text-sm font-medium"
                     >
-                      {day}
+                      {dayTranslations[day]}
                     </label>
                   </div>
                 ))}
@@ -193,7 +203,7 @@ export function EditTeamDialog({
                 {days.map((day) => (
                   <div key={day} className="flex items-center space-x-2">
                     <RadioGroupItem value={day} id={`edit-game-${day}`} disabled={trainingDays.has(day)} />
-                    <Label htmlFor={`edit-game-${day}`} className="capitalize">{day}</Label>
+                    <Label htmlFor={`edit-game-${day}`}>{dayTranslations[day]}</Label>
                   </div>
                 ))}
               </RadioGroup>

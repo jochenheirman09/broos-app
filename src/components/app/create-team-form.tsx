@@ -22,6 +22,16 @@ const days: DayOfWeek[] = [
   "sunday",
 ];
 
+const dayTranslations: Record<DayOfWeek, string> = {
+    monday: "Maandag",
+    tuesday: "Dinsdag",
+    wednesday: "Woensdag",
+    thursday: "Donderdag",
+    friday: "Vrijdag",
+    saturday: "Zaterdag",
+    sunday: "Zondag",
+};
+
 export function CreateTeamForm({
   clubId,
   onTeamCreated,
@@ -141,9 +151,9 @@ export function CreateTeamForm({
                 />
                 <label
                   htmlFor={`train-${day}`}
-                  className="text-sm font-medium capitalize"
+                  className="text-sm font-medium"
                 >
-                  {day}
+                  {dayTranslations[day]}
                 </label>
               </div>
             ))}
@@ -155,7 +165,7 @@ export function CreateTeamForm({
             {days.map((day) => (
               <div key={day} className="flex items-center space-x-2">
                 <RadioGroupItem value={day} id={`game-${day}`} disabled={trainingDays.has(day)} />
-                <Label htmlFor={`game-${day}`} className="capitalize">{day}</Label>
+                <Label htmlFor={`game-${day}`}>{dayTranslations[day]}</Label>
               </div>
             ))}
           </RadioGroup>
