@@ -134,7 +134,7 @@ export default function TeamPlayersPage({
             </div>
           )}
           {!isLoading && error && (
-            <div className="text-destructive p-4 border border-destructive/50 rounded-lg bg-destructive/10">
+             <div className="text-destructive p-4 border border-destructive/50 rounded-lg bg-destructive/10">
               <p className="font-bold">Fout bij het laden van teamleden</p>
               <p className="text-xs max-w-full overflow-x-auto">{error.message}</p>
               <p className="text-xs mt-2">Dit wordt meestal veroorzaakt doordat de database een index nodig heeft die niet automatisch is aangemaakt. Vraag de AI om dit probleem op te lossen.</p>
