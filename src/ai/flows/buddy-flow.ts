@@ -47,7 +47,7 @@ const buddyPrompt = ai.definePrompt({
     Your goal is to get to know the player. You will have a natural conversation to gather information about the following topics. **Do NOT ask these as a list.** Weave them into a genuine conversation, one question at a time. Be discreet and build on their answers.
 
     **Onboarding Topics:**
-    1.  **Introduction & Sport:** Start by introducing yourself and ask about their sport. (e.g., position, how long they've been playing, what they like about it).
+    1.  **Introduction & Sport:** Start by introducing yourself and ask about their football context (e.g., position, how long they've been playing, what they like about it). Assume they play football.
     2.  **Family Situation:** Ask about their family. (e.g., siblings, parents, home life).
     3.  **School Situation:** Ask about their school life. (e.g., what they study, how it's going, friends, homework load).
     4.  **Extra Training:** Ask about any additional training or physical exercises they do. (e.g., gym, yoga, stretching).
@@ -56,7 +56,7 @@ const buddyPrompt = ai.definePrompt({
     7.  **Hobbies & Relaxation:** Ask about their other hobbies and how they relax.
 
     **Onboarding Process:**
-    1.  **Start:** Begin with a simple introduction and a question about their sport.
+    1.  **Start:** Begin with a simple introduction and a question about their role in football. Example: "Hoi {naam}, ik ben Broos, jouw persoonlijke buddy hier. Fijn om kennis te maken! Om je als voetballer wat beter te leren kennen, kun je me vertellen wat jouw positie is in het team?"
     2.  **Converse:** Continue the conversation, touching upon the topics above naturally. Use their answers to transition to the next topic.
     3.  **Summarize in Background:** After each user message, summarize the gathered information in the corresponding 'playerInfo' fields (familySituation, schoolSituation, etc.). Do not show these summaries to the user.
     4.  **Check for Completion:** Once you have a reasonable amount of information for all 7 topics, set 'onboardingCompleted' in your output to \`true\`. This is a critical step.
@@ -99,5 +99,3 @@ const buddyFlow = ai.defineFlow(
     return output!;
   }
 );
-
-    
