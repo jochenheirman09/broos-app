@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { AlertCircle, HelpCircle, Database } from 'lucide-react';
+import { AlertCircle, HelpCircle, Database, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useUser } from '@/context/user-context';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -38,11 +38,11 @@ function UserCard({ user }: { user: WithId<UserProfile> }) {
 function ErrorDisplay({ error }: { error: string }) {
     return (
         <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
+            <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Query Mislukt: Onvoldoende Rechten</AlertTitle>
             <AlertDescription>
-                <p>De query om alle gebruikers op te halen is mislukt. Dit is verwacht gedrag.</p>
-                <p className="mt-2 text-xs">Uw `firestore.rules` staan niet toe dat de volledige `users` collectie wordt opgevraagd zonder een filter (zoals `where('clubId', '==', ...)`). Dit is een belangrijke beveiligingsmaatregel om data te beschermen.</p>
+                <p>De query om alle gebruikers op te halen is mislukt. Dit is het **verwachte en correcte gedrag** van uw beveiligingsregels.</p>
+                <p className="mt-2 text-xs">Uw `firestore.rules` staan niet toe dat de volledige `users` collectie wordt opgevraagd zonder een specifiek filter (zoals `where('clubId', '==', ...)`). Dit is een cruciale beveiligingsmaatregel om de data van al uw gebruikers te beschermen.</p>
                 <details className="mt-4 text-xs bg-black/20 p-2 rounded">
                     <summary>Technische Foutdetails</summary>
                     <pre className="whitespace-pre-wrap mt-2">{error}</pre>
@@ -70,10 +70,11 @@ export default function TeamU12Page() {
       setUsers([]);
 
       try {
-        console.log("Query Stap 1: Poging om alle gebruikers op te halen...");
+        console.log("Query Stap 1: Poging om ALLE gebruikers op te halen (dit zou moeten mislukken)...");
         const usersQuery = query(collection(db, 'users'));
         const usersSnapshot = await getDocs(usersQuery);
 
+        // Dit deel van de code zal waarschijnlijk nooit bereikt worden
         const usersData = usersSnapshot.docs.map(doc => ({
             ...(doc.data() as UserProfile),
             id: doc.id
@@ -82,16 +83,17 @@ export default function TeamU12Page() {
         setUsers(usersData);
         
       } catch (e: any) {
-        console.error("Fout bij het uitvoeren van de query:", e);
+        console.error("Fout bij het uitvoeren van de query (verwacht gedrag):", e);
         const errorMessage = e.message || "Onbekende fout";
         
-        if (e.code === 'permission-denied') {
+        // Specifiek voor permissiefouten, maak een gedetailleerde error
+        if (e.code === 'permission-denied' || e.message.includes('permission-denied') || e.message.includes('insufficient permissions')) {
             const permissionError = new FirestorePermissionError({
                 path: `users`,
                 operation: 'list',
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError(`Permissiefout: ${permissionError.message}. Het is niet toegestaan om alle gebruikers zonder filter op te vragen.`);
+            setError(`Permissiefout: ${permissionError.message}. Dit is correct, de beveiligingsregels blokkeren het opvragen van alle gebruikers.`);
         } else {
             setError(errorMessage);
         }
@@ -112,14 +114,14 @@ export default function TeamU12Page() {
             Database Query: Alle Geregistreerde Gebruikers
           </CardTitle>
           <CardDescription>
-            Deze pagina probeert alle gebruikers uit de `users` collectie op te halen. Dit zal (en moet) resulteren in een permissiefout vanwege de beveiligingsregels.
+            Deze pagina probeert **alle** gebruikers uit de `users` collectie op te halen. Deze actie moet worden geblokkeerd door de Firestore-beveiligingsregels, wat resulteert in een (correcte) permissiefout.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading && (
             <div className="flex justify-center items-center h-64 gap-4">
               <Spinner />
-              <p className="text-muted-foreground">Query wordt uitgevoerd...</p>
+              <p className="text-muted-foreground">Query op alle gebruikers wordt uitgevoerd...</p>
             </div>
           )}
           {error && !isLoading && (
@@ -127,6 +129,13 @@ export default function TeamU12Page() {
           )}
           {!isLoading && !error && (
             <div className="border rounded-lg">
+                <Alert variant="default" className="border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400">
+                    <ShieldCheck className="h-4 w-4 !text-green-500" />
+                    <AlertTitle>Query Onverwacht Geslaagd</AlertTitle>
+                    <AlertDescription>
+                        De query om alle gebruikers op te halen is onverwacht geslaagd. Dit duidt op te open `firestore.rules`. Het wordt sterk aangeraden om uw regels te controleren en te beperken wie alle gebruikers mag zien.
+                    </AlertDescription>
+                </Alert>
                 {users.length > 0 ? (
                     users.map((user) => (
                         <UserCard key={user.id} user={user} />
