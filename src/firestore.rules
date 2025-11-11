@@ -83,8 +83,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (isOwner(userId) || isClubResponsibleForTargetUser(userId));
       
-      // A list operation is only allowed if it filters by clubId.
-      allow list: if isSignedIn() && request.query.where[0][0] == 'clubId';
+      // CRITICAL: A list operation is only allowed if it explicitly filters by a clubId or a teamId.
+      // This is safe because to know the clubId or teamId, you must already be part of the system.
+      // This prevents fetching all users.
+      allow list: if isSignedIn() && (
+                    (request.query.where[0][0] == 'clubId' && isClubOwner(request.query.where[0][2])) ||
+                    (request.query.where[0][0] == 'teamId')
+                  );
 
       allow create: if isSignedIn() && isOwner(userId);
       allow update, delete: if isSignedIn() && isOwner(userId);

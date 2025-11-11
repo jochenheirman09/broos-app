@@ -10,7 +10,6 @@ import {
   doc,
   writeBatch,
   where,
-  getDoc,
 } from "firebase/firestore";
 import type { UserProfile, WithId, Team } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, ServerCrash, RefreshCw } from "lucide-react";
+import { CheckCircle, ServerCrash, RefreshCw, Users, ShieldAlert, FileWarning } from "lucide-react";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
 
@@ -56,33 +55,53 @@ export default function MigrateUsersPage() {
     setError(null);
 
     try {
-      // Get all teams for the current club to map teamId to clubId.
+      // Step 1: Get all teams for the current user's club.
       const teamsRef = collection(db, `clubs/${userProfile.clubId}/teams`);
       const teamsSnapshot = await getDocs(teamsRef);
-      const teamIdsInClub = teamsSnapshot.docs.map(doc => doc.id);
-
-      if (teamIdsInClub.length === 0) {
+      const teamsInClub = teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithId<Team>));
+      
+      if (teamsInClub.length === 0) {
         setStatus("success");
         setSkippedUsers(["Geen teams gevonden in uw club. Er zijn geen gebruikers om te migreren."]);
         return;
       }
-      
+
       const usersToUpdate: WithId<UserProfile>[] = [];
       const localSkipped: string[] = [];
 
-      // Query for users that belong to one of the club's teams
-      const usersQuery = query(collection(db, "users"), where("teamId", "in", teamIdsInClub));
-      const usersSnapshot = await getDocs(usersQuery);
-
-      usersSnapshot.forEach(userDoc => {
-          const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
-          // Check if clubId is missing
-          if (!userData.clubId) {
-              usersToUpdate.push(userData);
-          } else {
-              localSkipped.push(`${userData.name} (Reden: Heeft al een clubId)`);
-          }
-      });
+      // Step 2: For each team, query for its members.
+      for (const team of teamsInClub) {
+        const usersQuery = query(collection(db, "users"), where("teamId", "==", team.id));
+        
+        try {
+            const usersSnapshot = await getDocs(usersQuery);
+            usersSnapshot.forEach(userDoc => {
+                const userData = { ...userDoc.data(), id: userDoc.id } as WithId<UserProfile>;
+                // Check if clubId is missing or incorrect.
+                if (!userData.clubId || userData.clubId !== userProfile.clubId) {
+                    // Only add if not already in the list to avoid duplicates
+                    if (!usersToUpdate.some(u => u.id === userData.id)) {
+                        usersToUpdate.push(userData);
+                    }
+                } else {
+                     if (!localSkipped.some(u => u.startsWith(userData.name))) {
+                        localSkipped.push(`${userData.name} (Reden: Heeft al het correcte clubId)`);
+                    }
+                }
+            });
+        } catch (e: any) {
+            console.error(`Fout bij ophalen van gebruikers voor team ${team.name}:`, e);
+            // This is where we create and emit the contextual error
+            const permissionError = new FirestorePermissionError({
+                path: `users (querying where teamId == ${team.id})`,
+                operation: 'list',
+                requestResourceData: { query: { teamId: team.id } },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            // We throw the error to stop the migration and display it.
+            throw e;
+        }
+      }
 
       setSkippedUsers(localSkipped);
       
@@ -110,12 +129,6 @@ export default function MigrateUsersPage() {
 
     } catch (e: any) {
       console.error("Fout tijdens migratie:", e);
-      // Emit a contextual error
-      const permissionError = new FirestorePermissionError({
-          path: `users (querying where 'teamId' is in your club's teams)`,
-          operation: 'list',
-      });
-      errorEmitter.emit('permission-error', permissionError);
       setError(e.message || "Er is een onbekende fout opgetreden.");
       setStatus("error");
     }
@@ -134,6 +147,14 @@ export default function MigrateUsersPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+           <Alert variant="default" className="border-primary/50">
+             <Users className="h-4 w-4" />
+             <AlertTitle>Hoe het werkt</AlertTitle>
+             <AlertDescription>
+                Dit script haalt eerst alle teams in uw club op. Vervolgens zoekt het per team naar leden. Voor elk lid wordt gecontroleerd of de `clubId` ontbreekt of incorrect is, en wordt deze indien nodig gerepareerd.
+             </AlertDescription>
+           </Alert>
+
           <Button
             onClick={handleMigration}
             disabled={status === "loading" || userLoading}
@@ -164,7 +185,7 @@ export default function MigrateUsersPage() {
               </AlertTitle>
               <AlertDescription className="text-green-700">
                 <p className="font-bold mb-2">
-                  {updatedUsers.length > 0 ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Geen gebruikers te updaten.'}
+                  {updatedUsers.length > 0 ? `${updatedUsers.length} gebruiker(s) succesvol bijgewerkt:` : 'Alle gebruikers zijn al correct geconfigureerd.'}
                 </p>
                 {updatedUsers.length > 0 && (
                   <ul className="list-disc pl-5 text-sm max-h-40 overflow-y-auto">
@@ -192,10 +213,13 @@ export default function MigrateUsersPage() {
               <ServerCrash className="h-4 w-4" />
               <AlertTitle>Migratiefout</AlertTitle>
               <AlertDescription>
-                <p>De migratie kon niet worden voltooid.</p>
-                <pre className="mt-2 p-2 bg-black/10 rounded-md text-xs whitespace-pre-wrap">
-                  {error}
-                </pre>
+                <p>De migratie kon niet worden voltooid. Dit komt waarschijnlijk door een permissiefout in de Firestore-regels.</p>
+                 <details className="mt-2 text-xs bg-black/10 p-2 rounded">
+                  <summary>Technische Details</summary>
+                  <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">
+                    {error}
+                  </pre>
+              </details>
               </AlertDescription>
             </Alert>
           )}
