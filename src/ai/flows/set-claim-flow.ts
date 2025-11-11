@@ -47,18 +47,29 @@ const setClaimFlow = ai.defineFlow(
             throw new Error("User must be authenticated.");
         }
         // Security check: Only the specific user can run this flow for themselves.
-        if (auth.uid !== input.uid || input.email !== 'jochen.heirman@gmail.com') {
-            throw new Error("You are not authorized to perform this action.");
+        if (input.email !== 'jochen.heirman@gmail.com') {
+            throw new Error("You are not authorized to perform this action for this email.");
         }
     }
   },
   async (input) => {
+    // Check if the admin SDK was initialized. If not, admin.apps will be empty.
+    if (admin.apps.length === 0) {
+        const errorMessage = "Firebase Admin SDK is not initialized. Cannot set claims.";
+        console.error(errorMessage);
+        return {
+            success: false,
+            message: errorMessage,
+        };
+    }
+      
     try {
-        const targetUid = 'DKsO1eHpocf8QxwfjQUwcC5UOkm2'; // Hardcoded for security
+        // Hardcoded for security, only this specific user can get the claim via this flow.
+        const targetUid = 'DKsO1eHpocf8QxwfjQUwcC5UOkm2'; 
         if (input.uid !== targetUid) {
             return {
                 success: false,
-                message: `This action is only for the designated responsible user. Your UID ${input.uid} does not match.`,
+                message: `This action is only for the designated responsible user. Your UID ${input.uid} does not match the target UID.`,
             }
         }
         
