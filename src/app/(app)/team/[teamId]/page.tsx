@@ -67,7 +67,7 @@ export default function TeamMembersPage({
   params: { teamId: string };
 }) {
   const { teamId } = params;
-  const { userProfile } = useUser();
+  const { userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   
   const [team, setTeam] = useState<Team | null>(null);
@@ -76,44 +76,42 @@ export default function TeamMembersPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Wacht tot de userProfile volledig is geladen.
+    if (userLoading) {
+      return;
+    }
+    
+    // Essentiële data moet aanwezig zijn voordat we verder gaan.
     if (!db || !userProfile?.clubId || !teamId) {
-      console.log("Not fetching: db, userProfile.clubId, or teamId is missing.", { db, userProfile, teamId });
-      // Set loading to false if we can't fetch, to prevent infinite spinner
-      if (!userProfile?.clubId && !isLoading) {
-        // Only set error if we are not already in a loading state, and clubId is the issue
-        setError("Gebruikersprofiel is nog niet geladen of bevat geen club ID.");
-      }
-      if (isLoading) setIsLoading(false);
+      setIsLoading(false);
+      setError("Kon de teamgegevens niet laden omdat essentiële informatie (zoals club ID) ontbreekt in je profiel.");
       return;
     }
 
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      console.log(`Starting data fetch for teamId: ${teamId} in club: ${userProfile.clubId}`);
       
       try {
-        // Step 1: Fetch team details to display the team name
+        // Stap 1: Haal de teamgegevens op om de teamnaam te tonen.
         const teamRef = doc(db, `clubs/${userProfile.clubId}/teams/${teamId}`);
-        console.log("Fetching team document from path:", teamRef.path);
         const teamSnap = await getDoc(teamRef);
         
         if (teamSnap.exists()) {
-          const teamData = teamSnap.data() as Team;
-          console.log("Team data found:", teamData);
-          setTeam(teamData);
+          setTeam(teamSnap.data() as Team);
         } else {
-          console.error(`Team with ID "${teamId}" not found in club "${userProfile.clubId}".`);
           throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
         }
 
-        // Step 2: Fetch members for that team. This is the query that requires permission.
-        const membersQuery = query(collection(db, 'users'), where('teamId', '==', teamId));
-        console.log("Executing members query for teamId:", teamId);
+        // Stap 2: Haal de teamleden op. Dit is de query die de permissiefout veroorzaakt.
+        // We filteren nu op ZOWEL clubId als teamId om aan de security rules te voldoen.
+        const membersQuery = query(
+          collection(db, 'users'), 
+          where('clubId', '==', userProfile.clubId),
+          where('teamId', '==', teamId)
+        );
 
         const membersSnapshot = await getDocs(membersQuery);
-        console.log(`Query completed. Found ${membersSnapshot.docs.length} members.`);
-        
         const membersData = membersSnapshot.docs.map(doc => ({
           ...doc.data() as UserProfile,
           id: doc.id,
@@ -122,26 +120,30 @@ export default function TeamMembersPage({
         setMembers(membersData);
 
       } catch (e: any) {
-        console.error("[TEAM_PAGE] CRITICAL_ERROR while fetching team data:", e);
-        if (e.code === 'permission-denied') {
+        console.error("Fout bij het ophalen van teamgegevens:", e);
+        if (e.code === 'permission-denied' || e.message.includes("permission")) {
             const permissionError = new FirestorePermissionError({
-                path: 'users', // This is the path we are querying
+                path: 'users', // We queryen de 'users' collectie
                 operation: 'list',
+                requestResourceData: {
+                  query: {
+                    clubId: userProfile.clubId,
+                    teamId: teamId
+                  }
+                }
             });
-            console.log("Emitting permission-error via errorEmitter for a 'list' operation on 'users'.");
             errorEmitter.emit('permission-error', permissionError);
-            setError(permissionError.message);
+            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. Controleer de Firestore-regels.");
         } else {
             setError(e.message || "Er is een onbekende fout opgetreden.");
         }
       } finally {
-        console.log("Finished fetching data, setting isLoading to false.");
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [db, userProfile, teamId, isLoading]);
+  }, [db, userProfile, teamId, userLoading]);
 
 
   return (
@@ -178,7 +180,7 @@ export default function TeamMembersPage({
                 <AlertTriangle className="h-6 w-6 mr-3" />
                 Fout bij het laden van teamleden
               </div>
-              <p className="text-sm">Dit duidt meestal op een permissieprobleem. De beveiligingsregels staan de huidige zoekopdracht niet toe. Controleer de console voor de gedetailleerde foutmelding.</p>
+              <p className="text-sm">Dit duidt meestal op een permissieprobleem of een foutieve query. Controleer de console voor gedetailleerde foutinformatie.</p>
               <details className="mt-2 text-xs bg-black/10 p-2 rounded">
                   <summary>Technische Details</summary>
                   <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">
