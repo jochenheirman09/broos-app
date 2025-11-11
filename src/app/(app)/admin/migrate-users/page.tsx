@@ -1,28 +1,192 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useUser } from "@/context/user-context";
+import { useFirestore } from "@/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  writeBatch,
+  getDoc,
+  collectionGroup,
+} from "firebase/firestore";
+import type { UserProfile, WithId, Team } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, RefreshCw, ServerCrash } from "lucide-react";
 
-export default function DeprecatedPage() {
+type MigrationStatus = "idle" | "loading" | "success" | "error";
 
-    return (
+export default function MigrateUsersPage() {
+  const { userProfile, loading: userLoading } = useUser();
+  const db = useFirestore();
+
+  const [status, setStatus] = useState<MigrationStatus>("idle");
+  const [updatedUsers, setUpdatedUsers] = useState<string[]>([]);
+  const [skippedUsers, setSkippedUsers] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleMigration = async () => {
+    if (!userProfile || !userProfile.clubId || !db) {
+      setError("Huidige gebruiker is geen clubverantwoordelijke.");
+      setStatus("error");
+      return;
+    }
+
+    setStatus("loading");
+    setUpdatedUsers([]);
+    setSkippedUsers([]);
+    setError(null);
+
+    try {
+      // Stap 1: Haal alle gebruikers op die tot de club van de verantwoordelijke behoren.
+      // Deze query is nu toegestaan door de nieuwe, correcte beveiligingsregel.
+      const usersQuery = query(
+        collection(db, "users"),
+        where("clubId", "==", userProfile.clubId)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      const usersToProcess = usersSnapshot.docs.map(
+        (d) => ({ ...d.data(), id: d.id } as WithId<UserProfile>)
+      );
+
+      // Filter de gebruikers die al een clubId hebben.
+      const usersNeedingUpdate = usersToProcess.filter(
+        (u) => u.teamId && !u.clubId
+      );
+      const usersNotNeedingUpdate = usersToProcess.filter(
+        (u) => !u.teamId || u.clubId
+      );
+      setSkippedUsers(usersNotNeedingUpdate.map(u => `${u.name} (ID: ${u.id})`));
+
+      if (usersNeedingUpdate.length === 0) {
+        setStatus("success");
+        return;
+      }
+      
+      const batch = writeBatch(db);
+      const updatedNames: string[] = [];
+
+      for (const user of usersNeedingUpdate) {
+        if (user.teamId) {
+            // De clubId is al bekend, we hoeven het team niet meer op te zoeken.
+            const userRef = doc(db, "users", user.id);
+            batch.update(userRef, { clubId: userProfile.clubId });
+            updatedNames.push(`${user.name} (ID: ${user.id})`);
+        }
+      }
+
+      await batch.commit();
+      setUpdatedUsers(updatedNames);
+      setStatus("success");
+
+    } catch (e: any) {
+      console.error("Migratiefout:", e);
+      if (e.code === 'permission-denied') {
+        setError("QUERY MISLUKT: Missing or insufficient permissions. Controleer of de beveiligingsregels correct zijn ingesteld om gebruikers per clubId op te lijsten.");
+      } else {
+        setError(e.message || "Er is een onbekende fout opgetreden.");
+      }
+      setStatus("error");
+    }
+  };
+
+  return (
     <div className="container mx-auto py-8">
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>Pagina Gearchiveerd</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-6 w-6" />
+            Gebruikersmigratie (Club ID's)
+          </CardTitle>
           <CardDescription>
-            Deze migratiepagina is niet langer nodig.
+            Dit script repareert bestaande gebruikersprofielen door de
+            ontbrekende `clubId` toe te voegen. Dit is nodig zodat een
+            clubverantwoordelijke alle leden van zijn/haar club kan zien. Voer
+            dit eenmalig uit.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Verouderd</AlertTitle>
-                <AlertDescription>
-                    Deze pagina was een tijdelijke oplossing en is nu vervangen door een betere team-management flow. U kunt deze pagina veilig negeren.
-                </AlertDescription>
+        <CardContent className="space-y-6">
+          <Button
+            onClick={handleMigration}
+            disabled={status === "loading" || userLoading}
+            size="lg"
+          >
+            {status === "loading" ? (
+              <Spinner className="mr-2" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            {status === "loading"
+              ? "Migratie bezig..."
+              : "Start Gebruikersmigratie"}
+          </Button>
+
+          {status === "loading" && (
+            <div className="flex items-center justify-center p-8 text-muted-foreground">
+              <Spinner size="large" />
+              <p className="ml-4">Gebruikers controleren en bijwerken...</p>
+            </div>
+          )}
+
+          {status === "success" && (
+            <Alert variant="default" className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-800">
+                Migratie Voltooid!
+              </AlertTitle>
+              <AlertDescription className="text-green-700">
+                <p className="font-bold mb-2">
+                  {updatedUsers.length} gebruiker(s) succesvol bijgewerkt:
+                </p>
+                {updatedUsers.length > 0 ? (
+                  <ul className="list-disc pl-5 text-sm">
+                    {updatedUsers.map((name) => (
+                      <li key={name}>{name}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Alle gebruikers waren al correct geconfigureerd.</p>
+                )}
+                 <p className="font-bold mt-4 mb-2">
+                  {skippedUsers.length} gebruiker(s) overgeslagen (al correct):
+                </p>
+                {skippedUsers.length > 0 && (
+                     <ul className="list-disc pl-5 text-sm">
+                        {skippedUsers.map((name) => (
+                        <li key={name}>{name}</li>
+                        ))}
+                    </ul>
+                )}
+              </AlertDescription>
             </Alert>
+          )}
+
+          {status === "error" && (
+            <Alert variant="destructive">
+              <ServerCrash className="h-4 w-4" />
+              <AlertTitle>Migratiefout</AlertTitle>
+              <AlertDescription>
+                <p>De migratie kon niet worden voltooid.</p>
+                <pre className="mt-2 p-2 bg-black/10 rounded-md text-xs whitespace-pre-wrap">
+                  {error}
+                </pre>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     </div>
-    )
+  );
 }

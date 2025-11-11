@@ -103,8 +103,7 @@ export default function TeamMembersPage({
           throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
         }
 
-        // Stap 2: Haal de teamleden op. Dit is de query die de permissiefout veroorzaakt.
-        // We filteren nu op ZOWEL clubId als teamId om aan de security rules te voldoen.
+        // Stap 2: Haal de teamleden op. Dit is de query die aan de nieuwe, correcte security rule voldoet.
         const membersQuery = query(
           collection(db, 'users'), 
           where('clubId', '==', userProfile.clubId),
@@ -123,7 +122,7 @@ export default function TeamMembersPage({
         console.error("Fout bij het ophalen van teamgegevens:", e);
         if (e.code === 'permission-denied' || e.message.includes("permission")) {
             const permissionError = new FirestorePermissionError({
-                path: 'users', // We queryen de 'users' collectie
+                path: `users (querying on clubId: ${userProfile.clubId} and teamId: ${teamId})`,
                 operation: 'list',
                 requestResourceData: {
                   query: {
@@ -133,7 +132,7 @@ export default function TeamMembersPage({
                 }
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. Controleer de Firestore-regels. Zorg ervoor dat de query zowel 'clubId' als 'teamId' bevat en dat je de rol 'responsible' hebt in je club.");
+            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. Dit komt waarschijnlijk door een fout in de Firestore-regels. De regels moeten een lijst-operatie op de 'users' collectie toestaan wanneer er op 'clubId' wordt gefilterd.");
         } else {
             setError(e.message || "Er is een onbekende fout opgetreden.");
         }
