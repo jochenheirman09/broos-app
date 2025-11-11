@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Spinner } from '@/components/ui/spinner';
 import { AlertCircle, TestTube2, User as UserIcon, Shield } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useUser } from '@/context/user-context';
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <UserIcon className="h-4 w-4" />,
@@ -58,44 +59,50 @@ function MemberCard({ member }: { member: WithId<UserProfile> }) {
 
 export default function TeamU12Page() {
   const db = useFirestore();
+  const { userProfile } = useUser();
   const [teamId, setTeamId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isTeamIdLoading, setIsTeamIdLoading] = useState(true);
 
-  // 1. Find the team ID for team "U12"
+  // 1. Find the team ID for team "U12" within the current user's club
   useEffect(() => {
-    if (!db) return;
+    if (!db || !userProfile?.clubId) {
+        if (!userProfile) {
+            setError("Gebruikersprofiel wordt geladen... Wacht een moment.");
+        } else if (!userProfile.clubId) {
+            setError("Geen club ID gevonden in uw profiel. Zorg ervoor dat u een 'responsible' gebruiker bent met een club.");
+        }
+        return;
+    };
     
     const findTeamId = async () => {
         setIsTeamIdLoading(true);
         setError(null);
         try {
-            console.log("Searching for team with name 'U12'...");
-            const teamsQuery = query(collectionGroup(db, 'teams'), where('name', '==', 'U12'));
+            console.log(`Searching for team 'U12' in club '${userProfile.clubId}'...`);
+            const teamsRef = collection(db, 'clubs', userProfile.clubId, 'teams');
+            const teamsQuery = query(teamsRef, where('name', '==', 'U12'));
             const querySnapshot = await getDocs(teamsQuery);
 
             if (querySnapshot.empty) {
                 console.warn("No team found with name 'U12'.");
-                setError("Team 'U12' niet gevonden in de database.");
+                setError("Team 'U12' niet gevonden in uw club.");
                 setTeamId(null);
             } else {
-                if (querySnapshot.size > 1) {
-                    console.warn("Multiple teams found with name 'U12'. Using the first one.");
-                }
                 const teamDoc = querySnapshot.docs[0];
                 console.log(`Found team 'U12' with ID: ${teamDoc.id}`);
                 setTeamId(teamDoc.id);
             }
         } catch (e: any) {
             console.error("Error finding team ID for 'U12':", e);
-            setError(`Fout bij het zoeken naar team U12: ${e.message}. Dit kan duiden op een missende database-index. Contacteer support.`);
+            setError(`Fout bij het zoeken naar team U12: ${e.message}.`);
         } finally {
             setIsTeamIdLoading(false);
         }
     };
 
     findTeamId();
-  }, [db]);
+  }, [db, userProfile]);
 
 
   // 2. Once we have the team ID, query for users in that team
@@ -114,7 +121,7 @@ export default function TeamU12Page() {
   useEffect(() => {
       if (membersError) {
           console.error("Error fetching members:", membersError);
-          setError(`Fout bij het ophalen van teamleden: ${membersError.message}`);
+          setError(`Fout bij het ophalen van teamleden: ${membersError.message}. Dit kan duiden op een missende database-index voor de 'users' collectie.`);
       }
   }, [membersError]);
 
@@ -140,7 +147,7 @@ export default function TeamU12Page() {
               <p className="text-muted-foreground">Teamleden worden geladen...</p>
             </div>
           )}
-          {error && (
+          {error && !isLoading && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Er is een fout opgetreden</AlertTitle>
