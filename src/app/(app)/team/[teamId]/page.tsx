@@ -58,11 +58,10 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
 }
 
 export default function TeamPlayersPage({
-  params,
+  params: { teamId },
 }: {
   params: { teamId: string };
 }) {
-  const { teamId } = params;
   const { userProfile } = useUser();
   const db = useFirestore();
   const [team, setTeam] = useState<Team | null>(null);
