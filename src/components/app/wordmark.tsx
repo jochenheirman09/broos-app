@@ -16,7 +16,9 @@ export function Wordmark({
         className
       )}
     >
-      Broos
+      Broos 2.0
     </span>
   );
 }
+
+    

@@ -6,7 +6,7 @@ import { UserProvider } from '@/context/user-context';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Broos',
+  title: 'Broos 2.0',
   description: 'Jouw partner in mentaal welzijn.',
 };
 
@@ -43,3 +43,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

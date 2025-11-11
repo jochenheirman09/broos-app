@@ -13,7 +13,7 @@ export default function LoginPage() {
     <Card>
       <CardHeader className="text-center">
         <CardTitle>Welkom terug</CardTitle>
-        <CardDescription>Log in om verder te gaan naar Broos.</CardDescription>
+        <CardDescription>Log in om verder te gaan naar Broos 2.0.</CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm />
@@ -30,3 +30,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
