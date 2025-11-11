@@ -11,14 +11,12 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, PlusCircle, RefreshCw } from "lucide-react";
+import { Building } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
-import Link from "next/link";
-import { Button } from "../ui/button";
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
@@ -69,13 +67,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-           <Link href="/admin/migrate-users" passHref>
-             <Button variant="outline">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Repareer Bestaande Gebruikers
-             </Button>
-           </Link>
-          <Separator/>
           <ClubUpdates clubId={club.id} />
         </CardContent>
       </Card>
