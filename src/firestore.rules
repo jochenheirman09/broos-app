@@ -104,6 +104,7 @@ service cloud.firestore {
       allow get: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to get user");
       
       // FIX: This rule now correctly requires a filter on 'clubId' for any list operation by a responsible user.
+      // This ensures a 'responsible' can only query for users within their own club.
       allow list: if isResponsible() 
                     && getUserData(request.auth.uid).clubId != null
                     && request.query.keys().hasAny(['where']) 
@@ -111,7 +112,8 @@ service cloud.firestore {
                     || debug("Allow responsible to list users ONLY when filtered by their own clubId");
 
       allow create: if isSignedIn() && isOwner(userId) || debug("Allow owner to create user doc");
-      allow update: if isSignedIn() && isOwner(userId) || debug("Allow owner to update user doc");
+      // A user can update their own doc. A responsible can update a user in their club (needed for migration).
+      allow update: if (isSignedIn() && isOwner(userId)) || (isResponsible() && isClubResponsibleForTargetUser(userId)) || debug("Allow owner or club responsible to update user doc");
       allow delete: if isSignedIn() && isOwner(userId) || debug("Allow owner to delete user doc");
       
       match /wellnessScores/{scoreId} {
