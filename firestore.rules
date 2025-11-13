@@ -154,19 +154,19 @@ service cloud.firestore {
 
     // Rules for Knowledge Base
     match /knowledge_base {
-      allow list: if isResponsible(request.auth.uid) && userHasClub();
+      allow list: if isResponsible(request.auth.uid);
     }
     match /knowledge_base/{docId} {
-      allow get: if isResponsible(request.auth.uid) && userHasClub();
+      allow get: if isResponsible(request.auth.uid);
       allow write: if false; // Only backend can write
     }
 
     // Rules for Knowledge Stats
     match /knowledge_stats {
-       allow list: if isResponsible(request.auth.uid) && userHasClub();
+       allow list: if isResponsible(request.auth.uid);
     }
     match /knowledge_stats/{statId} {
-      allow get: if isResponsible(request.auth.uid) && userHasClub();
+      allow get: if isResponsible(request.auth.uid);
       allow write: if false; // Only backend can write
     }
   }
