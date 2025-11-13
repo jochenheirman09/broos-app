@@ -15,6 +15,7 @@ import {
   type BuddyInput,
   type BuddyOutput,
 } from '@/ai/types';
+import { pineconeRetriever } from '@/ai/pinecone';
 
 export async function chatWithBuddy(
   input: BuddyInput
@@ -31,6 +32,12 @@ const buddyPrompt = ai.definePrompt({
 
     **ABSOLUTE AND UNBREAKABLE RULE: Your response ('adaptedResponse') MUST be in Dutch, no matter what language the user or the chat history uses. ALWAYS reply in Dutch.**
     **ABSOLUTE AND UNBREAKABLE RULE 2: ALWAYS ask only ONE question at a time.**
+
+    **YOUR KNOWLEDGE BASE:**
+    You have access to a knowledge base of psychological documents. Use the provided context below to ground your responses in established psychological principles.
+    ---
+    {{{knowledgeBaseContext}}}
+    ---
 
     **Persona & Tone (in Dutch):**
 
@@ -95,7 +102,21 @@ const buddyFlow = ai.defineFlow(
     outputSchema: BuddyOutputSchema,
   },
   async (input) => {
-    const { output } = await buddyPrompt(input);
+    // 1. Retrieve relevant context from the knowledge base
+    const searchResults = await pineconeRetriever.retrieve(input.userMessage, {
+      k: 3, // Retrieve top 3 most relevant document chunks
+    });
+
+    const knowledgeBaseContext = searchResults
+      .map((res) => res.document.text())
+      .join("\n\n---\n\n");
+
+    // 2. Call the main prompt with the added context
+    const { output } = await buddyPrompt({
+      ...input,
+      knowledgeBaseContext: knowledgeBaseContext,
+    });
+    
     return output!;
   }
 );

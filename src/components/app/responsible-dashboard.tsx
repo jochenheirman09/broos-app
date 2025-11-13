@@ -11,12 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building } from "lucide-react";
+import { Building, BookOpen } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
+import { KnowledgeBaseStats } from "./knowledge-base-stats";
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
@@ -70,6 +71,22 @@ function ClubManagement({ clubId }: { clubId: string }) {
           <ClubUpdates clubId={club.id} />
         </CardContent>
       </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <BookOpen className="h-6 w-6 mr-3 text-primary" />
+            Kennisbank Management
+          </CardTitle>
+           <CardDescription>
+            Overzicht van de documenten die de AI-buddy gebruikt.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <KnowledgeBaseStats clubId={club.id} />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Team Management</CardTitle>

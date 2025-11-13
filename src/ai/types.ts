@@ -11,6 +11,7 @@ export const BuddyInputSchema = z.object({
     .optional()
     .describe('The history of the conversation so far.'),
   onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
+  knowledgeBaseContext: z.string().optional().describe('Context retrieved from the knowledge base.'),
 });
 export type BuddyInput = z.infer<typeof BuddyInputSchema>;
 

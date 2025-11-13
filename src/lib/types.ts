@@ -144,3 +144,17 @@ export interface PlayerTraining {
     description: string;
     createdAt: any; // Firestore ServerTimestamp
 }
+
+export interface KnowledgeDocument {
+    id: string;
+    name: string;
+    storagePath: string;
+    status: 'pending' | 'ingesting' | 'completed' | 'error';
+    ingestedAt?: any; // Firestore ServerTimestamp
+}
+
+export interface KnowledgeUsageStat {
+    id: string; // Corresponds to KnowledgeDocument ID
+    queryCount: number;
+    lastQueried: any; // Firestore ServerTimestamp
+}
