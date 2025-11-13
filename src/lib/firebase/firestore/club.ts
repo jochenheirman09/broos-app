@@ -3,7 +3,7 @@
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { collection, doc, writeBatch } from "firebase/firestore";
+import { collection, doc, writeBatch, getDoc } from "firebase/firestore";
 
 export async function createClub(
   db: ReturnType<typeof useFirestore>,
@@ -17,6 +17,17 @@ export async function createClub(
     throw new Error("Firestore is not available.");
   }
 
+  const userRef = doc(db, "users", userId);
+  const userDoc = await getDoc(userRef);
+
+  if (!userDoc.exists() || userDoc.data().role !== 'responsible') {
+    throw new Error("User is not a 'responsible' or does not exist.");
+  }
+  
+  if (userDoc.data().clubId) {
+    throw new Error("User already has a club.");
+  }
+
   const batch = writeBatch(db);
   const clubRef = doc(collection(db, "clubs"));
   const clubData = {
@@ -26,7 +37,6 @@ export async function createClub(
   };
   batch.set(clubRef, clubData);
 
-  const userRef = doc(db, "users", userId);
   const userData = { clubId: clubRef.id };
   batch.update(userRef, userData);
 
@@ -35,8 +45,6 @@ export async function createClub(
   } catch (error) {
     console.error("Batch commit failed in createClub:", error);
 
-    // It's hard to know which write failed in a batch.
-    // We can emit errors for both operations to be safe.
     const clubPermissionError = new FirestorePermissionError({
       path: clubRef.path,
       operation: "create",
@@ -51,7 +59,6 @@ export async function createClub(
     });
     errorEmitter.emit("permission-error", userPermissionError);
 
-    // Re-throw the original error to allow the caller to handle the promise rejection.
     throw error;
   }
 }
