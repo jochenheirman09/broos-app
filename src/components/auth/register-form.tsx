@@ -117,6 +117,7 @@ export function RegisterForm() {
         role: values.role,
         emailVerified: false,
         acceptedTerms: true,
+        clubId: null, // Explicitly set clubId to null
       });
 
       await sendEmailVerification(user);

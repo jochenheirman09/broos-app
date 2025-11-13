@@ -1,9 +1,11 @@
+
 "use client";
 
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, doc, writeBatch, getDoc } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 export async function createClub(
   db: ReturnType<typeof useFirestore>,
@@ -42,6 +44,16 @@ export async function createClub(
 
   try {
     await batch.commit();
+    // After successful commit, force a refresh of the user's ID token.
+    // This isn't strictly necessary for Firestore data changes, but good practice
+    // if custom claims were involved. More importantly, we can trigger a state update.
+    const auth = getAuth();
+    if (auth.currentUser) {
+        // This is a bit of a hack. The user context listens to onAuthStateChanged and onSnapshot.
+        // The onSnapshot should pick up the user document change, but sometimes it can be slow.
+        // A full user reload can sometimes help trigger listeners faster.
+        await auth.currentUser.reload();
+    }
   } catch (error) {
     console.error("Batch commit failed in createClub:", error);
 
