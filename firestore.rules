@@ -126,14 +126,5 @@ service cloud.firestore {
     match /knowledge_base {
        allow list: if isResponsible();
     }
-
-    // Rules for Knowledge Stats - allow any responsible user to read.
-    match /knowledge_stats/{statId} {
-      allow get: if isResponsible();
-      allow write: if false; 
-    }
-    match /knowledge_stats {
-       allow list: if isResponsible();
-    }
   }
 }
