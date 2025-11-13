@@ -107,7 +107,7 @@ export function ChatInterface() {
   const viewportRef = useRef<HTMLDivElement>(null);
   
   const buddyName = userProfile?.buddyName || "Broos";
-  const firstName = userProfile?.name.split(" ")[0];
+  const firstName = userProfile?.name?.split(" ")[0];
 
   const today = format(new Date(), "yyyy-MM-dd");
 
