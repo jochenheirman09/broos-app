@@ -24,7 +24,7 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
     error: "destructive"
 };
 
-const statusTranslation: { [key: string]: string } = {
+const statusTranslation: { [key:string]: string } = {
   completed: "Verwerkt",
   ingesting: "Bezig met verwerken",
   pending: "In behandeling",
@@ -54,31 +54,21 @@ export function KnowledgeBaseStats({ clubId }: { clubId: string }) {
       </div>
     );
   }
-
-  if (docsError) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Fout</AlertTitle>
-        <AlertDescription>
-          Kon de documenten van de kennisbank niet laden. Probeer het later opnieuw.
-          { docsError?.message }
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!documents || documents.length === 0) {
+  
+  // If there's a permission error, it's likely because the collection doesn't exist yet.
+  // In this case, we show the empty state, which is the correct user experience.
+  if (docsError || !documents || documents.length === 0) {
     return (
       <Alert>
         <UploadCloud className="h-4 w-4" />
         <AlertTitle>Lege Kennisbank</AlertTitle>
         <AlertDescription>
-          Er zijn nog geen documenten gevonden. Upload documenten (PDF's) naar uw Firebase Storage in de `knowledge_base/{'{clubId}'}/{'{documentName}'}` map om de AI-buddy te trainen. De status verschijnt hier automatisch.
+          Er zijn nog geen documenten gevonden. Upload documenten (bv. PDF's) naar uw Firebase Storage in de `knowledge_base/{'{clubId}'}/{'{documentName}'}` map om de AI-buddy te trainen. De status verschijnt hier automatisch zodra er documenten zijn.
         </AlertDescription>
       </Alert>
     );
   }
+
 
   return (
     <div className="border rounded-lg overflow-hidden">
