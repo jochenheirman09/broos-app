@@ -1,7 +1,7 @@
 'use server';
 
-import { defineRetriever, Document } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { Document } from 'genkit';
+import { ai } from '@/ai/genkit';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
 
@@ -23,7 +23,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (magnitudeA * magnitudeB);
 }
 
-export const retriever = defineRetriever(
+export const retriever = ai.defineRetriever(
   {
     name: 'custom-firestore-retriever',
   },
@@ -31,11 +31,10 @@ export const retriever = defineRetriever(
     const firestore = getFirestore();
 
     // 1. Generate embedding for the user's query.
-    const embeddingResponse = await googleAI.embed({
-      model: 'text-embedding-004',
+    const { embedding: queryEmbedding } = await ai.embed({
+      model: 'googleai/text-embedding-004',
       content: query,
     });
-    const queryEmbedding = embeddingResponse.embedding;
 
     // 2. Fetch all documents from the 'knowledge_base' collection.
     // In a production scenario, you would implement a more efficient strategy,
