@@ -128,7 +128,7 @@ service cloud.firestore {
     match /clubs/{clubId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn(); // Allow listing clubs, e.g. for a search feature
-      allow create: if isResponsible(request.auth.uid) && !userHasClub();
+      allow create: if isResponsible(request.auth.uid) && getUserData(request.auth.uid).clubId == null;
       allow update, delete: if isClubOwner(clubId);
 
       match /clubUpdates/{updateId} {
@@ -150,6 +150,24 @@ service cloud.firestore {
             allow write: if false;
         }
       }
+    }
+
+    // Rules for Knowledge Base
+    match /knowledge_base {
+      allow list: if isResponsible(request.auth.uid) && userHasClub();
+    }
+    match /knowledge_base/{docId} {
+      allow get: if isResponsible(request.auth.uid) && userHasClub();
+      allow write: if false; // Only backend can write
+    }
+
+    // Rules for Knowledge Stats
+    match /knowledge_stats {
+       allow list: if isResponsible(request.auth.uid) && userHasClub();
+    }
+    match /knowledge_stats/{statId} {
+      allow get: if isResponsible(request.auth.uid) && userHasClub();
+      allow write: if false; // Only backend can write
     }
   }
 }

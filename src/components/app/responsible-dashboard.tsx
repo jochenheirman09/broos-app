@@ -20,7 +20,6 @@ import { ClubUpdates } from "./club-updates";
 import { KnowledgeBaseStats } from "./knowledge-base-stats";
 
 function ClubManagement({ clubId }: { clubId: string }) {
-  console.log("ClubManagement: Rendering with clubId:", clubId);
   const firestore = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -35,7 +34,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
   }, []);
 
   if (isLoading) {
-    console.log("ClubManagement: Loading club data...");
     return (
       <Card>
         <CardContent className="flex justify-center items-center p-8">
@@ -46,19 +44,16 @@ function ClubManagement({ clubId }: { clubId: string }) {
   }
 
   if (!club) {
-    console.error("ClubManagement: Club data not found for ID:", clubId);
     return (
       <Card>
         <CardContent className="p-6">
           <p className="text-destructive">
-            Fout: Clubgegevens niet gevonden voor uw account.
+            Fout: Clubgegevens niet gevonden voor uw account. Dit kan een permissieprobleem zijn.
           </p>
         </CardContent>
       </Card>
     );
   }
-
-  console.log("ClubManagement: Club data loaded:", club.name);
 
   return (
     <>
@@ -73,7 +68,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {console.log("ClubManagement: Rendering ClubUpdates...")}
           <ClubUpdates clubId={club.id} />
         </CardContent>
       </Card>
@@ -89,7 +83,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-            {console.log("ClubManagement: Rendering KnowledgeBaseStats...")}
             <KnowledgeBaseStats clubId={club.id} />
         </CardContent>
       </Card>
@@ -101,7 +94,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
         <CardContent className="space-y-6">
           <div>
             <h3 className="text-xl font-semibold mb-4">Jouw Teams</h3>
-            {console.log("ClubManagement: Rendering TeamList...")}
             <TeamList
               clubId={club.id}
               key={refreshKey}
@@ -113,7 +105,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
             <h3 className="text-xl font-semibold mb-4">
               Voeg een Nieuw Team Toe
             </h3>
-            {console.log("ClubManagement: Rendering CreateTeamForm...")}
             <CreateTeamForm clubId={club.id} onTeamCreated={handleTeamChange} />
           </div>
         </CardContent>
@@ -124,6 +115,5 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
 
 export function ResponsibleDashboard({ clubId }: { clubId: string }) {
-  console.log("ResponsibleDashboard: Rendering with clubId:", clubId);
   return <ClubManagement clubId={clubId} />;
 }
