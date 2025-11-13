@@ -71,11 +71,6 @@ service cloud.firestore {
         return responsibleData.clubId == targetUserData.clubId;
     }
 
-    function userHasClub() {
-      let userData = getUserData(request.auth.uid);
-      return userData.clubId != null && exists(/databases/$(database)/documents/clubs/$(userData.clubId));
-    }
-
     // --- Rules ---
 
     match /{path=**}/teams/{teamId} {
@@ -126,7 +121,7 @@ service cloud.firestore {
     match /clubs/{clubId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn(); // Allow listing clubs, e.g. for a search feature
-      allow create: if isResponsible(request.auth.uid) && !userHasClub();
+      allow create: if isResponsible(request.auth.uid);
       allow update, delete: if isClubOwner(clubId);
 
       match /clubUpdates/{updateId} {
