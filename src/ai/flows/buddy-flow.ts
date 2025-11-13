@@ -16,6 +16,7 @@ import {
   type BuddyOutput,
 } from '@/ai/types';
 import { retriever } from '@/ai/retriever';
+import { Document } from 'genkit/retriever';
 
 export async function chatWithBuddy(
   input: BuddyInput
@@ -102,14 +103,16 @@ const buddyFlow = ai.defineFlow(
     outputSchema: BuddyOutputSchema,
   },
   async (input) => {
-    // 1. Retrieve relevant context from the knowledge base
-    const searchResults = await retriever.retrieve(input.userMessage, {
-      k: 3, // Retrieve top 3 most relevant document chunks
-    });
-
-    const knowledgeBaseContext = searchResults
-      .map((res) => res.document.text())
-      .join("\n\n---\n\n");
+    let knowledgeBaseContext = '';
+    // 1. Retrieve relevant context from the knowledge base if there is a user message
+    if (input.userMessage) {
+      const searchResponse = await retriever.retrieve(input.userMessage, {
+        k: 3, // Retrieve top 3 most relevant document chunks
+      });
+      knowledgeBaseContext = searchResponse.documents
+        .map((doc: Document) => doc.text())
+        .join('\n\n---\n\n');
+    }
 
     // 2. Call the main prompt with the added context
     const { output } = await buddyPrompt({
