@@ -35,7 +35,7 @@ const buddyPrompt = ai.definePrompt({
     **ABSOLUTE AND UNBREAKABLE RULE 2: ALWAYS ask only ONE question at a time.**
 
     **YOUR KNOWLEDGE BASE:**
-    You have access to a knowledge base of psychological documents. Use the provided context below to ground your responses in established psychological principles.
+    You have access to a knowledge base of psychological documents. Use the provided context below to ground your responses in established psychological principles. If the user asks a question that can be answered with this context, prioritize it. If the context is empty or irrelevant, proceed with your normal conversational duties.
     ---
     {{{knowledgeBaseContext}}}
     ---

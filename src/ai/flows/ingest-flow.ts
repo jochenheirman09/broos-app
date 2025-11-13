@@ -4,8 +4,10 @@
  */
 import { ai } from "@/ai/genkit";
 import { z } from "genkit";
-import { retriever } from "@/ai/retriever";
 import { textEmbeddingGecko } from "@genkit-ai/google-genai";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+
 
 // This flow is a placeholder for the document ingestion logic.
 // In a real application, you would add logic here to:
@@ -24,38 +26,51 @@ export async function ingestDocument(url: string) {
   // This is a mock implementation.
   console.log(`Starting ingestion for document at: ${url}`);
 
-  try {
-    // In a real scenario, you would use ai.embed() to process and store the document.
-    // For example:
-    // const loader = () => new PDFLoader(url);
-    // await retriever.addDocuments(loader);
+  const firestore = getFirestore();
+  const storage = getStorage().bucket();
 
-    console.log(`Placeholder: Successfully processed document from ${url}.`);
+  // List all files in your "documents" folder in Firebase Storage
+  const [files] = await storage.getFiles({ prefix: "documents/" });
 
-    // Here you would update the document's status in Firestore to 'completed'.
-    // For example: await updateKnowledgeDocumentStatus(docId, 'completed');
+  for (const file of files) {
+    if (await firestore.collection('knowledge_base').doc(file.name).get().then(d => d.exists)) {
+        console.log(`Skipping ${file.name}, already ingested.`);
+        continue;
+    }
 
-    return { success: true, message: "Document processed successfully." };
-  } catch (error) {
-    console.error(`Error ingesting document from ${url}:`, error);
+    const [buffer] = await file.download();
+    const text = buffer.toString("utf8");
 
-    // Update the document's status in Firestore to 'error'.
-    // For example: await updateKnowledgeDocumentStatus(docId, 'error');
+    // 1️⃣ Generate embedding using Gemini embedding model
+    const { embedding } = await textEmbeddingGecko.embed({ content: text });
 
-    return { success: false, message: "Failed to process document." };
+    // 2️⃣ Save embedding and metadata in Firestore
+    await firestore.collection("knowledge_base").doc(file.name).set({
+      name: file.name,
+      content: text,
+      embedding,
+      createdAt: new Date(),
+    });
+
+    console.log(`✅ Ingested ${file.name}`);
   }
 }
 
 export const ingestFlow = ai.defineFlow(
   {
     name: "ingestDocumentFlow",
-    inputSchema: DocInputSchema,
+    inputSchema: z.object({ path: z.string() }),
     outputSchema: z.object({
       success: z.boolean(),
       message: z.string(),
     }),
   },
-  async ({ url }) => {
-    return ingestDocument(url);
+  async ({ path }) => {
+    try {
+        await ingestDocument(path);
+        return { success: true, message: "Document processed successfully." };
+    } catch (e: any) {
+        return { success: false, message: e.message || "Failed to process document." };
+    }
   }
 );
