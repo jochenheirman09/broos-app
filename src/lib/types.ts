@@ -1,3 +1,4 @@
+
 export type UserRole = "player" | "staff" | "responsible";
 
 export interface UserProfile {
@@ -19,6 +20,7 @@ export interface UserProfile {
   matchPreparation?: string;
   recoveryHabits?: string;
   additionalHobbies?: string;
+  acceptedTerms?: boolean;
 }
 
 export interface Club {
@@ -142,5 +144,3 @@ export interface PlayerTraining {
     description: string;
     createdAt: any; // Firestore ServerTimestamp
 }
-
-    

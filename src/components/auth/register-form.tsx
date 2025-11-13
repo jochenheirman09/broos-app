@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -11,6 +12,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,6 +34,8 @@ import { useAuth, useFirestore } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import type { UserRole } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
+import { Checkbox } from "../ui/checkbox";
+import Link from "next/link";
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
 
@@ -46,6 +50,10 @@ const formSchema = z
       .min(6, { message: "Wachtwoord moet minstens 6 tekens bevatten." }),
     confirmPassword: z.string(),
     role: z.enum(roles, { required_error: "Selecteer een rol." }),
+    acceptedTerms: z.boolean().refine((val) => val === true, {
+      message:
+        "Je moet akkoord gaan met het privacybeleid en de voorwaarden.",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Wachtwoorden komen niet overeen.",
@@ -70,6 +78,7 @@ export function RegisterForm() {
       password: "",
       confirmPassword: "",
       role: selectedRole || undefined,
+      acceptedTerms: false,
     },
   });
 
@@ -107,6 +116,7 @@ export function RegisterForm() {
         email: values.email,
         role: values.role,
         emailVerified: false,
+        acceptedTerms: true,
       });
 
       await sendEmailVerification(user);
@@ -218,6 +228,36 @@ export function RegisterForm() {
             )}
           />
         )}
+        
+        <FormField
+          control={form.control}
+          name="acceptedTerms"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-clay-inset">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Ik ga akkoord met het{" "}
+                  <Link href="/privacy-policy" className="text-primary hover:underline" target="_blank">
+                    Privacybeleid
+                  </Link>{" "}
+                  en de{" "}
+                  <Link href="/terms-and-conditions" className="text-primary hover:underline" target="_blank">
+                    Algemene Voorwaarden
+                  </Link>
+                  .
+                </FormLabel>
+                <FormMessage />
+              </div>
+            </FormItem>
+          )}
+        />
+
 
         <Button
           type="submit"
