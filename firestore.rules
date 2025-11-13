@@ -121,7 +121,7 @@ service cloud.firestore {
     match /clubs/{clubId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn(); // Allow listing clubs, e.g. for a search feature
-      allow create: if isResponsible(request.auth.uid);
+      allow create: if isSignedIn() && request.auth.token.email_verified == true && isResponsible(request.auth.uid) && getUserData(request.auth.uid).clubId == null;
       allow update, delete: if isClubOwner(clubId);
 
       match /clubUpdates/{updateId} {
