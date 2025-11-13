@@ -49,7 +49,11 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
+    const path = memoizedDocRef ? memoizedDocRef.path : 'unknown path';
+    console.log(`[useDoc] Subscribing to: ${path}`);
+    
     if (!memoizedDocRef) {
+      console.log(`[useDoc] Subscription skipped (null ref) for: ${path}`);
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -58,21 +62,22 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
-
+    
     const unsubscribe = onSnapshot(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
+          console.log(`[useDoc] Data received for: ${path}`);
           setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
-          // Document does not exist
+          console.warn(`[useDoc] Document does not exist at: ${path}`);
           setData(null);
         }
-        setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
+        setError(null); 
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        console.error(`[useDoc] PERMISSION ERROR on: ${path}`, error);
         const contextualError = new FirestorePermissionError({
           operation: 'get',
           path: memoizedDocRef.path,
@@ -82,12 +87,14 @@ export function useDoc<T = any>(
         setData(null)
         setIsLoading(false)
 
-        // trigger global error propagation
         errorEmitter.emit('permission-error', contextualError);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`[useDoc] Unsubscribing from: ${path}`);
+      unsubscribe();
+    }
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
 
   if (memoizedDocRef && !memoizedDocRef.__memo) {
