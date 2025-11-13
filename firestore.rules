@@ -33,7 +33,9 @@ service cloud.firestore {
     }
 
     function isResponsible() {
-        return resource.data.role == 'responsible';
+        // Use `get` on the `users` path to check the role of the requesting user.
+        // This is necessary because `resource.data` is not available on `list` operations.
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
     }
     
     // Allow team lookup by invitation code for any signed-in user
@@ -119,20 +121,20 @@ service cloud.firestore {
 
     // Rules for Knowledge Base - allow any responsible user to read.
     match /knowledge_base/{docId} {
-      allow get: if isSignedIn();
+      allow get: if isResponsible();
       allow write: if false; 
     }
     match /knowledge_base {
-       allow list: if isSignedIn();
+       allow list: if isResponsible();
     }
 
     // Rules for Knowledge Stats - allow any responsible user to read.
     match /knowledge_stats/{statId} {
-      allow get: if isSignedIn();
+      allow get: if isResponsible();
       allow write: if false; 
     }
     match /knowledge_stats {
-       allow list: if isSignedIn();
+       allow list: if isResponsible();
     }
   }
 }
