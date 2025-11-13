@@ -23,7 +23,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (magnitudeA * magnitudeB);
 }
 
-export const retriever = ai.defineRetriever(
+export const customFirestoreRetriever = ai.defineRetriever(
   {
     name: 'custom-firestore-retriever',
   },

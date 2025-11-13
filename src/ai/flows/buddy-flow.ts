@@ -15,7 +15,7 @@ import {
   type BuddyInput,
   type BuddyOutput,
 } from '@/ai/types';
-import { retriever } from '@/ai/retriever';
+import { customFirestoreRetriever } from '@/ai/retriever';
 import { Document } from 'genkit/retriever';
 
 export async function chatWithBuddy(
@@ -106,10 +106,12 @@ const buddyFlow = ai.defineFlow(
     let knowledgeBaseContext = '';
     // 1. Retrieve relevant context from the knowledge base if there is a user message
     if (input.userMessage) {
-      const searchResponse = await retriever.retrieve(input.userMessage, {
-        k: 3, // Retrieve top 3 most relevant document chunks
+      const { documents } = await ai.retrieve({
+        retriever: customFirestoreRetriever,
+        query: input.userMessage,
+        options: { k: 3 },
       });
-      knowledgeBaseContext = searchResponse.documents
+      knowledgeBaseContext = documents
         .map((doc: Document) => doc.text())
         .join('\n\n---\n\n');
     }
