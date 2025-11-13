@@ -71,21 +71,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
           <ClubUpdates clubId={club.id} />
         </CardContent>
       </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <BookOpen className="h-6 w-6 mr-3 text-primary" />
-            Kennisbank Management
-          </CardTitle>
-           <CardDescription>
-            Overzicht van de documenten die de AI-buddy gebruikt en hoe vaak ze worden geraadpleegd.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <KnowledgeBaseStats clubId={club.id} />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -109,6 +94,22 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </div>
         </CardContent>
       </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <BookOpen className="h-6 w-6 mr-3 text-primary" />
+            Kennisbank Management
+          </CardTitle>
+           <CardDescription>
+            Overzicht van de documenten die de AI-buddy gebruikt en hoe vaak ze worden geraadpleegd.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <KnowledgeBaseStats clubId={club.id} />
+        </CardContent>
+      </Card>
+
     </>
   );
 }
