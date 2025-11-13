@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -6,11 +7,14 @@ import { useEffect } from "react";
 import { AppHeader } from "@/components/app/header";
 import { Spinner } from "@/components/ui/spinner";
 import { PlayerLayout } from "@/components/app/player-layout";
+import { useFirestore } from "@/firebase";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, userProfile, loading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const db = useFirestore();
 
   const isProfileIncomplete =
     userProfile &&
@@ -30,6 +34,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Just-in-time sync for email verification status
+    if (user.emailVerified && userProfile && !userProfile.emailVerified) {
+      updateUserProfile({
+        db,
+        userId: user.uid,
+        data: { emailVerified: true },
+      });
+    }
+
     if (isProfileIncomplete) {
       if (pathname !== "/complete-profile") {
         router.replace("/complete-profile");
@@ -38,7 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       // If profile is complete, redirect away from setup page to dashboard
       router.replace("/dashboard");
     }
-  }, [user, userProfile, loading, router, isProfileIncomplete, pathname]);
+  }, [user, userProfile, loading, router, isProfileIncomplete, pathname, db]);
 
   if (loading || !user || !user.emailVerified) {
     return (
