@@ -26,7 +26,6 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export const retriever = defineRetriever(
   {
     name: 'custom-firestore-retriever',
-    configSchema: undefined,
   },
   async (query, options) => {
     const firestore = getFirestore();
