@@ -21,6 +21,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ((userProfile.role === "player" &&
       (!userProfile.teamId || !userProfile.birthDate)) ||
       (userProfile.role === "staff" && !userProfile.teamId));
+      
+  const isResponsibleWithClub = userProfile?.role === "responsible" && userProfile?.clubId;
+
 
   useEffect(() => {
     if (loading) return;
@@ -48,10 +51,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace("/complete-profile");
       }
     } else if (pathname === "/complete-profile") {
-      // If profile is complete, redirect away from setup page to dashboard
       router.replace("/dashboard");
     }
-  }, [user, userProfile, loading, router, isProfileIncomplete, pathname, db]);
+
+    // Redirect responsible user away from create-club if they already have one
+    if(isResponsibleWithClub && pathname === "/create-club") {
+        router.replace("/dashboard");
+    }
+
+  }, [user, userProfile, loading, router, isProfileIncomplete, isResponsibleWithClub, pathname, db]);
 
   if (loading || !user || !user.emailVerified) {
     return (
