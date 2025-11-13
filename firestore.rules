@@ -13,7 +13,6 @@
  * Key Security Decisions:
  * - Heavy reliance on client-side logic to query for correct data (e.g., filtering by teamId or clubId).
  * - Rules are kept simple and fast to avoid deployment timeouts.
- * - All `get()` and `exists()` calls have been removed from rules to improve performance.
  */
 rules_version = '2';
 
@@ -40,7 +39,7 @@ service cloud.firestore {
     
     // Allow team lookup by invitation code for any signed-in user
     match /{path=**}/teams/{teamId} {
-      allow list: if isSignedIn() && request.query.where[0][0] == 'invitationCode';
+      allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode';
     }
 
     match /users/{userId} {
