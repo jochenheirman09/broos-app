@@ -32,12 +32,20 @@ import {
 } from "firebase/auth";
 import { useAuth, useFirestore } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import type { UserRole } from "@/lib/types";
+import type { UserRole, Gender } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Checkbox } from "../ui/checkbox";
 import Link from "next/link";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
+const genders: { value: Gender; label: string }[] = [
+    { value: "male", label: "Jongen" },
+    { value: "female", label: "Meisje" },
+    { value: "other", label: "Andere" },
+    { value: "prefer_not_to_say", label: "Zeg ik liever niet" },
+];
+
 
 const formSchema = z
   .object({
@@ -50,6 +58,9 @@ const formSchema = z
       .min(6, { message: "Wachtwoord moet minstens 6 tekens bevatten." }),
     confirmPassword: z.string(),
     role: z.enum(roles, { required_error: "Selecteer een rol." }),
+    gender: z.enum(["male", "female", "other", "prefer_not_to_say"], {
+      required_error: "Selecteer je geslacht.",
+    }),
     acceptedTerms: z.boolean().refine((val) => val === true, {
       message:
         "Je moet akkoord gaan met het privacybeleid en de voorwaarden.",
@@ -115,6 +126,7 @@ export function RegisterForm() {
         name: values.name,
         email: values.email,
         role: values.role,
+        gender: values.gender,
         emailVerified: false,
         acceptedTerms: true,
         clubId: null, // Explicitly set clubId to null
@@ -195,6 +207,36 @@ export function RegisterForm() {
             </FormItem>
           )}
         />
+        
+        <FormField
+          control={form.control}
+          name="gender"
+          render={({ field }) => (
+            <FormItem className="space-y-3">
+              <FormLabel>Geslacht</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  className="flex flex-col space-y-1"
+                >
+                    {genders.map(gender => (
+                        <FormItem key={gender.value} className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                                <RadioGroupItem value={gender.value} />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                                {gender.label}
+                            </FormLabel>
+                        </FormItem>
+                    ))}
+                </RadioGroup>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
 
         {!selectedRole && (
           <FormField

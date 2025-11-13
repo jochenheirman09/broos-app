@@ -37,6 +37,11 @@
           "format": "date",
           "description": "Player's birth date."
         },
+        "gender": {
+          "type": "string",
+          "description": "The gender of the user.",
+          "enum": ["male", "female", "other", "prefer_not_to_say"]
+        },
         "teamId": {
           "type": "string",
           "description": "The ID of the team the user belongs to."

@@ -1,5 +1,6 @@
 
 export type UserRole = "player" | "staff" | "responsible";
+export type Gender = "male" | "female" | "other" | "prefer_not_to_say";
 
 export interface UserProfile {
   uid: string;
@@ -10,6 +11,7 @@ export interface UserProfile {
   clubId?: string;
   teamId?: string;
   birthDate?: string;
+  gender?: Gender;
   photoURL?: string;
   buddyName?: string;
   buddyAvatar?: string;
