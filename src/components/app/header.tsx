@@ -8,9 +8,12 @@ import { Logo } from "./logo";
 import { Wordmark } from "./wordmark";
 import Link from "next/link";
 import { User, Info } from "lucide-react";
+import { useState } from "react";
+import { ProfileSheet } from "./profile-sheet";
 
 export function AppHeader() {
   const { userProfile } = useUser();
+  const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
 
   const getInitials = (name: string = "") => {
     return name
@@ -21,27 +24,28 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-20 items-center">
-        <div className="mr-auto flex items-center space-x-3">
-          <Link href="/dashboard" className="flex items-center space-x-3">
-            <Logo />
-            <Wordmark>Broos 2.0</Wordmark>
-          </Link>
-        </div>
-        <div className="flex items-center space-x-2">
-          <ThemeToggle />
-          <Link href="/about">
-            <Button variant="ghost" size="icon">
-              <Info className="h-5 w-5" />
-              <span className="sr-only">About</span>
-            </Button>
-          </Link>
-          {userProfile && (
-            <Link href="/profile">
+    <>
+      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-20 items-center">
+          <div className="mr-auto flex items-center space-x-3">
+            <Link href="/dashboard" className="flex items-center space-x-3">
+              <Logo />
+              <Wordmark>Broos 2.0</Wordmark>
+            </Link>
+          </div>
+          <div className="flex items-center space-x-2">
+            <ThemeToggle />
+            <Link href="/about">
+              <Button variant="ghost" size="icon">
+                <Info className="h-5 w-5" />
+                <span className="sr-only">About</span>
+              </Button>
+            </Link>
+            {userProfile && (
               <Button
                 variant="ghost"
                 className="relative h-12 w-12 rounded-full"
+                onClick={() => setIsProfileSheetOpen(true)}
               >
                 <Avatar className="h-12 w-12 border-2 border-primary/50">
                   <AvatarImage src={userProfile.photoURL} />
@@ -54,10 +58,11 @@ export function AppHeader() {
                   </AvatarFallback>
                 </Avatar>
               </Button>
-            </Link>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <ProfileSheet isOpen={isProfileSheetOpen} onOpenChange={setIsProfileSheetOpen} />
+    </>
   );
 }
