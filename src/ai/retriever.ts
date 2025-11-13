@@ -10,30 +10,6 @@ if (!getApps().length) {
   initializeApp();
 }
 
-/**
- * A retry helper function to handle transient API errors like '503 Service Unavailable'.
- * @param fn The async function to execute.
- * @param retries The number of times to retry.
- * @param delayMs The delay between retries in milliseconds.
- * @returns The result of the provided function.
- */
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1500): Promise<T> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      if (err.message.includes("503") && i < retries - 1) {
-        console.warn(`Gemini overloaded — retrying in ${delayMs}ms...`);
-        await new Promise((r) => setTimeout(r, delayMs * (i + 1))); // Increase delay
-      } else {
-        throw err;
-      }
-    }
-  }
-  // This line should not be reachable if retries > 0
-  throw new Error("Exceeded maximum retries.");
-}
-
 function cosineSimilarity(a: number[], b: number[]): number {
   if (!a || !b || a.length !== b.length) {
     return 0;
@@ -56,11 +32,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export async function customFirestoreRetriever(query: string): Promise<Document[]> {
   const firestore = getFirestore();
 
-  // 1. Generate embedding for the user's query with retry logic.
-  const { embedding: queryEmbedding } = await withRetry(() => ai.embed({
+  // 1. Generate embedding for the user's query.
+  const { embedding: queryEmbedding } = await ai.embed({
     model: 'googleai/text-embedding-004',
     content: query,
-  }));
+  });
 
   // 2. Fetch all documents from the 'knowledge_base' collection.
   const snapshot = await firestore.collection('knowledge_base').get();

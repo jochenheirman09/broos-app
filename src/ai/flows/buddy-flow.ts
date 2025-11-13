@@ -18,30 +18,6 @@ import {
 import { customFirestoreRetriever } from '@/ai/retriever';
 import { Document } from 'genkit/retriever';
 
-/**
- * A retry helper function to handle transient API errors like '503 Service Unavailable'.
- * @param fn The async function to execute.
- * @param retries The number of times to retry.
- * @param delayMs The delay between retries in milliseconds.
- * @returns The result of the provided function.
- */
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1500): Promise<T> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      if (err.message.includes("503") && i < retries - 1) {
-        console.warn(`Gemini overloaded — retrying in ${delayMs}ms...`);
-        await new Promise((r) => setTimeout(r, delayMs * (i + 1))); // Increase delay
-      } else {
-        throw err;
-      }
-    }
-  }
-  // This line should not be reachable if retries > 0
-  throw new Error("Exceeded maximum retries.");
-}
-
 
 export async function chatWithBuddy(
   input: BuddyInput
@@ -129,12 +105,7 @@ const buddyFlow = ai.defineFlow(
     outputSchema: BuddyOutputSchema,
   },
   async (input) => {
-    // When a retriever is passed to a prompt, Genkit automatically populates
-    // the 'knowledgeBaseContext' field with the retrieved documents.
-    // We only need to provide the query to the prompt.
-    // The prompt's input schema expects `userMessage`, so we pass it.
-    const { output } = await withRetry(() => buddyPrompt(input));
-    
+    const { output } = await buddyPrompt(input);
     return output!;
   }
 );

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { chatWithBuddy } from "@/ai/flows/buddy-flow";
+import { chatWithBuddy, BuddyOutput } from "@/ai/flows/buddy-flow";
 import { saveWellnessScores, saveAlert } from "@/lib/firebase/firestore/wellness";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +104,7 @@ export function ChatInterface() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [stallingMessages, setStallingMessages] = useState<string[]>([]);
   const viewportRef = useRef<HTMLDivElement>(null);
   
   const buddyName = userProfile?.buddyName || "Broos";
@@ -122,8 +123,20 @@ export function ChatInterface() {
 
   const { data: messages, isLoading: messagesLoading } =
     useCollection<ChatMessageType>(messagesQuery);
+    
+  const addAssistantMessage = useCallback(async (content: string) => {
+    if (!user || !db) return;
+     addDoc(
+        collection(db, "users", user.uid, "chats", today, "messages"),
+        {
+            role: "assistant",
+            content: content,
+            timestamp: serverTimestamp(),
+        }
+    );
+  }, [user, db, today]);
 
-  const handleInitialMessage = async () => {
+  const handleInitialMessage = useCallback(async () => {
     if (!userProfile || !user || !db || !firstName) return;
     
     setIsLoading(true);
@@ -139,16 +152,7 @@ export function ChatInterface() {
             onboardingCompleted: !!userProfile.onboardingCompleted,
         });
 
-        // This can be awaited as it's the first message
-        await addDoc(
-            collection(db, "users", user.uid, "chats", today, "messages"),
-            {
-                role: "assistant",
-                content: adaptedResponse,
-                timestamp: serverTimestamp(),
-            }
-        );
-        
+        await addAssistantMessage(adaptedResponse);
         saveChatSummary(db, user.uid, today, adaptedResponse);
 
         const updates: any = {};
@@ -173,14 +177,13 @@ export function ChatInterface() {
     } finally {
         setIsLoading(false);
     }
-  };
+  }, [userProfile, user, db, firstName, buddyName, today, addAssistantMessage, toast]);
 
   useEffect(() => {
     if (!messagesLoading && messages?.length === 0) {
       handleInitialMessage();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messagesLoading, messages]);
+  }, [messagesLoading, messages, handleInitialMessage]);
 
   useEffect(() => {
     if (viewportRef.current) {
@@ -189,7 +192,37 @@ export function ChatInterface() {
         behavior: "smooth",
       });
     }
-  }, [messages]);
+  }, [messages, stallingMessages]);
+
+  const handleStallingAndRetry = useCallback(async (apiCall: () => Promise<BuddyOutput>) => {
+        const stallMsgs = [
+            "Oeps, het is even druk bij de server. Een momentje, ik probeer het opnieuw...",
+            "Het duurt iets langer dan normaal. Ik waardeer je geduld en probeer het nog een laatste keer voor je.",
+        ];
+
+        for (let i = 0; i < stallMsgs.length + 1; i++) {
+            try {
+                const result = await apiCall();
+                setStallingMessages([]); // Clear stalling messages on success
+                return result;
+            } catch (err: any) {
+                if (err.message && err.message.includes("503")) {
+                    if (i < stallMsgs.length) {
+                        setStallingMessages(prev => [...prev, stallMsgs[i]]);
+                        await new Promise(resolve => setTimeout(resolve, 2000 + i * 1000)); // Increase delay
+                    } else {
+                        const finalErrorMsg = "Het spijt me, maar het lukt me op dit moment niet om verbinding te maken. Laten we het gesprek op een later moment voortzetten.";
+                        setStallingMessages(prev => [...prev, finalErrorMsg]);
+                        setInput(input); // Restore user input
+                        throw new Error(finalErrorMsg); // Throw final error to be caught by the main handler
+                    }
+                } else {
+                    throw err; // Re-throw other errors immediately
+                }
+            }
+        }
+        throw new Error("Onverwachte fout in de retry-logica.");
+  }, [input]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,8 +230,8 @@ export function ChatInterface() {
 
     const userMessageContent = input;
     setInput("");
+    setStallingMessages([]);
 
-    // Add user message optimistically (non-blocking)
     addDoc(
       collection(db, "users", user.uid, "chats", today, "messages"),
       {
@@ -214,74 +247,43 @@ export function ChatInterface() {
       const chatHistory = (messages || [])
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
+      const agentResponse = messages && messages.length > 0 ? messages[messages.length - 1].content : "";
 
-      const agentResponse =
-        messages && messages.length > 0
-          ? messages[messages.length - 1].content
-          : "";
-
-      // Await the AI response as we need it to proceed
-      const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await chatWithBuddy({
+      const apiCall = () => chatWithBuddy({
         buddyName: buddyName,
         userName: firstName,
-        userAge: userProfile.birthDate
-          ? new Date().getFullYear() -
-            new Date(userProfile.birthDate).getFullYear()
-          : 18,
+        userAge: userProfile.birthDate ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear() : 18,
         userMessage: userMessageContent,
         chatHistory: chatHistory,
         agentResponse: agentResponse,
         onboardingCompleted: !!userProfile.onboardingCompleted,
       });
-
-      // Add assistant message (non-blocking)
-      addDoc(
-        collection(db, "users", user.uid, "chats", today, "messages"),
-        {
-          role: "assistant",
-          content: adaptedResponse,
-          timestamp: serverTimestamp(),
-        }
-      );
       
-      // All subsequent writes are non-blocking for a snappy UI feel.
+      const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await handleStallingAndRetry(apiCall);
+
+      addAssistantMessage(adaptedResponse);
+      
       saveChatSummary(db, user.uid, today, adaptedResponse);
-
       const updates: any = {};
-      if (playerInfo) {
-          Object.assign(updates, playerInfo);
-      }
-      if (onboardingCompleted && !userProfile.onboardingCompleted) {
-          updates.onboardingCompleted = true;
-      }
-      if (Object.keys(updates).length > 0) {
-          updateUserProfile({ db, userId: user.uid, data: updates });
-      }
-
-      if (scores && Object.keys(scores).length > 0) {
-        saveWellnessScores({
-          db,
-          userId: user.uid,
-          scores,
-          summary: adaptedResponse,
-        });
-      }
-
+      if (playerInfo) Object.assign(updates, playerInfo);
+      if (onboardingCompleted && !userProfile.onboardingCompleted) updates.onboardingCompleted = true;
+      if (Object.keys(updates).length > 0) updateUserProfile({ db, userId: user.uid, data: updates });
+      if (scores && Object.keys(scores).length > 0) saveWellnessScores({ db, userId: user.uid, scores, summary: adaptedResponse });
       if (alerts && alerts.length > 0) {
         for (const alert of alerts) {
           saveAlert({ db, userId: user.uid, alert });
         }
       }
-    } catch (error) {
+
+    } catch (error: any) {
       console.error("Error chatting with buddy:", error);
-      // Restore input on error
-      setInput(userMessageContent);
-      toast({
-        variant: "destructive",
-        title: "Oh nee!",
-        description:
-          "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
-      });
+      if (!error.message.includes("Laten we het gesprek op een later moment voortzetten")) {
+         toast({
+            variant: "destructive",
+            title: "Oh nee!",
+            description: "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
+         });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -295,16 +297,25 @@ export function ChatInterface() {
     );
   }
 
+  const allMessages = [
+      ...(messages || []),
+      ...stallingMessages.map((msg, index) => ({
+          id: `stall-${index}`,
+          role: 'assistant' as const,
+          content: msg,
+          timestamp: new Date()
+      }))
+  ]
+
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-grow">
         <ScrollViewport ref={viewportRef} className="h-full">
           <div className="px-4">
-            {messages &&
-              messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))}
-            {isLoading && (
+            {allMessages.map((message) => (
+                <ChatMessage key={message.id} message={message as WithId<ChatMessageType>} />
+            ))}
+            {isLoading && stallingMessages.length === 0 && (
               <div className="flex items-start gap-3 my-4 justify-start">
                 <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
                 <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
