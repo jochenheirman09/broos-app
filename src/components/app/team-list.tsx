@@ -183,7 +183,7 @@ export function TeamList({
         <AlertTitle>Nog Geen Teams</AlertTitle>
         <AlertDescription>
           Je hebt nog geen teams aangemaakt voor je club. Voeg er hieronder een
-          toe.
+          toe om te beginnen met het beheren van je club.
         </AlertDescription>
       </Alert>
     );
