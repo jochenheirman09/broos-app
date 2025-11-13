@@ -6,7 +6,7 @@ import { collection, query, orderBy } from "firebase/firestore";
 import type { KnowledgeDocument, KnowledgeUsageStat } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { FileText, BarChart2, AlertCircle } from "lucide-react";
+import { FileText, BarChart2, AlertCircle, UploadCloud } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import {
 import { Badge } from "../ui/badge";
 import { formatDistanceToNow } from 'date-fns';
 import { nl } from 'date-fns/locale';
+import { useMemo } from "react";
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } = {
     completed: "default",
@@ -26,19 +27,26 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } 
     error: "destructive"
 };
 
+const statusTranslation: { [key: string]: string } = {
+  completed: "Verwerkt",
+  ingesting: "Bezig met verwerken",
+  pending: "In behandeling",
+  error: "Fout",
+};
+
 export function KnowledgeBaseStats({ clubId }: { clubId: string }) {
   const db = useFirestore();
 
   const documentsQuery = useMemoFirebase(() => {
     return query(
-      collection(db, `clubs/${clubId}/knowledgeDocuments`),
+      collection(db, "knowledge_base"),
       orderBy("name", "asc")
     );
-  }, [db, clubId]);
+  }, [db]);
 
   const statsQuery = useMemoFirebase(() => {
-     return collection(db, `clubs/${clubId}/knowledgeStats`);
-  }, [db, clubId]);
+     return collection(db, "knowledge_stats");
+  }, [db]);
 
   const {
     data: documents,
@@ -82,10 +90,10 @@ export function KnowledgeBaseStats({ clubId }: { clubId: string }) {
   if (!documents || documents.length === 0) {
     return (
       <Alert>
-        <FileText className="h-4 w-4" />
+        <UploadCloud className="h-4 w-4" />
         <AlertTitle>Lege Kennisbank</AlertTitle>
         <AlertDescription>
-          Er zijn nog geen documenten geüpload om de AI-buddy te trainen. Upload PDF-bestanden via Firebase Storage om te beginnen.
+          Er zijn nog geen documenten gevonden. Upload documenten (PDF's) naar uw Firebase Storage in de `knowledge_base/{'{clubId}'}/{'{documentName}'}` map om de AI-buddy te trainen. De status verschijnt hier automatisch.
         </AlertDescription>
       </Alert>
     );
@@ -109,13 +117,13 @@ export function KnowledgeBaseStats({ clubId }: { clubId: string }) {
               <TableRow key={doc.id}>
                 <TableCell className="font-medium">{doc.name}</TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant[doc.status] || 'secondary'}>{doc.status}</Badge>
+                  <Badge variant={statusVariant[doc.status] || 'secondary'}>{statusTranslation[doc.status] || doc.status}</Badge>
                 </TableCell>
                 <TableCell className="text-center">
                     {docStats?.queryCount || 0}
                 </TableCell>
                 <TableCell className="text-right">
-                    {docStats?.lastQueried ? formatDistanceToNow(docStats.lastQueried.toDate(), { addSuffix: true, locale: nl }) : 'Nooit'}
+                    {docStats?.lastQueried ? formatDistanceToNow(new Date(docStats.lastQueried.seconds * 1000), { addSuffix: true, locale: nl }) : 'Nooit'}
                 </TableCell>
               </TableRow>
             );

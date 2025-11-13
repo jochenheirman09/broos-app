@@ -4,7 +4,7 @@
  */
 import { ai } from "@/ai/genkit";
 import { z } from "genkit";
-import { pineconeRetriever } from "@/ai/pinecone";
+import { retriever } from "@/ai/retriever";
 import { textEmbeddingGecko } from "@genkit-ai/google-genai";
 
 // This flow is a placeholder for the document ingestion logic.
@@ -28,7 +28,7 @@ export async function ingestDocument(url: string) {
     // In a real scenario, you would use ai.embed() to process and store the document.
     // For example:
     // const loader = () => new PDFLoader(url);
-    // await pineconeRetriever.addDocuments(loader);
+    // await retriever.addDocuments(loader);
 
     console.log(`Placeholder: Successfully processed document from ${url}.`);
 

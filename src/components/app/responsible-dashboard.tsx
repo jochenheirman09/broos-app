@@ -79,7 +79,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
             Kennisbank Management
           </CardTitle>
            <CardDescription>
-            Overzicht van de documenten die de AI-buddy gebruikt.
+            Overzicht van de documenten die de AI-buddy gebruikt en hoe vaak ze worden geraadpleegd.
           </CardDescription>
         </CardHeader>
         <CardContent>

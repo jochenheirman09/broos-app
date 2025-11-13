@@ -148,7 +148,7 @@ export interface PlayerTraining {
 export interface KnowledgeDocument {
     id: string;
     name: string;
-    storagePath: string;
+    firestorePath: string; // Path to the document in Firestore knowledge_base collection
     status: 'pending' | 'ingesting' | 'completed' | 'error';
     ingestedAt?: any; // Firestore ServerTimestamp
 }

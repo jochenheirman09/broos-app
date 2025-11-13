@@ -15,7 +15,7 @@ import {
   type BuddyInput,
   type BuddyOutput,
 } from '@/ai/types';
-import { pineconeRetriever } from '@/ai/pinecone';
+import { retriever } from '@/ai/retriever';
 
 export async function chatWithBuddy(
   input: BuddyInput
@@ -103,7 +103,7 @@ const buddyFlow = ai.defineFlow(
   },
   async (input) => {
     // 1. Retrieve relevant context from the knowledge base
-    const searchResults = await pineconeRetriever.retrieve(input.userMessage, {
+    const searchResults = await retriever.retrieve(input.userMessage, {
       k: 3, // Retrieve top 3 most relevant document chunks
     });
 
