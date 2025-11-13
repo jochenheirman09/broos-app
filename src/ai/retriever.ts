@@ -1,6 +1,6 @@
 'use server';
 
-import { defineRetriever, Document } from 'genkit/retriever';
+import { defineRetriever, Document } from 'genkit';
 import { textEmbeddingGecko } from '@genkit-ai/google-genai';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
