@@ -28,6 +28,7 @@ const buddyPrompt = ai.definePrompt({
   name: 'buddyPrompt',
   input: { schema: BuddyInputSchema },
   output: { schema: BuddyOutputSchema },
+  retriever: customFirestoreRetriever, // Pass the async retriever function directly
   prompt: `
     You are an AI agent named {{{buddyName}}}. You act as a highly skilled, understanding, and empathetic psychologist, specializing in child and sports psychology for the 12-18 age group.
 
@@ -103,24 +104,11 @@ const buddyFlow = ai.defineFlow(
     outputSchema: BuddyOutputSchema,
   },
   async (input) => {
-    let knowledgeBaseContext = '';
-    // 1. Retrieve relevant context from the knowledge base if there is a user message
-    if (input.userMessage) {
-      const { documents } = await ai.retrieve({
-        retriever: customFirestoreRetriever,
-        query: input.userMessage,
-        options: { k: 3 },
-      });
-      knowledgeBaseContext = documents
-        .map((doc: Document) => doc.text())
-        .join('\n\n---\n\n');
-    }
-
-    // 2. Call the main prompt with the added context
-    const { output } = await buddyPrompt({
-      ...input,
-      knowledgeBaseContext: knowledgeBaseContext,
-    });
+    // When a retriever is passed to a prompt, Genkit automatically populates
+    // the 'knowledgeBaseContext' field with the retrieved documents.
+    // We only need to provide the query to the prompt.
+    // The prompt's input schema expects `userMessage`, so we pass it.
+    const { output } = await buddyPrompt(input);
     
     return output!;
   }
