@@ -19,7 +19,7 @@ import { DocInputSchema } from '@/ai/types';
 //
 // This flow can be triggered by a Cloud Function when a new file is uploaded to Storage.
 
-export async function ingestDocument(url: string) {
+async function ingestDocument(url: string) {
   // This is a mock implementation.
   console.log(`Starting ingestion for document at: ${url}`);
 
