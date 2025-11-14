@@ -11,13 +11,15 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, BookOpen } from "lucide-react";
+import { Building, BookOpen, BarChart2 } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
 import { KnowledgeBaseStats } from "./knowledge-base-stats";
+import Link from 'next/link';
+import { Button } from '../ui/button';
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
@@ -68,6 +70,12 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+            <Link href="/analysis" passHref>
+                <Button variant="outline" className="w-full">
+                    <BarChart2 className="mr-2 h-4 w-4" />
+                    Ga naar Analyse Dashboard
+                </Button>
+            </Link>
           <ClubUpdates clubId={club.id} />
         </CardContent>
       </Card>
