@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const withPWA = require('next-pwa')({
@@ -7,6 +8,8 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development'
 })
 
+// Force cache invalidation by adding a comment with a timestamp.
+// Last attempt: 2024-07-31T12:00:00Z
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
