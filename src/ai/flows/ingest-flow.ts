@@ -1,3 +1,4 @@
+
 "use server";
 /**
  * @fileOverview A Genkit flow for ingesting documents into the knowledge base.
@@ -7,7 +8,7 @@ import { z } from "genkit";
 import { textEmbeddingGecko } from "@genkit-ai/google-genai";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-
+import { DocInputSchema } from '@/ai/types';
 
 // This flow is a placeholder for the document ingestion logic.
 // In a real application, you would add logic here to:
@@ -17,10 +18,6 @@ import { getStorage } from "firebase-admin/storage";
 // 4. Use the retriever to add these chunks to the vector database.
 //
 // This flow can be triggered by a Cloud Function when a new file is uploaded to Storage.
-
-const DocInputSchema = z.object({
-  url: z.string().describe("The URL of the document to ingest."),
-});
 
 export async function ingestDocument(url: string) {
   // This is a mock implementation.
@@ -59,15 +56,15 @@ export async function ingestDocument(url: string) {
 export const ingestFlow = ai.defineFlow(
   {
     name: "ingestDocumentFlow",
-    inputSchema: z.object({ path: z.string() }),
+    inputSchema: DocInputSchema,
     outputSchema: z.object({
       success: z.boolean(),
       message: z.string(),
     }),
   },
-  async ({ path }) => {
+  async ({ url }) => {
     try {
-        await ingestDocument(path);
+        await ingestDocument(url);
         return { success: true, message: "Document processed successfully." };
     } catch (e: any) {
         return { success: false, message: e.message || "Failed to process document." };

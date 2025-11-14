@@ -1,3 +1,4 @@
+
 "use client";
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -14,7 +15,7 @@ import type { Alert as AlertData, WellnessScore } from "@/lib/types";
 interface SaveWellnessScoreParams {
   db: ReturnType<typeof useFirestore>;
   userId: string;
-  scores: Partial<WellnessScore>;
+  scores: Partial<Omit<WellnessScore, 'id' | 'date' | 'summary'>>;
   summary: string;
 }
 
