@@ -37,19 +37,6 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Add these arguments to run headless Chrome in a containerized environment
-        launchOptions: {
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process', // This is not recommended for general use, but can help in very constrained environments
-            '--disable-gpu'
-          ]
-        }
       },
     },
   ],
