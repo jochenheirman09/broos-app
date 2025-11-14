@@ -26,7 +26,7 @@ async function runAnalysis() {
   const clubsSnapshot = await db.collection('clubs').get();
 
   for (const clubDoc of clubsSnapshot.docs) {
-    const club = { id: clubDoc.id, ...clubDoc.data() } as WithId<Pick<Club, 'id' | 'name'>>;
+    const club = { id: clubDoc.id, ...clubDoc.data() } as WithId<Pick<Club, 'id' | 'name' | 'ownerId'>>;
     const teamsSnapshot = await clubDoc.ref.collection('teams').get();
     
     const teamSummariesForClub: { teamName: string; summary: TeamSummary }[] = [];
@@ -91,7 +91,7 @@ async function runAnalysis() {
           analysisCount++;
         }
 
-        // Save the generated insight for staff
+        // Save the generated insight for staff and send notification
         if (analysisResult?.insight) {
             const insightRef = teamDoc.ref.collection('staffUpdates').doc();
             const insightData: StaffUpdate = {
@@ -100,6 +100,18 @@ async function runAnalysis() {
                 date: format(today, 'yyyy-MM-dd'),
             };
             await insightRef.set(insightData);
+            
+            // Notify all staff members of this team
+            const staffQuery = db.collection('users').where('teamId', '==', team.id).where('role', '==', 'staff');
+            const staffSnapshot = await staffQuery.get();
+            for (const staffDoc of staffSnapshot.docs) {
+                await sendNotification({
+                    userId: staffDoc.id,
+                    title: `Nieuw Team-inzicht: ${insightData.title}`,
+                    body: `Er is een nieuw inzicht beschikbaar voor team ${team.name}. Bekijk het op je dashboard.`,
+                    link: '/dashboard',
+                });
+            }
         }
       }
     }
@@ -122,12 +134,37 @@ async function runAnalysis() {
                     date: format(new Date(), 'yyyy-MM-dd'),
                 };
                 await insightRef.set(insightData);
+
+                // Notify the club responsible
+                await sendNotification({
+                    userId: club.ownerId,
+                    title: `Nieuw Club-inzicht: ${insightData.title}`,
+                    body: `Er is een nieuw club-breed inzicht beschikbaar. Bekijk het op je dashboard.`,
+                    link: '/dashboard',
+                });
             }
         } catch (e) {
             console.error(`Failed to generate club-level insight for ${club.name}:`, e);
         }
     }
   }
+
+  // Check for new PlayerUpdates and send notifications
+  const playersSnapshot = await db.collection('users').where('role', '==', 'player').get();
+  for (const playerDoc of playersSnapshot.docs) {
+      const updatesSnapshot = await playerDoc.ref.collection('updates').where('date', '==', format(new Date(), 'yyyy-MM-dd')).get();
+      for (const updateDoc of updatesSnapshot.docs) {
+          const update = updateDoc.data() as StaffUpdate;
+          await sendNotification({
+              userId: playerDoc.id,
+              title: `Nieuw weetje: ${update.title}`,
+              body: 'Broos heeft een nieuw persoonlijk inzicht voor je op je dashboard.',
+              link: '/dashboard',
+          });
+      }
+  }
+
+
   return { analysisCount, notificationCount };
 }
 
