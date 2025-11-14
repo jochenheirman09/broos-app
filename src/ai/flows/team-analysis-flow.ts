@@ -13,7 +13,7 @@ import {
     TeamSummarySchema, 
     StaffUpdateSchema,
     TeamAnalysisOutputSchema,
-    WellnessScoreSchema, // Import the missing schema
+    WellnessScoreSchema, 
     type TeamAnalysisInput, 
     type TeamAnalysisOutput,
     type TeamSummary,
