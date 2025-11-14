@@ -76,12 +76,12 @@ export default function TeamMembersPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Wacht tot de userProfile volledig is geladen.
+    // Defensive check: Wait until the user profile is fully loaded.
     if (userLoading) {
       return;
     }
     
-    // Essentiële data moet aanwezig zijn voordat we verder gaan.
+    // Defensive check: Ensure all necessary IDs are present before fetching.
     if (!db || !userProfile?.clubId || !teamId) {
       setIsLoading(false);
       setError("Kon de teamgegevens niet laden omdat essentiële informatie (zoals club ID) ontbreekt in je profiel.");
@@ -93,17 +93,18 @@ export default function TeamMembersPage({
       setError(null);
       
       try {
-        // Stap 1: Haal de teamgegevens op om de teamnaam te tonen.
+        // Step 1: Fetch team details to display team name.
         const teamRef = doc(db, `clubs/${userProfile.clubId}/teams/${teamId}`);
         const teamSnap = await getDoc(teamRef);
         
         if (teamSnap.exists()) {
           setTeam(teamSnap.data() as Team);
         } else {
-          throw new Error(`Team met ID "${teamId}" niet gevonden in club "${userProfile.clubId}".`);
+          // This is a data integrity issue, not a permission issue.
+          throw new Error(`Team met ID "${teamId}" niet gevonden in uw club. Controleer of het team nog bestaat.`);
         }
 
-        // Stap 2: Haal de teamleden op. Dit is de query die aan de nieuwe, correcte security rule voldoet.
+        // Step 2: Fetch team members using a query that matches the security rules.
         const membersQuery = query(
           collection(db, 'users'), 
           where('teamId', '==', teamId)
@@ -119,20 +120,19 @@ export default function TeamMembersPage({
 
       } catch (e: any) {
         console.error("Fout bij het ophalen van teamgegevens:", e);
-        if (e.code === 'permission-denied' || e.message.includes("permission")) {
+        // Provide specific, user-friendly error messages.
+        if (e.code === 'permission-denied' || e.message.includes("permission-denied")) {
             const permissionError = new FirestorePermissionError({
                 path: `users (querying on teamId: ${teamId})`,
                 operation: 'list',
-                requestResourceData: {
-                  query: {
-                    teamId: teamId
-                  }
-                }
             });
             errorEmitter.emit('permission-error', permissionError);
-            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. Controleer de Firestore-regels. De regels moeten een lijst-operatie op de 'users' collectie toestaan wanneer er op 'teamId' wordt gefilterd.");
+            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. De Firestore-regels staan deze actie niet toe. De regels vereisen dat de 'users' collectie wordt opgevraagd met een filter op 'teamId'.");
+        } else if (e.message.includes("index")) {
+            // Firestore often includes a link to create the required index in the error message.
+            setError("Indexeringsfout: Firestore vereist een samengestelde index voor deze query. Controleer de ontwikkelaarsconsole van uw browser voor een directe link om deze index aan te maken.");
         } else {
-            setError(e.message || "Er is een onbekende fout opgetreden.");
+            setError(e.message || "Er is een onbekende fout opgetreden bij het laden van de gegevens.");
         }
       } finally {
         setIsLoading(false);
@@ -177,7 +177,7 @@ export default function TeamMembersPage({
                 <AlertTriangle className="h-6 w-6 mr-3" />
                 Fout bij het laden van teamleden
               </div>
-              <p className="text-sm">Dit duidt meestal op een permissieprobleem of een foutieve query. Controleer de console voor gedetailleerde foutinformatie. **Belangrijke opmerking:** Firestore vereist mogelijk een samengestelde index voor deze query. De foutmelding in de ontwikkelaarsconsole van uw browser bevat een directe link om deze index aan te maken.</p>
+              <p className="text-sm">{error}</p>
               <details className="mt-2 text-xs bg-black/10 p-2 rounded">
                   <summary>Technische Details</summary>
                   <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">

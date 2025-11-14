@@ -163,19 +163,34 @@ export function TeamList({
   onTeamChange: () => void;
 }) {
   const firestore = useFirestore();
+  
+  // Defensive check: only create the query if clubId is valid.
   const teamsQuery = useMemoFirebase(
     () =>
-      firestore
+      firestore && clubId
         ? query(collection(firestore, "clubs", clubId, "teams"), orderBy("name"))
         : null,
     [firestore, clubId]
   );
-  const { data: teams, isLoading } = useCollection<Team>(teamsQuery);
+  const { data: teams, isLoading, error } = useCollection<Team>(teamsQuery);
 
   if (isLoading) {
-    return <Spinner />;
+    return <div className="flex justify-center p-8"><Spinner /></div>;
   }
 
+  // Gracefully handle Firestore errors.
+  if (error) {
+    return (
+        <Alert variant="destructive">
+            <AlertTitle>Fout bij het laden</AlertTitle>
+            <AlertDescription>
+                Kon de teams niet laden. Dit kan een permissieprobleem zijn. Zorg ervoor dat u bent ingelogd en de juiste rechten heeft.
+            </AlertDescription>
+        </Alert>
+    )
+  }
+
+  // Gracefully handle the empty state.
   if (!teams || teams.length === 0) {
     return (
       <Alert className="bg-background">
