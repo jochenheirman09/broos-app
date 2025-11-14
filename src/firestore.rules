@@ -117,14 +117,5 @@ service cloud.firestore {
         }
       }
     }
-
-    // Rules for Knowledge Base - allow any responsible user to read.
-    match /knowledge_base/{docId} {
-      allow get: if isResponsible();
-      allow write: if false; 
-    }
-    match /knowledge_base {
-       allow list: if isResponsible();
-    }
   }
 }
