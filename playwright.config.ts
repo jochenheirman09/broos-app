@@ -7,6 +7,9 @@ const PORT = process.env.PORT || 9002;
 // Set webServer.url and use.baseURL with the dynamically retrieved port
 const baseURL = `http://localhost:${PORT}`;
 
+// Path to the global setup file.
+const globalSetup = require.resolve('./e2e/global-setup');
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -22,6 +25,10 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+
+  // Run the global setup before all tests
+  globalSetup,
+
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -37,6 +44,8 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
+        // Use the saved storage state to log in as the test user
+        storageState: path.join(__dirname, 'e2e/storageState.json'),
       },
     },
   ],
