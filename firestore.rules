@@ -1,3 +1,4 @@
+
 /**
  * @file Firestore Security Rules for Broos 2.0 application.
  *
@@ -13,6 +14,7 @@
  * Key Security Decisions:
  * - Heavy reliance on client-side logic to query for correct data (e.g., filtering by teamId or clubId).
  * - Rules are kept simple and fast to avoid deployment timeouts.
+ * - The 'functions' directory has been removed from this project as it is not needed for App Hosting.
  */
 rules_version = '2';
 
