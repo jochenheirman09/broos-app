@@ -5,7 +5,7 @@ import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { TeamAnalysisInput, analyzeTeamData, TeamSummary } from '@/ai/flows/team-analysis-flow';
 import { ClubAnalysisInput, analyzeClubData } from '@/ai/flows/club-analysis-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
-import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate } from '@/lib/types';
+import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate, PlayerUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
 
 // Initialize Firebase Admin SDK if it hasn't been already.
@@ -22,6 +22,8 @@ async function runAnalysis() {
   const { db } = initializeFirebaseAdmin();
   let analysisCount = 0;
   let notificationCount = 0;
+  const today = new Date();
+  const todayFormatted = format(today, 'yyyy-MM-dd');
 
   const clubsSnapshot = await db.collection('clubs').get();
 
@@ -72,8 +74,6 @@ async function runAnalysis() {
       if (playersData.length > 0) {
         const analysisInput: TeamAnalysisInput = { teamId: team.id, teamName: team.name, playersData };
         const analysisResult = await analyzeTeamData(analysisInput);
-
-        const today = new Date();
         
         // Save the data summary
         if (analysisResult?.summary) {
@@ -84,7 +84,7 @@ async function runAnalysis() {
             ...analysisResult.summary,
             id: summaryId,
             teamId: team.id,
-            date: format(today, 'yyyy-MM-dd'),
+            date: todayFormatted,
           }, { merge: true });
 
           teamSummariesForClub.push({ teamName: team.name, summary: analysisResult.summary });
@@ -97,7 +97,7 @@ async function runAnalysis() {
             const insightData: StaffUpdate = {
                 ...analysisResult.insight,
                 id: insightRef.id,
-                date: format(today, 'yyyy-MM-dd'),
+                date: todayFormatted,
             };
             await insightRef.set(insightData);
             
@@ -131,7 +131,7 @@ async function runAnalysis() {
                 const insightData: ClubUpdate = {
                     ...clubInsightResult,
                     id: insightRef.id,
-                    date: format(new Date(), 'yyyy-MM-dd'),
+                    date: todayFormatted,
                 };
                 await insightRef.set(insightData);
 
@@ -149,18 +149,24 @@ async function runAnalysis() {
     }
   }
 
-  // Check for new PlayerUpdates and send notifications
+  // Check for new PlayerUpdates ("weetjes") created today and send notifications
   const playersSnapshot = await db.collection('users').where('role', '==', 'player').get();
   for (const playerDoc of playersSnapshot.docs) {
-      const updatesSnapshot = await playerDoc.ref.collection('updates').where('date', '==', format(new Date(), 'yyyy-MM-dd')).get();
+      // Query for updates created on the current date
+      const updatesSnapshot = await playerDoc.ref.collection('updates').where('date', '==', todayFormatted).get();
       for (const updateDoc of updatesSnapshot.docs) {
-          const update = updateDoc.data() as StaffUpdate;
-          await sendNotification({
-              userId: playerDoc.id,
-              title: `Nieuw weetje: ${update.title}`,
-              body: 'Broos heeft een nieuw persoonlijk inzicht voor je op je dashboard.',
-              link: '/dashboard',
-          });
+          const update = updateDoc.data() as PlayerUpdate;
+          try {
+             await sendNotification({
+                userId: playerDoc.id,
+                title: `Nieuw weetje: ${update.title}`,
+                body: 'Je buddy heeft een nieuw persoonlijk inzicht voor je op je dashboard.',
+                link: '/dashboard',
+            });
+            notificationCount++;
+          } catch(e) {
+             console.error(`Failed to send 'weetje' notification to user ${playerDoc.id}:`, e);
+          }
       }
   }
 
