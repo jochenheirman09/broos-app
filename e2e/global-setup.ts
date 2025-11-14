@@ -1,34 +1,39 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { promises as fs } from 'fs';
-import path from 'path';
 import 'dotenv/config';
 
-// Path to the JSON file where authentication state will be stored.
-const storageStatePath = path.join(__dirname, 'storageState.json');
+// NOTE: This setup script is designed to run in a local Node.js environment
+// before the Playwright tests start. It will fail in the Firebase Studio
+// browser-based environment because it requires Node.js APIs and access to
+// a service account key via environment variables.
 
 async function globalSetup() {
   console.log('--- E2E Global Setup: Initializing Firebase Admin ---');
 
   // Ensure the service account key is available in the environment variables.
+  // This is the primary guard against running in an unsupported environment.
   if (!process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT) {
-    throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. Cannot run E2E tests.');
+    throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. This setup is intended for local E2E testing and requires admin credentials. It will not run in the Firebase Studio web terminal.');
   }
 
   // Initialize Firebase Admin SDK if not already initialized.
   if (!getApps().length) {
-    initializeApp({
-      credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT)),
-    });
+    try {
+      initializeApp({
+        credential: cert(JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT)),
+      });
+    } catch (error: any) {
+        console.error('Failed to initialize Firebase Admin SDK. Make sure your FIREBASE_ADMIN_SERVICE_ACCOUNT is a valid JSON string.');
+        throw error;
+    }
   }
   
   const auth = getAuth();
   const db = getFirestore();
 
-  console.log('--- E2E Global Setup: Creating Test Users ---');
+  console.log('--- E2E Global Setup: Seeding Test Database ---');
   
-  // Define test user credentials.
   const timestamp = Date.now();
   const testUsers = {
     player: {
@@ -54,7 +59,13 @@ async function globalSetup() {
     }
   };
 
-  // Create users in Firebase Auth and corresponding documents in Firestore.
+  // Store credentials to be used by tests for logging in via the UI.
+  process.env.E2E_PLAYER_EMAIL = testUsers.player.email;
+  process.env.E2E_STAFF_EMAIL = testUsers.staff.email;
+  process.env.E2E_RESPONSIBLE_EMAIL = testUsers.responsible.email;
+  process.env.E2E_PASSWORD = 'password123';
+
+
   for (const user of Object.values(testUsers)) {
     try {
       const userRecord = await auth.createUser({
@@ -83,36 +94,8 @@ async function globalSetup() {
     }
   }
 
-  // We'll use the 'responsible' user to log in for the tests.
-  const authState = {
-    email: testUsers.responsible.email,
-    password: testUsers.responsible.password,
-  };
-
-  // A helper function to log in with a custom token (more robust than password).
-  const loginWithCustomToken = async () => {
-    const userRecord = await auth.getUserByEmail(testUsers.responsible.email);
-    const customToken = await auth.createCustomToken(userRecord.uid);
-    
-    // IMPORTANT: This part needs to be executed in the browser context.
-    // Since this script runs in Node.js, we can't directly use the client-side `signInWithCustomToken`.
-    // Instead, we will save the user's credentials to a file. The tests will
-    // then use these credentials to log in via the UI, which is a more realistic E2E scenario.
-  };
-
-  // For simplicity and realism, we will not use custom tokens in this setup.
-  // Instead, we'll store credentials for the test runner. Playwright will handle
-  // the login flow through the UI, which is what we want to test.
-  
-  // NOTE: Storing plain text passwords is not ideal for production, but it's
-  // acceptable for a temporary, isolated E2E test environment. The proper way
-  // would involve a more complex setup using custom tokens, which is beyond
-  // the scope of this initial setup.
-
-  // We are not writing a storageState.json file because the login
-  // will be performed through the UI in each test. This ensures the login flow
-  // itself is tested. We are now ready to run the tests.
-
+  // The setup is complete. Tests will now run and use the credentials
+  // stored in process.env to log in through the application's UI.
   console.log('--- E2E Global Setup: Complete ---');
 }
 

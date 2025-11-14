@@ -1,4 +1,3 @@
-
 import { test, expect } from '@playwright/test';
 
 test.describe('Authentication', () => {
@@ -19,7 +18,7 @@ test.describe('Authentication', () => {
     await page.getByLabel('Herhaal wachtwoord').fill(userPassword);
     
     // Select gender
-    await page.getByRole('combobox', { name: 'Selecteer je geslacht' }).click();
+    await page.getByRole('combobox', { name: 'Geslacht' }).click();
     await page.getByRole('option', { name: 'Jongen' }).click();
 
     // Accept terms

@@ -1,5 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
 
 // Use process.env.PORT by default and fallback to port 9002
 const PORT = process.env.PORT || 9002;
@@ -44,8 +43,6 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Use the saved storage state to log in as the test user
-        storageState: path.join(__dirname, 'e2e/storageState.json'),
       },
     },
   ],
