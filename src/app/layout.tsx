@@ -8,6 +8,12 @@ import { ThemeProvider } from '@/components/theme-provider';
 export const metadata: Metadata = {
   title: 'Broos 2.0',
   description: 'Jouw partner in mentaal welzijn.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Broos 2.0',
+  },
 };
 
 export default function RootLayout({
@@ -24,6 +30,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <meta name="theme-color" content="#E8EAF6" />
       </head>
       <body className="h-full font-body antialiased">
         <ThemeProvider
@@ -43,5 +50,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    

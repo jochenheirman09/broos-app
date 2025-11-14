@@ -1,0 +1,21 @@
+{
+  "name": "Broos 2.0",
+  "short_name": "Broos",
+  "description": "Jouw partner in mentaal welzijn voor jonge sporters.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E8EAF6",
+  "theme_color": "#3F51B5",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
