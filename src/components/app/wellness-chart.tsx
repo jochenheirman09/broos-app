@@ -14,7 +14,6 @@ import type { WellnessScore } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { TrendingUp, FileWarning } from "lucide-react";
 import { Spinner } from "../ui/spinner";
-import { placeholderWellnessScores } from "@/lib/placeholder-data";
 import { useState } from "react";
 import { Button } from "../ui/button";
 import {
@@ -95,7 +94,7 @@ export function WellnessChart() {
   const latestScore =
     !isLoading && scoresData && scoresData.length > 0
       ? scoresData[0]
-      : placeholderWellnessScores[0];
+      : null;
 
   if (isLoading) {
     return (

@@ -7,7 +7,6 @@ import type { StaffUpdate } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Users, Activity, HeartPulse } from "lucide-react";
-import { placeholderStaffUpdates } from "@/lib/placeholder-data";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   'Team Performance': <Activity className="h-5 w-5 text-primary" />,
@@ -35,10 +34,6 @@ export function StaffUpdates({ clubId, teamId }: { clubId: string, teamId: strin
     error,
   } = useCollection<StaffUpdate>(updatesQuery);
 
-  const displayUpdates =
-    !isLoading && updates && updates.length > 0
-      ? updates
-      : placeholderStaffUpdates;
 
   if (isLoading) {
     return (
@@ -59,13 +54,13 @@ export function StaffUpdates({ clubId, teamId }: { clubId: string, teamId: strin
     );
   }
 
-  if (displayUpdates.length === 0) {
+  if (!updates || updates.length === 0) {
     return (
       <Alert>
         <Users className="h-4 w-4" />
         <AlertTitle>Nog geen team-inzichten</AlertTitle>
         <AlertDescription>
-          Zodra spelers gesprekken voeren, verschijnen hier analyses en trends voor jouw team.
+          Zodra spelers gesprekken voeren en de dagelijkse analyse is uitgevoerd, verschijnen hier analyses en trends voor jouw team.
         </AlertDescription>
       </Alert>
     );
@@ -73,7 +68,7 @@ export function StaffUpdates({ clubId, teamId }: { clubId: string, teamId: strin
 
   return (
     <div className="space-y-4">
-      {displayUpdates.map((update) => (
+      {updates.map((update) => (
         <div key={update.id} className="p-4 rounded-xl bg-card/50 flex gap-4 items-start shadow-clay-card">
           <div className="mt-1">
              {categoryIcons[update.category as keyof typeof categoryIcons] || categoryIcons.default}

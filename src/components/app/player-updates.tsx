@@ -7,7 +7,6 @@ import type { PlayerUpdate } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Info, Sparkles, Lightbulb, BrainCircuit } from "lucide-react";
-import { placeholderPlayerUpdates } from "@/lib/placeholder-data";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   Sleep: <Lightbulb className="h-5 w-5 text-primary" />,
@@ -35,11 +34,6 @@ export function PlayerUpdates() {
     error,
   } = useCollection<PlayerUpdate>(updatesQuery);
 
-  const displayUpdates =
-    !isLoading && updates && updates.length > 0
-      ? updates
-      : placeholderPlayerUpdates;
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-40">
@@ -59,7 +53,7 @@ export function PlayerUpdates() {
     );
   }
 
-  if (displayUpdates.length === 0) {
+  if (!updates || updates.length === 0) {
     return (
       <Alert>
         <Sparkles className="h-4 w-4" />
@@ -73,7 +67,7 @@ export function PlayerUpdates() {
 
   return (
     <div className="space-y-4">
-      {displayUpdates.map((update) => (
+      {updates.map((update) => (
         <div key={update.id} className="p-4 rounded-xl bg-card/50 flex gap-4 items-start shadow-clay-card">
           <div className="mt-1">
              {categoryIcons[update.category] || categoryIcons.default}
