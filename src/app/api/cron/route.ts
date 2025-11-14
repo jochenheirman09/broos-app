@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { TeamAnalysisInput, analyzeTeamData } from '@/ai/flows/team-analysis-flow';
-import type { UserProfile, Team, WellnessScore, WithId } from '@/lib/types';
+import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
 
 // Initialize Firebase Admin SDK if it hasn't been already.
@@ -46,17 +46,20 @@ async function runAnalysis() {
           const score = wellnessSnapshot.docs[0].data() as WellnessScore;
           playersData.push({
             userId: player.id,
+            name: player.name,
             scores: score,
           });
         }
       }
 
       if (playersData.length > 0) {
-        const analysisInput: TeamAnalysisInput = { teamId: team.id, playersData };
+        const analysisInput: TeamAnalysisInput = { teamId: team.id, teamName: team.name, playersData };
         const analysisResult = await analyzeTeamData(analysisInput);
 
+        const today = new Date();
+        
+        // Save the data summary
         if (analysisResult?.summary) {
-          const today = new Date();
           const summaryId = `weekly-${getYear(today)}-${getISOWeek(today)}`;
           const summaryRef = teamDoc.ref.collection('summaries').doc(summaryId);
           
@@ -68,6 +71,17 @@ async function runAnalysis() {
           }, { merge: true });
 
           analysisCount++;
+        }
+
+        // Save the generated insight (StaffUpdate)
+        if (analysisResult?.insight) {
+            const insightRef = teamDoc.ref.collection('staffUpdates').doc();
+            const insightData: StaffUpdate = {
+                ...analysisResult.insight,
+                id: insightRef.id,
+                date: format(today, 'yyyy-MM-dd'),
+            };
+            await insightRef.set(insightData);
         }
       }
     }

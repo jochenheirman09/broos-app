@@ -1,6 +1,7 @@
+
 "use server";
 /**
- * @fileOverview A Genkit flow for analyzing team wellness data and generating summaries.
+ * @fileOverview A Genkit flow for analyzing team wellness data and generating summaries and insights.
  *
  * - analyzeTeamData - A function that handles the team data analysis.
  * - TeamAnalysisInput - The input type for the analyzeTeamData function.
@@ -14,17 +15,19 @@ import { WellnessScoreSchema } from "@/ai/types";
 // Define the shape of a single player's data for input
 const PlayerWellnessDataSchema = z.object({
   userId: z.string(),
+  name: z.string(),
   scores: WellnessScoreSchema,
 });
 
 // Define the input for the analysis flow
 export const TeamAnalysisInputSchema = z.object({
   teamId: z.string(),
+  teamName: z.string(),
   playersData: z.array(PlayerWellnessDataSchema),
 });
 export type TeamAnalysisInput = z.infer<typeof TeamAnalysisInputSchema>;
 
-// Define the output schema for the team summary
+// Define the output schema for the team summary (data part)
 export const TeamSummarySchema = z.object({
   averageMood: z.number().optional(),
   averageStress: z.number().optional(),
@@ -35,9 +38,20 @@ export const TeamSummarySchema = z.object({
 });
 export type TeamSummary = z.infer<typeof TeamSummarySchema>;
 
+// Define the output schema for the generated insight (StaffUpdate)
+export const StaffUpdateSchema = z.object({
+    title: z.string().describe("Een korte, pakkende titel voor het inzicht."),
+    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een staflid/coach."),
+    category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']).describe("De categorie van het inzicht."),
+});
+export type StaffUpdate = Omit<z.infer<typeof StaffUpdateSchema>, 'id' | 'date'>;
+
+
+// Define the final output schema for the entire flow
 export const TeamAnalysisOutputSchema = z.object({
   teamId: z.string(),
   summary: TeamSummarySchema,
+  insight: StaffUpdateSchema.optional(),
 });
 export type TeamAnalysisOutput = z.infer<typeof TeamAnalysisOutputSchema>;
 
@@ -49,6 +63,32 @@ export async function analyzeTeamData(
 }
 
 
+const insightPrompt = ai.definePrompt({
+    name: 'generateStaffInsight',
+    input: { schema: z.object({ teamName: z.string(), summary: TeamSummarySchema, playerCount: z.number() }) },
+    output: { schema: StaffUpdateSchema },
+    prompt: `
+        You are a sports data analyst creating a concise insight for a youth football coach.
+        Based on the following weekly wellness summary for team '{{{teamName}}}' with {{{playerCount}}} players, generate one actionable insight.
+
+        **Data:**
+        - Average Mood: {{{summary.averageMood}}} (1-5 scale)
+        - Average Stress: {{{summary.averageStress}}} (1-5 scale)
+        - Average Sleep: {{{summary.averageSleep}}} (1-5 scale)
+        - Average Motivation: {{{summary.averageMotivation}}} (1-5 scale)
+        - Total Injuries: {{{summary.injuryCount}}}
+        - Common Topics Discussed: {{{summary.commonTopics}}}
+
+        **Task:**
+        1.  Analyze the data to find the most significant trend, risk, or positive point.
+        2.  Write a short, clear title.
+        3.  Write a concise, actionable 'content' explaining the insight. If a score is low, suggest action. If it's high, give encouragement. If there's a risk, highlight it.
+        4.  Choose the most appropriate category: 'Player Wellness', 'Injury Risk', or 'Team Performance'.
+        5.  **Output must be in Dutch.**
+    `
+});
+
+
 const teamAnalysisFlow = ai.defineFlow(
   {
     name: "teamAnalysisFlow",
@@ -56,11 +96,7 @@ const teamAnalysisFlow = ai.defineFlow(
     outputSchema: TeamAnalysisOutputSchema,
   },
   async (input) => {
-    // This is a placeholder implementation.
-    // In a real scenario, this would involve more complex logic,
-    // potentially calling another LLM to find correlations or generate insights.
-
-    const { playersData } = input;
+    const { playersData, teamId, teamName } = input;
     const playerCount = playersData.length;
 
     if (playerCount === 0) {
@@ -88,27 +124,13 @@ const teamAnalysisFlow = ai.defineFlow(
 
     for (const playerData of playersData) {
       const { scores } = playerData;
-      if (scores.mood) {
-        totals.mood += scores.mood;
-        totals.moodCount++;
-      }
-      if (scores.stress) {
-        totals.stress += scores.stress;
-        totals.stressCount++;
-      }
-       if (scores.sleep) {
-        totals.sleep += scores.sleep;
-        totals.sleepCount++;
-      }
-       if (scores.motivation) {
-        totals.motivation += scores.motivation;
-        totals.motivationCount++;
-      }
-      if (scores.injury) {
-        injuryCount++;
-      }
+      if (scores.mood) { totals.mood += scores.mood; totals.moodCount++; }
+      if (scores.stress) { totals.stress += scores.stress; totals.stressCount++; }
+      if (scores.sleep) { totals.sleep += scores.sleep; totals.sleepCount++; }
+      if (scores.motivation) { totals.motivation += scores.motivation; totals.motivationCount++; }
+      if (scores.injury) { injuryCount++; }
       if (scores.freeText) {
-          const topics = scores.freeText.split(" ").filter(t => t.length > 3); // simplistic
+          const topics = scores.freeText.split(" ").filter(t => t.length > 3);
           for(const topic of topics) {
               allTopics.set(topic, (allTopics.get(topic) || 0) + 1);
           }
@@ -116,17 +138,28 @@ const teamAnalysisFlow = ai.defineFlow(
     }
 
     const summary: TeamSummary = {
-      averageMood: totals.moodCount > 0 ? totals.mood / totals.moodCount : undefined,
-      averageStress: totals.stressCount > 0 ? totals.stress / totals.stressCount : undefined,
-      averageSleep: totals.sleepCount > 0 ? totals.sleep / totals.sleepCount : undefined,
-      averageMotivation: totals.motivationCount > 0 ? totals.motivation / totals.motivationCount : undefined,
+      averageMood: totals.moodCount > 0 ? parseFloat((totals.mood / totals.moodCount).toFixed(1)) : undefined,
+      averageStress: totals.stressCount > 0 ? parseFloat((totals.stress / totals.stressCount).toFixed(1)) : undefined,
+      averageSleep: totals.sleepCount > 0 ? parseFloat((totals.sleep / totals.sleepCount).toFixed(1)) : undefined,
+      averageMotivation: totals.motivationCount > 0 ? parseFloat((totals.motivation / totals.motivationCount).toFixed(1)) : undefined,
       injuryCount,
       commonTopics: [...allTopics.entries()].sort((a,b) => b[1] - a[1]).slice(0, 3).map(e => e[0]),
     };
 
+    // Now, call the insight prompt
+    let insight: StaffUpdate | undefined = undefined;
+    try {
+        const insightResult = await insightPrompt({ teamName, summary, playerCount });
+        insight = insightResult.output;
+    } catch (e) {
+        console.error("Failed to generate staff insight:", e);
+        // Do not block the flow, just return summary
+    }
+
     return {
       teamId: input.teamId,
       summary,
+      insight,
     };
   }
 );
