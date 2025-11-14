@@ -35,6 +35,7 @@ export interface Club {
   id: string;
   name:string;
   ownerId: string;
+  invitationCode?: string;
 }
 
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';

@@ -2,7 +2,7 @@
 
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
-import type { Club } from "@/lib/types";
+import type { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import {
   Card,
@@ -11,17 +11,22 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, BookOpen, BarChart2 } from "lucide-react";
+import { Building, BookOpen, BarChart2, RefreshCw, KeyRound, Copy } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
 import { KnowledgeBaseStats } from "./knowledge-base-stats";
+import { Button } from "../ui/button";
+import { generateClubInvitationCode } from "@/lib/firebase/firestore/club";
+import { useToast } from "@/hooks/use-toast";
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const clubRef = useMemoFirebase(
     () => (firestore ? doc(firestore, "clubs", clubId) : null),
@@ -32,6 +37,35 @@ function ClubManagement({ clubId }: { clubId: string }) {
   const handleTeamChange = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  const handleGenerateCode = async () => {
+    if (!club) return;
+    setIsGenerating(true);
+    try {
+      await generateClubInvitationCode(firestore, club.id);
+      toast({
+        title: "Code gegenereerd!",
+        description: `Een nieuwe uitnodigingscode is gegenereerd voor ${club.name}.`,
+      });
+      // The useDoc hook will automatically show the new code
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Fout",
+        description: "Kon geen uitnodigingscode genereren.",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast({
+      title: "Gekopieerd!",
+      description: "Uitnodigingscode voor de club gekopieerd naar klembord.",
+    });
+  };
 
   if (isLoading) {
     return (
@@ -59,13 +93,42 @@ function ClubManagement({ clubId }: { clubId: string }) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center text-2xl font-bold">
-            <Building className="h-7 w-7 mr-3 text-primary" />
-            {club.name}
-          </CardTitle>
-          <CardDescription>
-            Bekijk hieronder club-brede inzichten die dagelijks automatisch worden bijgewerkt.
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                  <CardTitle className="flex items-center text-2xl font-bold">
+                    <Building className="h-7 w-7 mr-3 text-primary" />
+                    {club.name}
+                  </CardTitle>
+                  <CardDescription>
+                    Bekijk hieronder club-brede inzichten die dagelijks automatisch worden bijgewerkt.
+                  </CardDescription>
+              </div>
+               <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {club.invitationCode ? (
+                         <div className="flex items-center gap-2 w-full">
+                           <span className="font-mono text-base bg-muted px-4 py-2 rounded-lg shadow-clay-inset flex-grow text-center">
+                               {club.invitationCode}
+                           </span>
+                           <Button variant="ghost" size="icon" onClick={() => copyToClipboard(club.invitationCode!)} aria-label="Kopieer club code">
+                               <Copy className="h-5 w-5" />
+                           </Button>
+                           <Button variant="ghost" size="icon" onClick={handleGenerateCode} disabled={isGenerating} aria-label="Genereer nieuwe club code">
+                               <RefreshCw className="h-5 w-5" />
+                           </Button>
+                       </div>
+                    ) : (
+                       <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={handleGenerateCode}
+                            disabled={isGenerating}
+                        >
+                            {isGenerating ? <Spinner size="small" className="mr-2" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                            Genereer Club Code
+                        </Button>
+                    )}
+                </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <ClubUpdates clubId={club.id} />

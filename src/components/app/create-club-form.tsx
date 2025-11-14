@@ -10,6 +10,7 @@ import { Spinner } from "../ui/spinner";
 import { createClub } from "@/lib/firebase/firestore/club";
 import { useFirestore } from "@/firebase";
 import Link from "next/link";
+import { Separator } from "../ui/separator";
 
 export function CreateClubForm() {
   const { user } = useUser();
@@ -58,28 +59,45 @@ export function CreateClubForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="name">Clubnaam</Label>
-          <Input
-            id="name"
-            name="name"
-            placeholder="bv. Real Madrid"
-            required
-            value={clubName}
-            onChange={(e) => setClubName(e.target.value)}
-          />
-        </div>
-        <Button type="submit" className="w-full" disabled={isLoading} size="lg">
-          {isLoading && <Spinner size="small" className="mr-2" />}
-          {isLoading ? "Club aanmaken..." : "Club aanmaken"}
-        </Button>
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nieuwe Clubnaam</Label>
+            <Input
+              id="name"
+              name="name"
+              placeholder="bv. Real Madrid"
+              required
+              value={clubName}
+              onChange={(e) => setClubName(e.target.value)}
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={isLoading} size="lg">
+            {isLoading && <Spinner size="small" className="mr-2" />}
+            {isLoading ? "Club aanmaken..." : "Nieuwe club aanmaken"}
+          </Button>
+      </form>
 
-         <div className="text-center text-sm">
-            <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                Of sluit je aan bij een bestaande club
-            </Link>
+      <div className="relative">
+        <Separator />
+        <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
         </div>
-    </form>
+        <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+            Of
+            </span>
+        </div>
+      </div>
+
+      <div className="text-center">
+          <Button variant="outline" asChild className="w-full">
+            <Link href="/join-club">
+                Sluit je aan bij een bestaande club
+            </Link>
+          </Button>
+      </div>
+
+    </div>
   );
 }

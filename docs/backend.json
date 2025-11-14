@@ -121,6 +121,10 @@
         "ownerId": {
           "type": "string",
           "description": "The UID of the user who owns the club."
+        },
+        "invitationCode": {
+          "type": "string",
+          "description": "A unique code for other responsible users to join the club."
         }
       },
       "required": [

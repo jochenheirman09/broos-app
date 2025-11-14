@@ -3,8 +3,19 @@
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { collection, doc, writeBatch, getDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, writeBatch, getDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+
+// Function to generate a random 8-character alphanumeric code
+const generateCode = (length = 8) => {
+  const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
 
 export async function createClub(
   db: ReturnType<typeof useFirestore>,
@@ -34,7 +45,7 @@ export async function createClub(
   const querySnapshot = await getDocs(q);
 
   if (!querySnapshot.empty) {
-    throw new Error(`Een club met de naam "${clubName}" bestaat al. Vraag de beheerder om je toegang te geven.`);
+    throw new Error(`Een club met de naam "${clubName}" bestaat al. Vraag de clubbeheerder om je toegang te geven.`);
   }
 
   const batch = writeBatch(db);
@@ -43,6 +54,7 @@ export async function createClub(
     name: clubName,
     ownerId: userId,
     id: clubRef.id,
+    invitationCode: generateCode(),
   };
   batch.set(clubRef, clubData);
 
@@ -51,10 +63,8 @@ export async function createClub(
 
   try {
     await batch.commit();
-    const auth = getAuth();
-    if (auth.currentUser) {
-        await auth.currentUser.reload();
-    }
+    // No need to reload user claims, as we are not using them.
+    // The user context will refetch the profile with the new clubId.
   } catch (error) {
     console.error("Batch commit failed in createClub:", error);
 
@@ -73,5 +83,31 @@ export async function createClub(
     errorEmitter.emit("permission-error", userPermissionError);
 
     throw error;
+  }
+}
+
+export async function generateClubInvitationCode(
+  db: ReturnType<typeof useFirestore>,
+  clubId: string
+) {
+  if (!clubId) throw new Error("Club ID is required.");
+  if (!db) throw new Error("Firestore is not available");
+
+  const invitationCode = generateCode();
+  const clubRef = doc(db, "clubs", clubId);
+  const updateData = { invitationCode };
+
+  try {
+    await updateDoc(clubRef, updateData);
+    return invitationCode;
+  } catch (error) {
+    console.error("Error generating club invitation code:", error);
+    const permissionError = new FirestorePermissionError({
+      path: clubRef.path,
+      operation: "update",
+      requestResourceData: updateData,
+    });
+    errorEmitter.emit("permission-error", permissionError);
+    throw permissionError;
   }
 }
