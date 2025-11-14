@@ -4,6 +4,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, App } from 'firebase-admin/app';
 import { TeamAnalysisInput, analyzeTeamData, TeamSummary } from '@/ai/flows/team-analysis-flow';
 import { ClubAnalysisInput, analyzeClubData } from '@/ai/flows/club-analysis-flow';
+import { sendNotification } from '@/ai/flows/notification-flow';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
 
@@ -20,6 +21,7 @@ function initializeFirebaseAdmin(): { db: Firestore } {
 async function runAnalysis() {
   const { db } = initializeFirebaseAdmin();
   let analysisCount = 0;
+  let notificationCount = 0;
 
   const clubsSnapshot = await db.collection('clubs').get();
 
@@ -42,6 +44,19 @@ async function runAnalysis() {
       for (const playerDoc of playersSnapshot.docs) {
         const player = { id: playerDoc.id, ...playerDoc.data() } as WithId<UserProfile>;
         
+        // Send daily check-in notification to players
+        try {
+            await sendNotification({
+                userId: player.id,
+                title: `Tijd voor je check-in, ${player.name.split(' ')[0]}!`,
+                body: `Hoe was je dag? Vertel het aan je buddy.`,
+                link: '/chat'
+            });
+            notificationCount++;
+        } catch (e) {
+            console.error(`Failed to send notification to user ${player.id}:`, e);
+        }
+
         const wellnessSnapshot = await playerDoc.ref.collection('wellnessScores').orderBy('date', 'desc').limit(1).get();
 
         if (!wellnessSnapshot.empty) {
@@ -113,7 +128,7 @@ async function runAnalysis() {
         }
     }
   }
-  return analysisCount;
+  return { analysisCount, notificationCount };
 }
 
 /**
@@ -128,10 +143,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const count = await runAnalysis();
+    const { analysisCount, notificationCount } = await runAnalysis();
     return NextResponse.json({
       success: true,
-      message: `Analysis completed successfully for ${count} teams.`,
+      message: `Analysis completed for ${analysisCount} teams. ${notificationCount} notifications sent.`,
     });
   } catch (error: any) {
     console.error('Cron job failed:', error);

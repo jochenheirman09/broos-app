@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -16,6 +17,7 @@ import { PlayerUpdates } from "./player-updates";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, limit, query } from "firebase/firestore";
 import { Chat } from "@/lib/types";
+import { RequestNotificationPermission } from "./request-notification-permission";
 
 export function PlayerDashboard() {
   const { userProfile, user } = useUser();
@@ -36,6 +38,8 @@ export function PlayerDashboard() {
 
   return (
     <div className="space-y-6">
+       <RequestNotificationPermission />
+
       <Card className="text-center">
         <CardHeader>
           <CardTitle>

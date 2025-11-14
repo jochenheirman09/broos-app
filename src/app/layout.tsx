@@ -1,9 +1,11 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import { UserProvider } from '@/context/user-context';
 import { ThemeProvider } from '@/components/theme-provider';
+import { ForegroundMessageListener } from '@/lib/firebase/messaging';
 
 export const metadata: Metadata = {
   title: 'Broos 2.0',
@@ -43,6 +45,7 @@ export default function RootLayout({
             <UserProvider>
               {children}
               <Toaster />
+              <ForegroundMessageListener />
             </UserProvider>
           </FirebaseClientProvider>
         </ThemeProvider>

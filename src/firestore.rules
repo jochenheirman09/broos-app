@@ -1,3 +1,4 @@
+
 /**
  * @file Firestore Security Rules for Broos 2.0 application.
  *
@@ -60,6 +61,13 @@ service cloud.firestore {
         // For simplicity, we allow read/write to any signed-in user,
         // relying on the client not to expose this functionality to wrong roles.
         allow read, write: if isSignedIn();
+      }
+
+      match /fcmTokens/{tokenId} {
+        // A user can only write their own FCM tokens. No one else can read them.
+        allow read: if false;
+        allow list: if false;
+        allow write: if isOwner(userId);
       }
 
       match /trainings/{trainingId} {

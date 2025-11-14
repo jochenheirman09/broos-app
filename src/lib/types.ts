@@ -1,4 +1,5 @@
 
+
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -23,6 +24,11 @@ export interface UserProfile {
   recoveryHabits?: string;
   additionalHobbies?: string;
   acceptedTerms?: boolean;
+}
+
+export interface FcmToken {
+    token: string;
+    createdAt: any; // Firestore ServerTimestamp
 }
 
 export interface Club {
