@@ -8,7 +8,7 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development'
 })
 
-// Laatste poging: 2024-08-01T15:00:00Z - Final Build Fix Attempt
+// Forceer een nieuwe build: 2024-08-01T16:00:00Z
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {

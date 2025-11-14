@@ -1,4 +1,3 @@
-
 "use server";
 /**
  * @fileOverview A Genkit flow for analyzing team wellness data and generating summaries and insights.
@@ -13,7 +12,7 @@ import {
     TeamSummarySchema, 
     StaffUpdateSchema,
     TeamAnalysisOutputSchema,
-    WellnessScoreSchema, 
+    WellnessScoreSchema, // Import the missing schema
     type TeamAnalysisInput, 
     type TeamAnalysisOutput,
     type TeamSummary,
