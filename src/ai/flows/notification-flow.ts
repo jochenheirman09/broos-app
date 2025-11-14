@@ -9,7 +9,8 @@ import { z } from 'genkit';
 import { getMessaging, Message } from 'firebase-admin/messaging';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { FcmToken } from '@/lib/types';
-import { NotificationInputSchema, type NotificationInput } from '@/ai/types';
+import type { NotificationInput } from '@/ai/types';
+import { NotificationInputSchema } from '@/ai/types';
 
 
 export async function sendNotification(

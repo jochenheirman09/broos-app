@@ -2,22 +2,6 @@
 import { z } from 'genkit';
 import type { Gender } from '@/lib/types';
 
-export const BuddyInputSchema = z.object({
-  buddyName: z.string().describe('The name of the AI buddy.'),
-  userName: z.string().describe("The user's name."),
-  userAge: z.number().describe("The user's age."),
-  userGender: z.custom<Gender>().describe("The user's gender, either 'male' or 'female'."),
-  userMessage: z.string().describe("The user's latest message."),
-  agentResponse: z.string().optional().describe('The previous response from the agent.'),
-  chatHistory: z
-    .string()
-    .optional()
-    .describe('The history of the conversation so far.'),
-  onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
-  knowledgeBaseContext: z.string().optional().describe('Context retrieved from the knowledge base.'),
-});
-export type BuddyInput = z.infer<typeof BuddyInputSchema>;
-
 export const WellnessScoreSchema = z.object({
   mood: z.optional(z.number().min(1).max(5)),
   moodReason: z.optional(z.string().describe("The reasoning behind the mood score.")),
@@ -42,6 +26,22 @@ export const WellnessScoreSchema = z.object({
   freeText: z.optional(z.string()),
   shareWithStaff: z.optional(z.boolean()),
 });
+
+export const BuddyInputSchema = z.object({
+  buddyName: z.string().describe('The name of the AI buddy.'),
+  userName: z.string().describe("The user's name."),
+  userAge: z.number().describe("The user's age."),
+  userGender: z.custom<Gender>().describe("The user's gender, either 'male' or 'female'."),
+  userMessage: z.string().describe("The user's latest message."),
+  agentResponse: z.string().optional().describe('The previous response from the agent.'),
+  chatHistory: z
+    .string()
+    .optional()
+    .describe('The history of the conversation so far.'),
+  onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
+  knowledgeBaseContext: z.string().optional().describe('Context retrieved from the knowledge base.'),
+});
+export type BuddyInput = z.infer<typeof BuddyInputSchema>;
 
 export const PlayerInfoSchema = z.object({
     familySituation: z.optional(z.string().describe("Summary of the player's family life and composition.")),
