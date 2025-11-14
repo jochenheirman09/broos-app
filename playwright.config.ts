@@ -35,7 +35,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        // Add these arguments to run headless Chrome in a containerized environment
+        launchOptions: {
+          args: ['--no-sandbox', '--disable-gpu']
+        }
+      },
     },
   ],
 
