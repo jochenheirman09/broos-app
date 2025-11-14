@@ -1,15 +1,16 @@
-
 "use server";
 /**
  * @fileOverview A Genkit flow for ingesting documents into the knowledge base.
  */
-import { ingestFlow } from './ingest-flow-internal';
-import type { DocInput } from '@/ai/types';
 
+import { z } from "genkit";
+import { DocInputSchema } from '@/ai/types';
+import { ingestFlow } from './ingest-flow-internal'; // <<< NEW IMPORT
 
-// This file now only contains the 'use server' export wrapper
-export async function ingestDocument(
-  input: DocInput
-): Promise<{ success: boolean; message: string }> {
+// This file now only wraps the flow function for server action export.
+export const ingestDocument = async (
+  input: z.infer<typeof DocInputSchema>
+): Promise<{ success: boolean; message: string }> => {
     return ingestFlow(input);
 };
+// All flow definition is now in ingest-flow-internal.ts
