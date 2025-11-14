@@ -148,7 +148,7 @@ export function ChatInterface() {
             userAge: userProfile.birthDate
                 ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
                 : 18,
-            userGender: userProfile.gender || 'prefer_not_to_say',
+            userGender: userProfile.gender || 'male',
             userMessage: '', 
             chatHistory: '', 
             onboardingCompleted: !!userProfile.onboardingCompleted,
@@ -255,7 +255,7 @@ export function ChatInterface() {
         buddyName: buddyName,
         userName: firstName,
         userAge: userProfile.birthDate ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear() : 18,
-        userGender: userProfile.gender || 'prefer_not_to_say',
+        userGender: userProfile.gender || 'male',
         userMessage: userMessageContent,
         chatHistory: chatHistory,
         agentResponse: agentResponse,

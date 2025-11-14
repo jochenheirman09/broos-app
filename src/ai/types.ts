@@ -6,7 +6,7 @@ export const BuddyInputSchema = z.object({
   buddyName: z.string().describe('The name of the AI buddy.'),
   userName: z.string().describe("The user's name."),
   userAge: z.number().describe("The user's age."),
-  userGender: z.custom<Gender>().describe("The user's gender."),
+  userGender: z.custom<Gender>().describe("The user's gender, either 'male' or 'female'."),
   userMessage: z.string().describe("The user's latest message."),
   agentResponse: z.string().optional().describe('The previous response from the agent.'),
   chatHistory: z

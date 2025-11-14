@@ -36,14 +36,11 @@ import type { UserRole, Gender } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Checkbox } from "../ui/checkbox";
 import Link from "next/link";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
-const genders: { value: Gender; label: string }[] = [
-    { value: "male", label: "Jongen" },
-    { value: "female", label: "Meisje" },
-    { value: "other", label: "Andere" },
-    { value: "prefer_not_to_say", label: "Zeg ik liever niet" },
+const genders: { value: Gender; labelPlayer: string; labelAdult: string }[] = [
+  { value: "male", labelPlayer: "Jongen", labelAdult: "Man" },
+  { value: "female", labelPlayer: "Meisje", labelAdult: "Vrouw" },
 ];
 
 
@@ -58,7 +55,7 @@ const formSchema = z
       .min(6, { message: "Wachtwoord moet minstens 6 tekens bevatten." }),
     confirmPassword: z.string(),
     role: z.enum(roles, { required_error: "Selecteer een rol." }),
-    gender: z.enum(["male", "female", "other", "prefer_not_to_say"], {
+    gender: z.enum(["male", "female"], {
       required_error: "Selecteer je geslacht.",
     }),
     acceptedTerms: z.boolean().refine((val) => val === true, {
@@ -92,6 +89,8 @@ export function RegisterForm() {
       acceptedTerms: false,
     },
   });
+
+  const watchedRole = form.watch("role");
 
   useEffect(() => {
     if (selectedRole && roles.includes(selectedRole)) {
@@ -212,26 +211,24 @@ export function RegisterForm() {
           control={form.control}
           name="gender"
           render={({ field }) => (
-            <FormItem className="space-y-3">
+            <FormItem>
               <FormLabel>Geslacht</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                  className="flex flex-col space-y-1"
-                >
-                    {genders.map(gender => (
-                        <FormItem key={gender.value} className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                                <RadioGroupItem value={gender.value} />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                                {gender.label}
-                            </FormLabel>
-                        </FormItem>
-                    ))}
-                </RadioGroup>
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecteer je geslacht" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {genders.map((gender) => (
+                    <SelectItem key={gender.value} value={gender.value}>
+                      {watchedRole === "player"
+                        ? gender.labelPlayer
+                        : gender.labelAdult}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -40,7 +41,7 @@
         "gender": {
           "type": "string",
           "description": "The gender of the user.",
-          "enum": ["male", "female", "other", "prefer_not_to_say"]
+          "enum": ["male", "female"]
         },
         "teamId": {
           "type": "string",
