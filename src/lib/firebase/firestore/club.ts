@@ -4,7 +4,7 @@
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { collection, doc, writeBatch, getDoc } from "firebase/firestore";
+import { collection, doc, writeBatch, getDoc, query, where, getDocs } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 export async function createClub(
@@ -29,6 +29,20 @@ export async function createClub(
   if (userDoc.data().clubId) {
     throw new Error("User already has a club.");
   }
+
+  // --- NIEUWE VALIDATIE ---
+  // Controleer of er al een club met deze naam bestaat.
+  // We gebruiken een query om dit te controleren.
+  const clubsRef = collection(db, "clubs");
+  const q = query(clubsRef, where("name", "==", clubName));
+  const querySnapshot = await getDocs(q);
+
+  if (!querySnapshot.empty) {
+    // Als de query resultaten oplevert, bestaat de clubnaam al.
+    throw new Error(`Een club met de naam "${clubName}" bestaat al.`);
+  }
+  // --- EINDE NIEUWE VALIDATIE ---
+
 
   const batch = writeBatch(db);
   const clubRef = doc(collection(db, "clubs"));
