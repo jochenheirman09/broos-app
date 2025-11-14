@@ -3,10 +3,6 @@
 /**
  * @fileOverview A Genkit flow for analyzing aggregated team data at the club level
  * to generate high-level insights for the club responsible.
- *
- * - analyzeClubData - A function that handles the club-level data analysis.
- * - ClubAnalysisInput - The input type for the analyzeClubData function.
- * - ClubAnalysisOutput - The return type for the analyzeClubData function.
  */
 
 import { ai } from '@/ai/genkit';

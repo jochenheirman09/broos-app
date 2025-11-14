@@ -16,20 +16,21 @@ import {
   type BuddyOutput,
 } from '@/ai/types';
 import { customFirestoreRetriever } from '@/ai/retriever';
-import { Document } from 'genkit/retriever';
 
-
+// This function is the only export from this file.
+// It is an async function that can be called from server-side components.
 export async function chatWithBuddy(
   input: BuddyInput
 ): Promise<BuddyOutput> {
   return buddyFlow(input);
 }
 
+// The prompt is defined within the file and is not exported.
 const buddyPrompt = ai.definePrompt({
   name: 'buddyPrompt',
   input: { schema: BuddyInputSchema },
   output: { schema: BuddyOutputSchema },
-  retriever: customFirestoreRetriever, // Pass the async retriever function directly
+  retriever: customFirestoreRetriever,
   prompt: `
     You are an AI agent named {{{buddyName}}}. You act as a highly skilled, understanding, and empathetic psychologist, specializing in child and sports psychology for the 12-18 age group.
 
@@ -100,6 +101,7 @@ const buddyPrompt = ai.definePrompt({
   `,
 });
 
+// The flow is also defined within the file and is not exported.
 const buddyFlow = ai.defineFlow(
   {
     name: 'buddyFlow',

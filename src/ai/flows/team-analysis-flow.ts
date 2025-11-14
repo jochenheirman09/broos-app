@@ -48,7 +48,7 @@ const insightPrompt = ai.definePrompt({
         1.  Analyze the data to find the most significant trend, risk, or positive point.
         2.  Write a short, clear title.
         3.  Write a concise, actionable 'content' explaining the insight. If a score is low, suggest action. If it's high, give encouragement. If there's a risk, highlight it.
-        4.  Choose the most appropriate category: 'Player Wellness', 'Injury Risk', or 'Team Performance'.
+        4.  Choose the most appropriate category: 'Player Wellness', 'Injury Risk', 'Team Performance'.
         5.  **Output must be in Dutch.**
     `
 });

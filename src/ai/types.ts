@@ -2,31 +2,35 @@
 import { z } from 'genkit';
 import type { Gender } from '@/lib/types';
 
+// Schema for Wellness Scores - This is now the single source of truth.
 export const WellnessScoreSchema = z.object({
-  mood: z.optional(z.number().min(1).max(5)),
-  moodReason: z.optional(z.string().describe("The reasoning behind the mood score.")),
-  stress: z.optional(z.number().min(1).max(5)),
-  stressReason: z.optional(z.string().describe("The reasoning behind the stress score.")),
-  sleep: z.optional(z.number().min(1).max(5)),
-  sleepReason: z.optional(z.string().describe("The reasoning behind the sleep score.")),
-  motivation: z.optional(z.number().min(1).max(5)),
-  motivationReason: z.optional(z.string().describe("The reasoning behind the motivation score.")),
-  rest: z.optional(z.number().min(1).max(5)),
-  restReason: z.optional(z.string().describe("The reasoning behind the rest score.")),
-  familyLife: z.optional(z.number().min(1).max(5)),
-  familyLifeReason: z.optional(z.string().describe("The reasoning behind the family life score.")),
-  school: z.optional(z.number().min(1).max(5)),
-  schoolReason: z.optional(z.string().describe("The reasoning behind the school score.")),
-  hobbys: z.optional(z.number().min(1).max(5)),
-  hobbysReason: z.optional(z.string().describe("The reasoning behind the hobbys score.")),
-  food: z.optional(z.number().min(1).max(5)),
-  foodReason: z.optional(z.string().describe("The reasoning behind the food score.")),
-  injury: z.optional(z.boolean()),
-  injuryReason: z.optional(z.string().describe("The reasoning behind the injury status.")),
-  freeText: z.optional(z.string()),
-  shareWithStaff: z.optional(z.boolean()),
+  mood: z.optional(z.number().min(1).max(5)).describe("Score for mood."),
+  moodReason: z.optional(z.string()).describe("Reason for mood score."),
+  stress: z.optional(z.number().min(1).max(5)).describe("Score for stress."),
+  stressReason: z.optional(z.string()).describe("Reason for stress score."),
+  sleep: z.optional(z.number().min(1).max(5)).describe("Score for sleep quality."),
+  sleepReason: z.optional(z.string()).describe("Reason for sleep score."),
+  motivation: z.optional(z.number().min(1).max(5)).describe("Score for motivation."),
+  motivationReason: z.optional(z.string()).describe("Reason for motivation score."),
+  rest: z.optional(z.number().min(1).max(5)).describe("Score for rest."),
+  restReason: z.optional(z.string()).describe("Reason for rest score."),
+  familyLife: z.optional(z.number().min(1).max(5)).describe("Score for family life."),
+  familyLifeReason: z.optional(z.string()).describe("Reason for family life score."),
+  school: z.optional(z.number().min(1).max(5)).describe("Score for school situation."),
+  schoolReason: z.optional(z.string()).describe("Reason for school score."),
+  hobbys: z.optional(z.number().min(1).max(5)).describe("Score for hobbies."),
+  hobbysReason: z.optional(z.string()).describe("Reason for hobbies score."),
+  food: z.optional(z.number().min(1).max(5)).describe("Score for nutrition."),
+  foodReason: z.optional(z.string()).describe("Reason for nutrition score."),
+  injury: z.optional(z.boolean()).describe("Is the player injured?"),
+  injuryReason: z.optional(z.string()).describe("Reason for injury status."),
+  freeText: z.optional(z.string()).describe("Free text input from the user."),
+  shareWithStaff: z.optional(z.boolean()).describe("Whether to share info with staff."),
 });
+export type WellnessScore = z.infer<typeof WellnessScoreSchema>;
 
+
+// Schema for Buddy Flow Input
 export const BuddyInputSchema = z.object({
   buddyName: z.string().describe('The name of the AI buddy.'),
   userName: z.string().describe("The user's name."),
@@ -43,6 +47,7 @@ export const BuddyInputSchema = z.object({
 });
 export type BuddyInput = z.infer<typeof BuddyInputSchema>;
 
+// Schema for Player Info gathered during onboarding
 export const PlayerInfoSchema = z.object({
     familySituation: z.optional(z.string().describe("Summary of the player's family life and composition.")),
     schoolSituation: z.optional(z.string().describe("Summary of the player's school life and social circle.")),
@@ -52,6 +57,7 @@ export const PlayerInfoSchema = z.object({
     additionalHobbies: z.optional(z.string().describe("Summary of the player's hobbies and relaxation techniques.")),
 });
 
+// Schema for Alerts
 export const AlertSchema = z.object({
   alertType: z
     .enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity'])
@@ -62,6 +68,7 @@ export const AlertSchema = z.object({
 });
 export type Alert = z.infer<typeof AlertSchema>;
 
+// Schema for Buddy Flow Output
 export const BuddyOutputSchema = z.object({
   adaptedResponse: z
     .string()
