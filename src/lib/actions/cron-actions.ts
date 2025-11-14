@@ -9,16 +9,13 @@ import { sendNotification } from '@/ai/flows/notification-flow';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate, PlayerUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
 
-// Initialize Firebase Admin SDK if it hasn't been already.
-function initializeFirebaseAdmin(): { db: Firestore } {
+export async function runCronJobs() {
+  // Initialize Firebase Admin SDK if it hasn't been already, right here.
   if (!getApps().length) {
     initializeApp();
   }
-  return { db: getFirestore() };
-}
-
-export async function runCronJobs() {
-  const { db } = initializeFirebaseAdmin();
+  const db: Firestore = getFirestore();
+  
   let analysisCount = 0;
   let notificationCount = 0;
   const today = new Date();

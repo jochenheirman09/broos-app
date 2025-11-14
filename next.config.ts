@@ -9,7 +9,7 @@ const withPWA = require('next-pwa')({
 })
 
 // Force cache invalidation by adding a comment with a timestamp.
-// Laatste poging: 2024-08-01T12:00:03Z
+// Laatste poging: 2024-08-01T12:00:04Z
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
