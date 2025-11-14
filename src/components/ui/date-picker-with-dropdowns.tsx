@@ -77,8 +77,8 @@ function DatePickerWithDropdowns({
                     };
                 });
             } else if (name === "years") {
-                const earliestYear = fromYear || fromMonth?.getFullYear() || fromDate?.getFullYear();
-                const latestYear = toYear || toMonth?.getFullYear() || toDate?.getFullYear();
+                const earliestYear = fromYear || fromMonth?.getFullYear() || fromDate?.getFullYear() || new Date().getFullYear() - 100;
+                const latestYear = toYear || toMonth?.getFullYear() || toDate?.getFullYear() || new Date().getFullYear();
 
                 if (earliestYear && latestYear) {
                     const years = [];
@@ -95,19 +95,19 @@ function DatePickerWithDropdowns({
                 <Select
                     onValueChange={(newValue) => {
                         if (name === "months") {
-                            const newDate = new Date(caption.props.displayMonth);
+                            const newDate = new Date(props.displayMonth);
                             newDate.setMonth(parseInt(newValue));
-                            caption.props.onMonthChange?.(newDate);
+                            props.onChange?.(newDate);
                         } else if (name === "years") {
-                            const newDate = new Date(caption.props.displayMonth);
+                            const newDate = new Date(props.displayMonth);
                             newDate.setFullYear(parseInt(newValue));
-                            caption.props.onMonthChange?.(newDate);
+                            props.onChange?.(newDate);
                         }
                     }}
                     value={value?.toString()}
                 >
                     <SelectTrigger className="h-8 shadow-none border-0 text-base font-medium focus:ring-0 w-[120px] justify-start capitalize">
-                        <SelectValue>{`${capitalizedName}: ${value}`}</SelectValue>
+                        <SelectValue placeholder={capitalizedName} />
                     </SelectTrigger>
                     <SelectContent>
                         <ScrollArea className="h-72">
@@ -128,17 +128,13 @@ function DatePickerWithDropdowns({
 }
 DatePickerWithDropdowns.displayName = "DatePickerWithDropdowns"
 
-function format(date: Date, format: string): string {
-    const day = date.getDate();
-    const month = date.toLocaleString('default', { month: 'long' });
-    const shortMonth = date.toLocaleString('default', { month: 'short' });
-    const year = date.getFullYear();
-
-    return format
-        .replace('dd', String(day).padStart(2, '0'))
-        .replace('MMMM', month)
-        .replace('MMM', shortMonth)
-        .replace('yyyy', String(year));
+// Helper function to format dates, as it might not be globally available
+function format(date: Date, formatStr: string): string {
+    const months = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
+    if (formatStr === "MMM") {
+        return months[date.getMonth()];
+    }
+    return date.toLocaleDateString(); // Fallback
 }
 
 
