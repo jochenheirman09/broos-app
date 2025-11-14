@@ -4,8 +4,6 @@
  * @fileOverview A Genkit flow for analyzing team wellness data and generating summaries and insights.
  *
  * - analyzeTeamData - A function that handles the team data analysis.
- * - TeamAnalysisInput - The input type for the analyzeTeamData function.
- * - TeamAnalysisOutput - The return type for the analyzeTeamData function.
  */
 
 import { ai } from "@/ai/genkit";
@@ -15,6 +13,7 @@ import {
     TeamSummarySchema, 
     StaffUpdateSchema,
     TeamAnalysisOutputSchema,
+    WellnessScoreSchema, // Import the missing schema
     type TeamAnalysisInput, 
     type TeamAnalysisOutput,
     type TeamSummary,
@@ -26,7 +25,6 @@ export async function analyzeTeamData(
 ): Promise<TeamAnalysisOutput> {
   return teamAnalysisFlow(input);
 }
-
 
 const insightPrompt = ai.definePrompt({
     name: 'generateStaffInsight',
@@ -52,7 +50,6 @@ const insightPrompt = ai.definePrompt({
         5.  **Output must be in Dutch.**
     `
 });
-
 
 const teamAnalysisFlow = ai.defineFlow(
   {

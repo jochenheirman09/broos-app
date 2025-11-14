@@ -56,6 +56,7 @@ export const PlayerInfoSchema = z.object({
     recoveryHabits: z.optional(z.string().describe("Summary of how the player recovers after physical activity.")),
     additionalHobbies: z.optional(z.string().describe("Summary of the player's hobbies and relaxation techniques.")),
 });
+export type PlayerInfo = z.infer<typeof PlayerInfoSchema>;
 
 // Schema for Alerts
 export const AlertSchema = z.object({
@@ -108,6 +109,8 @@ export const PlayerWellnessDataSchema = z.object({
   name: z.string(),
   scores: WellnessScoreSchema,
 });
+export type PlayerWellnessData = z.infer<typeof PlayerWellnessDataSchema>;
+
 
 export const TeamAnalysisInputSchema = z.object({
   teamId: z.string(),
@@ -162,3 +165,4 @@ export type ClubAnalysisOutput = Omit<z.infer<typeof ClubUpdateSchema>, 'id' | '
 export const DocInputSchema = z.object({
   url: z.string().describe("The URL of the document to ingest."),
 });
+export type DocInput = z.infer<typeof DocInputSchema>;
