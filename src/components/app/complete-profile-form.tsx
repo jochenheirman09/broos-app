@@ -36,7 +36,7 @@ import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { Team } from "@/lib/types";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
-import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
+import { DatePickerWithDropdowns } from "@/components/ui/date-picker-with-dropdowns";
 
 const formSchema = z.object({
   birthDate: z.date({
