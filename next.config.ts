@@ -8,7 +8,7 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development'
 })
 
-// Final build fix attempt. 2024-08-01T15:00:00Z - Cache Bust 6
+// Final build fix attempt. 2024-08-01T15:00:00Z - Cache Bust 7
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {

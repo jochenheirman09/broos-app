@@ -3,8 +3,8 @@
 
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { TeamAnalysisInput, analyzeTeamData, TeamSummary } from '@/ai/flows/team-analysis-flow';
-import { ClubAnalysisInput, analyzeClubData } from '@/ai/flows/club-analysis-flow';
+import { analyzeTeamData, type TeamAnalysisInput, type TeamSummary } from '@/ai/flows/team-analysis-flow';
+import { analyzeClubData, type ClubAnalysisInput } from '@/ai/flows/club-analysis-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate, PlayerUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
@@ -37,7 +37,7 @@ export async function runCronJobs() {
       
       if (playersSnapshot.empty) continue;
       
-      const playersData = [];
+      const playersData: { userId: string; name: string; scores: WellnessScore }[] = [];
       const staffMembers: WithId<UserProfile>[] = [];
 
       for (const playerDoc of playersSnapshot.docs) {
