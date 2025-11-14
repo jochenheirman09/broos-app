@@ -32,13 +32,16 @@ service cloud.firestore {
     }
 
     function isResponsible() {
-        // Use `get` on the `users` path to check the role of the requesting user.
-        // This is necessary because `resource.data` is not available on `list` operations.
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
     }
     
+    function isMemberOfClub(clubId) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
+    }
+
     // Allow team lookup by invitation code for any signed-in user
     match /{path=**}/teams/{teamId} {
+      allow get: if isSignedIn();
       allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode';
     }
 
@@ -59,6 +62,11 @@ service cloud.firestore {
         // For simplicity, we allow read/write to any signed-in user,
         // relying on the client not to expose this functionality to wrong roles.
         allow read, write: if isSignedIn();
+      }
+      
+      match /fcmTokens/{tokenId} {
+        allow read, list: if false; // No one can read/list tokens
+        allow write: if isOwner(userId); // User can only manage their own tokens
       }
 
       match /trainings/{trainingId} {
@@ -104,11 +112,14 @@ service cloud.firestore {
 
       match /teams/{teamId} {
         allow get: if isSignedIn();
-        // Only club owner can list, create, update, or delete teams.
-        allow list, create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/clubs/$(clubId)).data.ownerId == request.auth.uid;
+        // Allow list, create, update, delete if the user is a responsible member of this club.
+        allow list, create, update, delete: if isResponsible() && isMemberOfClub(clubId);
 
         match /summaries/{summaryId} {
-            allow read, write: if isSignedIn(); // Trusted client
+            // Can be read by any authenticated user (client filters for role).
+            // Can only be written by the backend (cron job).
+            allow read: if isSignedIn();
+            allow write: if false;
         }
 
         match /staffUpdates/{updateId} {

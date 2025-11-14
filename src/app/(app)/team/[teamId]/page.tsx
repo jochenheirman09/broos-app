@@ -178,12 +178,6 @@ export default function TeamMembersPage({
                 Fout bij het laden van teamleden
               </div>
               <p className="text-sm">{error}</p>
-              <details className="mt-2 text-xs bg-black/10 p-2 rounded">
-                  <summary>Technische Details</summary>
-                  <pre className="mt-2 p-2 bg-black/50 text-white rounded-md max-w-full overflow-x-auto whitespace-pre-wrap">
-                    {error}
-                  </pre>
-              </details>
             </div>
           )}
           {!isLoading && !error && members && members.length > 0 && (
