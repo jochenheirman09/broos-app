@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { createClub } from "@/lib/firebase/firestore/club";
 import { useFirestore } from "@/firebase";
+import Link from "next/link";
 
 export function CreateClubForm() {
   const { user } = useUser();
@@ -38,25 +39,18 @@ export function CreateClubForm() {
 
     setIsLoading(true);
 
-    // This is a critical operation, so we await it.
-    // The non-blocking approach is more for frequent, less critical UI updates.
     try {
       await createClub(firestore, user.uid, clubName);
       toast({
         title: "Succes!",
         description: "Je club is aangemaakt.",
       });
-      // The user context will update automatically and redirect
-      // so we don't need to force a router.push here.
-    } catch (error) {
-      // Error is already emitted by createClub, so we don't need to re-emit.
-      // We can show a generic toast message.
+    } catch (error: any) {
       console.error("Fout bij het maken van de club:", error);
       toast({
         variant: "destructive",
         title: "Fout bij het maken van de club",
-        description:
-          "Je hebt mogelijk geen toestemming of er is een onverwachte fout opgetreden.",
+        description: error.message || "Er is een onverwachte fout opgetreden.",
       });
     } finally {
       setIsLoading(false);
@@ -64,8 +58,7 @@ export function CreateClubForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="name">Clubnaam</Label>
           <Input
@@ -81,7 +74,12 @@ export function CreateClubForm() {
           {isLoading && <Spinner size="small" className="mr-2" />}
           {isLoading ? "Club aanmaken..." : "Club aanmaken"}
         </Button>
-      </div>
+
+         <div className="text-center text-sm">
+            <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                Of sluit je aan bij een bestaande club
+            </Link>
+        </div>
     </form>
   );
 }

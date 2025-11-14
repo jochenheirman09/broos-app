@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useFirestore } from "@/firebase";
@@ -30,19 +29,13 @@ export async function createClub(
     throw new Error("User already has a club.");
   }
 
-  // --- NIEUWE VALIDATIE ---
-  // Controleer of er al een club met deze naam bestaat.
-  // We gebruiken een query om dit te controleren.
   const clubsRef = collection(db, "clubs");
   const q = query(clubsRef, where("name", "==", clubName));
   const querySnapshot = await getDocs(q);
 
   if (!querySnapshot.empty) {
-    // Als de query resultaten oplevert, bestaat de clubnaam al.
-    throw new Error(`Een club met de naam "${clubName}" bestaat al.`);
+    throw new Error(`Een club met de naam "${clubName}" bestaat al. Vraag de beheerder om je toegang te geven.`);
   }
-  // --- EINDE NIEUWE VALIDATIE ---
-
 
   const batch = writeBatch(db);
   const clubRef = doc(collection(db, "clubs"));
@@ -58,14 +51,8 @@ export async function createClub(
 
   try {
     await batch.commit();
-    // After successful commit, force a refresh of the user's ID token.
-    // This isn't strictly necessary for Firestore data changes, but good practice
-    // if custom claims were involved. More importantly, we can trigger a state update.
     const auth = getAuth();
     if (auth.currentUser) {
-        // This is a bit of a hack. The user context listens to onAuthStateChanged and onSnapshot.
-        // The onSnapshot should pick up the user document change, but sometimes it can be slow.
-        // A full user reload can sometimes help trigger listeners faster.
         await auth.currentUser.reload();
     }
   } catch (error) {
