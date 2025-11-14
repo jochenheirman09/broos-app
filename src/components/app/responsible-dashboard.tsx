@@ -18,8 +18,6 @@ import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
 import { KnowledgeBaseStats } from "./knowledge-base-stats";
-import Link from 'next/link';
-import { Button } from '../ui/button';
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
@@ -66,16 +64,10 @@ function ClubManagement({ clubId }: { clubId: string }) {
             {club.name}
           </CardTitle>
           <CardDescription>
-            Beheer hieronder je teams en bekijk club-brede inzichten.
+            Bekijk hieronder club-brede inzichten die dagelijks automatisch worden bijgewerkt.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-            <Link href="/analysis" passHref>
-                <Button variant="outline" className="w-full">
-                    <BarChart2 className="mr-2 h-4 w-4" />
-                    Ga naar Analyse Dashboard
-                </Button>
-            </Link>
           <ClubUpdates clubId={club.id} />
         </CardContent>
       </Card>

@@ -39,6 +39,7 @@ service cloud.firestore {
     
     // Allow team lookup by invitation code for any signed-in user
     match /{path=**}/teams/{teamId} {
+      allow get: if isSignedIn();
       allow list: if isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'invitationCode';
     }
 
@@ -108,7 +109,10 @@ service cloud.firestore {
         allow list, create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/clubs/$(clubId)).data.ownerId == request.auth.uid;
 
         match /summaries/{summaryId} {
-            allow read, write: if isSignedIn(); // Trusted client
+            // Can be read by any authenticated user (client filters for role).
+            // Can only be written by the backend (cron job).
+            allow read: if isSignedIn();
+            allow write: if false;
         }
 
         match /staffUpdates/{updateId} {
@@ -116,6 +120,14 @@ service cloud.firestore {
             allow write: if false;
         }
       }
+    }
+
+    match /knowledge_base/{docId} {
+      allow get: if isResponsible();
+      allow write: if false; 
+    }
+    match /knowledge_base {
+       allow list: if isResponsible();
     }
   }
 }
