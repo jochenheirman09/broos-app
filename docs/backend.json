@@ -1,0 +1,595 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the Broos 2.0 application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role in the application (player, staff, or responsible).",
+          "format": "string"
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Indicates whether the user's email address has been verified."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "The ID of the club the user belongs to. For players and staff, this is denormalized from the team. For responsibles, it's their own club."
+        },
+        "name": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "birthDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Player's birth date."
+        },
+        "gender": {
+          "type": "string",
+          "description": "The gender of the user.",
+          "enum": ["male", "female"]
+        },
+        "teamId": {
+          "type": "string",
+          "description": "The ID of the team the user belongs to."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "The URL of the user's profile picture."
+        },
+        "buddyName": {
+            "type": "string",
+            "description": "The custom name for the AI buddy."
+        },
+        "buddyAvatar": {
+            "type": "string",
+            "description": "The custom avatar for the AI buddy. Can be a predefined ID or a data URL for custom uploads."
+        },
+        "onboardingCompleted": {
+          "type": "boolean",
+          "description": "Flag indicating if the initial 'get-to-know-you' chat sequence is complete."
+        },
+        "familySituation": {
+          "type": "string",
+          "description": "AI-generated summary of the player's family life and composition."
+        },
+        "schoolSituation": {
+          "type": "string",
+          "description": "AI-generated summary of the player's school life and social circle."
+        },
+        "personalGoals": {
+          "type": "string",
+          "description": "AI-generated summary of the player's ambitions in football and life."
+        },
+        "matchPreparation": {
+          "type": "string",
+          "description": "AI-generated summary of the player's match preparation routines."
+        },
+        "recoveryHabits": {
+          "type": "string",
+          "description": "AI-generated summary of how the player recovers after physical activity."
+        },
+        "additionalHobbies": {
+          "type": "string",
+          "description": "AI-generated summary of the player's hobbies and relaxation techniques."
+        },
+        "acceptedTerms": {
+          "type": "boolean",
+          "description": "Indicates whether the user has accepted the terms and conditions."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "role",
+        "emailVerified",
+        "name"
+      ]
+    },
+    "Club": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Club",
+      "type": "object",
+      "description": "Represents a club managed within the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Club entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the club."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the club."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns the club."
+        },
+        "invitationCode": {
+          "type": "string",
+          "description": "A unique code for other responsible users to join the club."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "ownerId"
+      ]
+    },
+    "Team": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Team",
+      "type": "object",
+      "description": "Represents a team within a club.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Team entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the team."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "The ID of the club this team belongs to."
+        },
+        "invitationCode": {
+          "type": "string",
+          "description": "A unique code to join the team."
+        },
+        "schedule": {
+          "type": "object",
+          "description": "Weekly schedule for the team.",
+          "properties": {
+            "monday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "tuesday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "wednesday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "thursday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "friday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "saturday": { "type": "string", "enum": ["training", "game", "rest"] },
+            "sunday": { "type": "string", "enum": ["training", "game", "rest"] }
+          }
+        }
+      },
+      "required": ["id", "name", "clubId"]
+    },
+    "PlayerTraining": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PlayerTraining",
+      "type": "object",
+      "description": "Represents an individual training session added by a player.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the training session." },
+        "userId": { "type": "string", "description": "The ID of the user this training belongs to." },
+        "date": { "type": "string", "format": "date", "description": "The date of the training." },
+        "description": { "type": "string", "description": "A brief description of the training." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "date", "description"]
+    },
+    "WellnessScore": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "WellnessScore",
+      "type": "object",
+      "description": "Represents a player's daily wellness scores, generated by the AI buddy.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The date of the score entry in YYYY-MM-DD format."
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of the score."
+        },
+        "mood": { "type": "number", "minimum": 1, "maximum": 5 },
+        "moodReason": { "type": "string" },
+        "stress": { "type": "number", "minimum": 1, "maximum": 5 },
+        "stressReason": { "type": "string" },
+        "sleep": { "type": "number", "minimum": 1, "maximum": 5 },
+        "sleepReason": { "type": "string" },
+        "motivation": { "type": "number", "minimum": 1, "maximum": 5 },
+        "motivationReason": { "type": "string" },
+        "rest": { "type": "number", "minimum": 1, "maximum": 5 },
+        "restReason": { "type": "string" },
+        "familyLife": { "type": "number", "minimum": 1, "maximum": 5 },
+        "familyLifeReason": { "type": "string" },
+        "school": { "type": "number", "minimum": 1, "maximum": 5 },
+        "schoolReason": { "type": "string" },
+        "hobbys": { "type": "number", "minimum": 1, "maximum": 5 },
+        "hobbysReason": { "type": "string" },
+        "food": { "type": "number", "minimum": 1, "maximum": 5 },
+        "foodReason": { "type": "string" },
+        "injury": { "type": "boolean" },
+        "injuryReason": { "type": "string" },
+        "freeText": { "type": "string" },
+        "shareWithStaff": { "type": "boolean" },
+        "summary": { "type": "string", "description": "An AI-generated summary of the conversation for that day." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "date", "updatedAt"]
+    },
+    "Chat": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Chat",
+      "type": "object",
+      "description": "Represents a daily chat session between a user and the AI buddy.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The ID of the chat session, typically the date (YYYY-MM-DD)."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user participating in the chat."
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "The date of the chat session."
+        },
+        "summary": {
+          "type": "string",
+          "description": "An AI-generated summary of the conversation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last update."
+        }
+      },
+      "required": ["id", "userId", "date"]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single message within a chat session.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the message."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"],
+          "description": "The role of the message sender."
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the message."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The time the message was sent."
+        }
+      },
+      "required": ["id", "role", "content", "timestamp"]
+    },
+    "Alert": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Alert",
+      "type": "object",
+      "description": "Represents an alert triggered by the AI based on a user's message.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the alert." },
+        "userId": { "type": "string", "description": "The ID of the user who triggered the alert." },
+        "date": { "type": "string", "format": "date", "description": "The date the alert was triggered." },
+        "alertType": {
+          "type": "string",
+          "enum": ["Mental Health", "Aggression", "Substance Abuse", "Extreme Negativity"],
+          "description": "The category of the alert."
+        },
+        "triggeringMessage": { "type": "string", "description": "The message that triggered the alert." },
+        "status": {
+          "type": "string",
+          "enum": ["new", "acknowledged", "resolved"],
+          "description": "The status of the alert."
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the alert was created." }
+      },
+      "required": ["id", "userId", "date", "alertType", "triggeringMessage", "status", "createdAt"]
+    },
+    "PlayerUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PlayerUpdate",
+      "type": "object",
+      "description": "Represents an insightful update or 'weetje' for a player, comparing their data to the team average.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the update." },
+        "title": { "type": "string", "description": "The headline of the update." },
+        "content": { "type": "string", "description": "The detailed content of the update." },
+        "category": { "type": "string", "enum": ["Sleep", "Nutrition", "Motivation", "Stress", "Wellness"], "description": "The category of the update." },
+        "date": { "type": "string", "format": "date", "description": "The date the update was generated." }
+      },
+      "required": ["id", "title", "content", "category", "date"]
+    },
+    "StaffUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StaffUpdate",
+      "type": "object",
+      "description": "Represents an insight for staff about team-level trends.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["Team Performance", "Player Wellness", "Injury Risk"] },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "title", "content", "category", "date"]
+    },
+    "ClubUpdate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ClubUpdate",
+      "type": "object",
+      "description": "Represents a high-level insight for club management.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["Club Trends", "Team Comparison", "Resource Suggestion"] },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "title", "content", "category", "date"]
+    },
+    "TeamSummary": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "TeamSummary",
+        "type": "object",
+        "description": "Represents an aggregated summary of a team's wellness scores.",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier for the summary, e.g., 'weekly-2024-20'." },
+            "teamId": { "type": "string" },
+            "date": { "type": "string", "format": "date" },
+            "averageMood": { "type": "number" },
+            "averageStress": { "type": "number" },
+            "averageSleep": { "type": "number" },
+            "averageMotivation": { "type": "number" },
+            "injuryCount": { "type": "number" },
+            "commonTopics": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["id", "teamId", "date"]
+    },
+    "KnowledgeDocument": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "KnowledgeDocument",
+        "type": "object",
+        "description": "Represents a document in the knowledge base.",
+        "properties": {
+            "id": { "type": "string", "description": "Unique identifier for the document." },
+            "name": { "type": "string", "description": "The file name of the document." },
+            "firestorePath": { "type": "string", "description": "The path to the document in the Firestore knowledge_base collection." },
+            "status": { "type": "string", "enum": ["pending", "ingesting", "completed", "error"], "description": "The ingestion status of the document." },
+            "ingestedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "name", "firestorePath", "status"]
+    },
+    "KnowledgeUsageStat": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "KnowledgeUsageStat",
+        "type": "object",
+        "description": "Represents usage statistics for a knowledge base document.",
+        "properties": {
+            "id": { "type": "string", "description": "The document ID this stat corresponds to." },
+            "queryCount": { "type": "number", "description": "How many times this document was retrieved for a query." },
+            "lastQueried": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "queryCount"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user data, including role and email verification status. Uses path-based ownership for private user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/wellnessScores/{scoreId}",
+        "definition": {
+          "entityName": "WellnessScore",
+          "schema": { "$ref": "#/backend/entities/WellnessScore" },
+          "description": "Stores daily wellness scores for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "scoreId", "description": "The score's ID (YYYY-MM-DD)." }
+          ]
+        }
+      },
+       {
+        "path": "/users/{userId}/trainings/{trainingId}",
+        "definition": {
+          "entityName": "PlayerTraining",
+          "schema": { "$ref": "#/backend/entities/PlayerTraining" },
+          "description": "Stores individual training sessions for a user.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "trainingId", "description": "The unique ID of the training." }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/chats/{chatId}",
+        "definition": {
+          "entityName": "Chat",
+          "schema": { "$ref": "#/backend/entities/Chat" },
+          "description": "Stores daily chat sessions for a user.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "chatId", "description": "The chat session ID (YYYY-MM-DD)." }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/chats/{chatId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": { "$ref": "#/backend/entities/ChatMessage" },
+          "description": "Stores individual messages within a chat session.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "chatId", "description": "The chat session ID (YYYY-MM-DD)." },
+            { "name": "messageId", "description": "The message's unique ID." }
+          ]
+        }
+      },
+       {
+        "path": "/users/{userId}/alerts/{alertId}",
+        "definition": {
+          "entityName": "Alert",
+          "schema": { "$ref": "#/backend/entities/Alert" },
+          "description": "Stores alerts triggered for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "alertId", "description": "The unique ID of the alert." }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/updates/{updateId}",
+        "definition": {
+          "entityName": "PlayerUpdate",
+          "schema": { "$ref": "#/backend/entities/PlayerUpdate" },
+          "description": "Stores generated insights and updates for a player.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "updateId", "description": "The unique ID of the update." }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}",
+        "definition": {
+          "entityName": "Club",
+          "schema": {
+            "$ref": "#/backend/entities/Club"
+          },
+          "description": "Stores club data. Club is 1:1 with the User, which contains the clubId.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique identifier of the club."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/clubs/{clubId}/clubUpdates/{updateId}",
+        "definition": {
+          "entityName": "ClubUpdate",
+          "schema": { "$ref": "#/backend/entities/ClubUpdate" },
+          "description": "Stores high-level generated insights for club management.",
+          "params": [
+            { "name": "clubId", "description": "The club's ID." },
+            { "name": "updateId", "description": "The unique ID of the update." }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/teams/{teamId}",
+        "definition": {
+          "entityName": "Team",
+          "schema": {
+            "$ref": "#/backend/entities/Team"
+          },
+          "description": "Stores team data as a subcollection of a club.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique identifier of the club."
+            },
+            {
+              "name": "teamId",
+              "description": "The unique identifier of the team."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/teams/{teamId}/summaries/{summaryId}",
+        "definition": {
+          "entityName": "TeamSummary",
+          "schema": { "$ref": "#/backend/entities/TeamSummary" },
+          "description": "Stores aggregated wellness summaries for a team.",
+          "params": [
+            { "name": "clubId", "description": "The club's ID." },
+            { "name": "teamId", "description": "The team's ID." },
+            { "name": "summaryId", "description": "The summary's ID (e.g., 'weekly-2024-20')." }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/teams/{teamId}/staffUpdates/{updateId}",
+        "definition": {
+          "entityName": "StaffUpdate",
+          "schema": { "$ref": "#/backend/entities/StaffUpdate" },
+          "description": "Stores generated insights about the team for staff.",
+          "params": [
+            { "name": "clubId", "description": "The club's ID." },
+            { "name": "teamId", "description": "The team's ID." },
+            { "name": "updateId", "description": "The unique ID of the update." }
+          ]
+        }
+      },
+      {
+        "path": "/knowledge_base/{docId}",
+        "definition": {
+            "entityName": "KnowledgeDocument",
+            "schema": { "$ref": "#/backend/entities/KnowledgeDocument" },
+            "description": "Stores metadata about documents in the knowledge base for RAG.",
+            "params": [
+                { "name": "docId", "description": "The unique ID of the document." }
+            ]
+        }
+      },
+      {
+        "path": "/knowledge_stats/{statId}",
+        "definition": {
+            "entityName": "KnowledgeUsageStat",
+            "schema": { "$ref": "#/backend/entities/KnowledgeUsageStat" },
+            "description": "Stores usage stats for knowledge base documents.",
+            "params": [
+                { "name": "statId", "description": "The document ID the stat corresponds to." }
+            ]
+        }
+      }
+    ],
+    "reasoning": "This design prioritizes security and scalability for the Broos 2.0 application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages, wellness scores, alerts and player updates are stored in subcollections under the user, ensuring data privacy and easy retrieval. Team summaries are stored under the team, allowing for aggregated analysis. Knowledge base documents and usage statistics are stored in root collections, allowing club responsibles to manage them and the AI to retrieve them efficiently for all users."
+  }
+}
