@@ -9,6 +9,18 @@ import { useDoc, type UseDocResult } from './firestore/use-doc';
 import { useCollection, type UseCollectionResult } from './firestore/use-collection';
 import { FirebaseProvider, useMemoFirebase } from './provider';
 
+// --- DEBUG LOGGING: Log raw process.env values ---
+console.log("--- Firebase Config Debug ---");
+console.log("Raw NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+console.log("Raw NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+console.log("Raw NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+console.log("Raw NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+console.log("Raw NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID);
+console.log("Raw NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
+console.log("Raw NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID:", process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID);
+console.log("--- End Debug ---");
+
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -20,7 +32,7 @@ const firebaseConfig = {
               };
 
               // Log the configuration to the console for debugging purposes
-              console.log("Firebase Config Loaded:", {
+              console.log("Firebase Config Object:", {
                 apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
                   authDomain: firebaseConfig.authDomain,
                     projectId: firebaseConfig.projectId,
