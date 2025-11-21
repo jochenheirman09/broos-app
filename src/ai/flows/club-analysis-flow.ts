@@ -10,13 +10,11 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
 import {
   ClubAnalysisInputSchema,
   ClubUpdateSchema,
   type ClubAnalysisInput,
   type ClubAnalysisOutput,
-  TeamSummarySchema
 } from '@/ai/types';
 
 
@@ -71,3 +69,5 @@ const clubAnalysisFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

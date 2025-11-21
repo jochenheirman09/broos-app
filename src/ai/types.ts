@@ -116,6 +116,7 @@ export const StaffUpdateSchema = z.object({
     content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een staflid/coach."),
     category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']).describe("De categorie van het inzicht."),
 });
+export type StaffUpdate = Omit<z.infer<typeof StaffUpdateSchema>, 'id' | 'date'>;
 
 export const TeamAnalysisOutputSchema = z.object({
   teamId: z.string(),
@@ -142,3 +143,5 @@ export const ClubUpdateSchema = z.object({
     category: z.enum(['Club Trends', 'Team Comparison', 'Resource Suggestion']).describe("De meest passende categorie voor het inzicht."),
 });
 export type ClubAnalysisOutput = Omit<z.infer<typeof ClubUpdateSchema>, 'id' | 'date'>;
+
+    

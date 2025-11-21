@@ -5,11 +5,10 @@
  *
  * - analyzeTeamData - A function that handles the team data analysis.
  * - TeamAnalysisInput - The input type for the analyzeTeamData function.
- * - TeamAnalysisOutput - The return type for the analyzeTeamData function.
+ * - TeamAnalysisOutput - The return type for the analyzeTeamfFlunction.
  */
 
 import { ai } from "@/ai/genkit";
-import { z } from "genkit";
 import {
   TeamAnalysisInputSchema,
   TeamAnalysisOutputSchema,
@@ -18,7 +17,6 @@ import {
   type TeamAnalysisInput,
   type TeamAnalysisOutput,
   type TeamSummary,
-  type StaffUpdate,
 } from "@/ai/types";
 
 export async function analyzeTeamData(
@@ -112,10 +110,10 @@ const teamAnalysisFlow = ai.defineFlow(
     };
 
     // Now, call the insight prompt
-    let insight: Omit<StaffUpdate, 'id' | 'date'> | undefined = undefined;
+    let insight: TeamAnalysisOutput['insight'] | undefined = undefined;
     try {
-        const insightResult = await insightPrompt({ teamName, summary, playerCount });
-        insight = insightResult.output;
+        const { output } = await insightPrompt({ teamName, summary, playerCount });
+        insight = output;
     } catch (e) {
         console.error("Failed to generate staff insight:", e);
         // Do not block the flow, just return summary
@@ -128,3 +126,5 @@ const teamAnalysisFlow = ai.defineFlow(
     };
   }
 );
+
+    
