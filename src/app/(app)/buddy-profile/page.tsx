@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -16,7 +17,7 @@ import { Sparkles, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "@/components/app/predefined-avatars";
 import { useUser } from "@/context/user-context";
-import { useFirestore } from "@/firebase";
+import { useFirestore } from "@/firebase/client-provider";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -58,14 +59,13 @@ export default function BuddyProfilePage() {
         buddyAvatar: selectedAvatar,
       };
 
-      updateUserProfile({ db, userId: user.uid, data: updates });
+      await updateUserProfile({ db, userId: user.uid, data: updates });
       
       toast({
         title: "Opgeslagen!",
         description: "De gegevens van je buddy zijn bijgewerkt.",
       });
     } catch (error) {
-      console.error("Error updating buddy profile:", error);
       // The updateUserProfile function handles emitting the detailed error
       toast({ variant: "destructive", title: "Fout", description: "Kon de buddy-gegevens niet opslaan." });
     } finally {

@@ -42,7 +42,7 @@ export function AddTrainingDialog({
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!user) {
         toast({ variant: "destructive", title: "Niet ingelogd"});
         return;
@@ -58,17 +58,21 @@ export function AddTrainingDialog({
 
     setIsLoading(true);
     
-    // Non-blocking write
-    addPlayerTraining({
-      db,
-      userId: user.uid,
-      date,
-      description,
-    });
+    try {
+        await addPlayerTraining({
+            db,
+            userId: user.uid,
+            date,
+            description,
+        });
 
-    // Optimistic UI update
-    onTrainingAdded();
-    setIsLoading(false);
+        // Optimistic UI update
+        onTrainingAdded();
+    } catch(error) {
+        // Error is already emitted by the firestore function
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (

@@ -1,6 +1,6 @@
+
 "use client";
 
-import { useFirestore } from "@/firebase";
 import {
   collection,
   writeBatch,
