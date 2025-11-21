@@ -10,10 +10,10 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 import {
   ClubAnalysisInputSchema,
   ClubUpdateSchema,
-  TeamSummarySchema,
   type ClubAnalysisInput,
   type ClubAnalysisOutput,
 } from '@/ai/types';

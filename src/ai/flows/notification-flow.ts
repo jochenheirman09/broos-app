@@ -5,7 +5,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import { z } from 'genkit';
 import { getMessaging, Message } from 'firebase-admin/messaging';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { FcmToken } from '@/lib/types';

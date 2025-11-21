@@ -1,9 +1,10 @@
+
 "use server";
 /**
  * @fileOverview A Genkit flow for ingesting documents into the knowledge base.
  */
 import { ai } from "@/ai/genkit";
-import { z } from "genkit";
+import { z } from "zod";
 import { textEmbeddingGecko } from "@genkit-ai/google-genai";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";

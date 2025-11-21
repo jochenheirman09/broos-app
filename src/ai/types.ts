@@ -1,5 +1,5 @@
 
-import { z } from 'genkit';
+import { z } from 'zod';
 import type { Gender } from '@/lib/types';
 
 export const ScoreSchema = z.object({
@@ -99,7 +99,7 @@ export const TeamSummarySchema = z.object({
 });
 export type TeamSummary = z.infer<typeof TeamSummarySchema>;
 
-const PlayerWellnessDataSchema = z.object({
+export const PlayerWellnessDataSchema = z.object({
   userId: z.string(),
   name: z.string(),
   scores: ScoreSchema,
