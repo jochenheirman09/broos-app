@@ -19,6 +19,15 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// Log the configuration to the console for debugging purposes
+console.log("Firebase Config Loaded:", {
+  apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+  appId: firebaseConfig.appId ? '***' : 'MISSING'
+});
+
+
 interface FirebaseServices {
   firebaseApp: FirebaseApp;
   auth: Auth;
