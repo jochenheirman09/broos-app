@@ -30,7 +30,7 @@ const firebaseConfig = {
   authDomain: "studio-5690519872-e0869.firebaseapp.com",
   projectId: "studio-5690519872-e0869",
   storageBucket: "studio-5690519872-e0869.firebasestorage.app",
-  messagingSenderId: "796529432751",
+  messagingSenderId: "Y796529432751",
   appId: "1:796529432751:web:da147b13f407d67aaf9c5a",
   measurementId: "G-14976CYFEK",
 };
@@ -38,11 +38,8 @@ const firebaseConfig = {
 
 export function FirebaseClientProvider({ children }: { children: ReactNode }) {
   const firebaseServices = useMemo(() => {
-    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-      console.error("Firebase config values are placeholders. Please replace them in src/firebase/client-provider.tsx.");
-      // Initialize with dummy values to prevent crashes, but functionality will be broken.
-      const app = getApps().length > 0 ? getApp() : initializeApp({apiKey: "dummy-key", projectId: "dummy-project"});
-      return { firebaseApp: app, auth: getAuth(app), firestore: getFirestore(app) };
+    if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
+      console.warn("Firebase config is not fully configured with your keys. Please edit src/firebase/client-provider.tsx");
     }
     const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     return {

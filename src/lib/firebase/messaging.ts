@@ -22,10 +22,12 @@ export const useRequestNotificationPermission = () => {
         
         if (permission === 'granted') {
             
-            // IMPORTANT: Replace this placeholder with your actual VAPID key from Firebase Project Settings > Cloud Messaging.
+            // IMPORTANT: Replace the placeholder below with your actual VAPID key from the Firebase console.
+            // This is a public key, so it's safe to have in client-side code.
             const vapidKey = "BL921KtlXxkQTzzC4WqKljW4tDBR-2bOC2U828WlzXGWdGAz24u_ZkrtDEnhgLwJw-rIpe-nhK4naJPbt-CoPLo";
+
             if (vapidKey === "BL921KtlXxkQTzzC4WqKljW4tDBR-2bOC2U828WlzXGWdGAz24u_ZkrtDEnhgLwJw-rIpe-nhK4naJPbt-CoPLo") {
-                console.error("VAPID key is a placeholder. Please replace it in src/lib/firebase/messaging.ts.");
+                console.error("VAPID key is not configured. Please add it to src/lib/firebase/messaging.ts");
                 return;
             }
 
