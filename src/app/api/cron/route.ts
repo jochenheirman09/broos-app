@@ -2,10 +2,10 @@
 import { NextResponse } from 'next/server';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, App } from 'firebase-admin/app';
-import { type TeamAnalysisInput, analyzeTeamData } from '@/ai/flows/team-analysis-flow';
-import { type ClubAnalysisInput, analyzeClubData } from '@/ai/flows/club-analysis-flow';
-import { type TeamSummary } from '@/ai/types';
+import { analyzeTeamData } from '@/ai/flows/team-analysis-flow';
+import { analyzeClubData } from '@/ai/flows/club-analysis-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
+import type { TeamAnalysisInput, ClubAnalysisInput, TeamSummary } from '@/ai/types';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
 

@@ -2,21 +2,6 @@
 import { z } from 'genkit';
 import type { Gender } from '@/lib/types';
 
-export const BuddyInputSchema = z.object({
-  buddyName: z.string().describe('The name of the AI buddy.'),
-  userName: z.string().describe("The user's name."),
-  userAge: z.number().describe("The user's age."),
-  userGender: z.custom<Gender>().describe("The user's gender, either 'male' or 'female'."),
-  userMessage: z.string().describe("The user's latest message."),
-  agentResponse: z.string().optional().describe('The previous response from the agent.'),
-  chatHistory: z
-    .string()
-    .optional()
-    .describe('The history of the conversation so far.'),
-  onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
-});
-export type BuddyInput = z.infer<typeof BuddyInputSchema>;
-
 export const ScoreSchema = z.object({
   mood: z.optional(z.number().min(1).max(5)),
   moodReason: z.optional(z.string().describe("The reasoning behind the mood score.")),
@@ -62,6 +47,22 @@ export const AlertSchema = z.object({
     .describe("The user's message that triggered the alert."),
 });
 export type Alert = z.infer<typeof AlertSchema>;
+
+export const BuddyInputSchema = z.object({
+  buddyName: z.string().describe('The name of the AI buddy.'),
+  userName: z.string().describe("The user's name."),
+  userAge: z.number().describe("The user's age."),
+  userGender: z.custom<Gender>().describe("The user's gender, either 'male' or 'female'."),
+  userMessage: z.string().describe("The user's latest message."),
+  agentResponse: z.string().optional().describe('The previous response from the agent.'),
+  chatHistory: z
+    .string()
+    .optional()
+    .describe('The history of the conversation so far.'),
+  onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
+});
+export type BuddyInput = z.infer<typeof BuddyInputSchema>;
+
 
 export const BuddyOutputSchema = z.object({
   adaptedResponse: z
@@ -144,4 +145,12 @@ export const ClubUpdateSchema = z.object({
 });
 export type ClubAnalysisOutput = Omit<z.infer<typeof ClubUpdateSchema>, 'id' | 'date'>;
 
-    
+
+// Schemas for notification-flow
+export const NotificationInputSchema = z.object({
+  userId: z.string(),
+  title: z.string(),
+  body: z.string(),
+  link: z.string().optional(),
+});
+export type NotificationInput = z.infer<typeof NotificationInputSchema>;

@@ -13,6 +13,7 @@ import { ai } from '@/ai/genkit';
 import {
   ClubAnalysisInputSchema,
   ClubUpdateSchema,
+  TeamSummarySchema,
   type ClubAnalysisInput,
   type ClubAnalysisOutput,
 } from '@/ai/types';
@@ -48,7 +49,7 @@ const insightPrompt = ai.definePrompt({
         1.  Analyze the data to identify the most important club-wide trend, a notable comparison between teams, or a suggestion for a resource.
         2.  Write a short, clear, strategic title for the insight.
         3.  Write concise, actionable 'content' explaining the insight for club management.
-        4.  Choose the most appropriate category: 'Club Trends', 'Team Comparison', or 'Resource Suggestion'.
+        4.  Choose the most appropriate category: 'Club Trends', 'Team Comparison', of 'Resource Suggestion'.
         5.  **Output MUST be in Dutch.**
     `
 });
@@ -69,5 +70,3 @@ const clubAnalysisFlow = ai.defineFlow(
     return output!;
   }
 );
-
-    

@@ -14,6 +14,7 @@ import {
   TeamAnalysisOutputSchema,
   TeamSummarySchema,
   StaffUpdateSchema,
+  ScoreSchema,
   type TeamAnalysisInput,
   type TeamAnalysisOutput,
   type TeamSummary,
@@ -126,5 +127,3 @@ const teamAnalysisFlow = ai.defineFlow(
     };
   }
 );
-
-    
