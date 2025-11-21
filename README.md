@@ -12,6 +12,22 @@ npm run dev
 
 Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
 
+## Troubleshooting
+
+### Probleem: `.gitignore` wordt opgeslagen als `.gitignore.txt`
+
+Op sommige Windows-systemen kan het opslaan van een bestand met de naam `.gitignore` ertoe leiden dat het wordt opgeslagen als `.gitignore.txt`. Git herkent dit `.txt`-bestand niet, waardoor bestanden die genegeerd zouden moeten worden (zoals `.env` of `env.txt`) toch worden meegenomen.
+
+**Oplossing:**
+
+Voer het volgende commando uit in uw terminal (in de hoofdmap van het project) om het bestand correct te hernoemen:
+
+```bash
+ren .gitignore.txt .gitignore
+```
+
+Als uw bestand een andere naam heeft gekregen (bijv. `gitignore.txt`), pas het commando dan dienovereenkomstig aan. Nadat u dit hebt gedaan, zal Git het bestand correct herkennen en de juiste bestanden negeren.
+
 ## End-to-End (E2E) Testing with Playwright
 
 This project uses [Playwright](https://playwright.dev/) for end-to-end testing. The tests simulate real user interactions to ensure the application works as expected from start to finish.
