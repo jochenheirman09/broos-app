@@ -17,7 +17,7 @@ import { Sparkles, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "@/components/app/predefined-avatars";
 import { useUser } from "@/context/user-context";
-import { useFirestore } from "@/firebase";
+import { useFirestore } from "@/firebase/client-provider";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -100,7 +100,7 @@ export default function BuddyProfilePage() {
 
   const renderSelectedAvatar = () => {
     if (selectedAvatar && selectedAvatar.startsWith('data:image')) {
-         return <img src={selectedAvatar} alt="Gek選舉n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
+         return <img src={selectedAvatar} alt="Gek选举n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
     }
     const PredefinedComponent = predefinedAvatars.find(a => a.id === selectedAvatar)?.component;
     if (PredefinedComponent) {

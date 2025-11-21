@@ -83,7 +83,7 @@ export function JoinClubForm() {
       };
 
       // Use the centralized update function
-      updateUserProfile({
+      await updateUserProfile({
         db,
         userId: user.uid,
         data: updatedProfile,
