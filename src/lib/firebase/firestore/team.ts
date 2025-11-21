@@ -3,7 +3,7 @@
 import { useFirestore } from "@/firebase/client-provider";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { Schedule } from "@/lib/types";
+import { Schedule, DayOfWeek } from "@/lib/types";
 import {
   collection,
   deleteDoc,
