@@ -22,10 +22,10 @@ export const useRequestNotificationPermission = () => {
         
         if (permission === 'granted') {
             
-            // Get the VAPID key from environment variables
-            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-            if (!vapidKey) {
-                console.error("VAPID key not found. Cannot get FCM token.");
+            // IMPORTANT: Replace this placeholder with your actual VAPID key from Firebase Project Settings > Cloud Messaging.
+            const vapidKey = "BL921KtlXxkQTzzC4WqKljW4tDBR-2bOC2U828WlzXGWdGAz24u_ZkrtDEnhgLwJw-rIpe-nhK4naJPbt-CoPLo";
+            if (vapidKey === "BL921KtlXxkQTzzC4WqKljW4tDBR-2bOC2U828WlzXGWdGAz24u_ZkrtDEnhgLwJw-rIpe-nhK4naJPbt-CoPLo") {
+                console.error("VAPID key is a placeholder. Please replace it in src/lib/firebase/messaging.ts.");
                 return;
             }
 
@@ -60,7 +60,7 @@ export const ForegroundMessageListener = () => {
     const app = useFirebaseApp();
     
     useEffect(() => {
-        if (app && typeof window !== 'undefined') {
+        if (app && typeof window !== 'undefined' && "Notification" in window && Notification.permission === 'granted') {
             const messaging = getMessaging(app);
             const unsubscribe = onMessage(messaging, (payload) => {
                 // You can show a custom in-app notification here

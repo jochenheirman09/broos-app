@@ -14,27 +14,6 @@ run: npm run start
 # Optional. Default is 0.
 minInstances: 0
 
-# Specifies the secrets to be made available as environment variables.
-# The `name` must match the environment variable name expected by the app.
-# The `key` must match the secret name in Secret Manager.
-secrets:
-  - name: NEXT_PUBLIC_FIREBASE_API_KEY
-    key: FIREBASE_API_KEY
-  - name: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    key: FIREBASE_AUTH_DOMAIN
-  - name: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    key: FIREBASE_PROJECT_ID
-  - name: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    key: FIREBASE_STORAGE_BUCKET
-  - name: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    key: FIREBASE_MESSAGING_SENDER_ID
-  - name: NEXT_PUBLIC_FIREBASE_APP_ID
-    key: FIREBASE_APP_ID
-  - name: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    key: FIREBASE_MEASUREMENT_ID
-  - name: FIREBASE_ADMIN_SERVICE_ACCOUNT
-    key: FIREBASE_ADMIN_SERVICE_ACCOUNT
-
 # This section configures the continuous deployment for the backend.
 deployment:
   # The repository to deploy from.
