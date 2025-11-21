@@ -41,6 +41,8 @@ export const ScoreSchema = z.object({
   freeText: z.optional(z.string()),
   shareWithStaff: z.optional(z.boolean()),
 });
+export type WellnessScore = z.infer<typeof ScoreSchema>;
+
 
 export const PlayerInfoSchema = z.object({
     familySituation: z.optional(z.string().describe("Summary of the player's family life and composition.")),
@@ -85,4 +87,58 @@ export const BuddyOutputSchema = z.object({
 });
 export type BuddyOutput = z.infer<typeof BuddyOutputSchema>;
 
-    
+// Schemas for team-analysis-flow
+export const TeamSummarySchema = z.object({
+  averageMood: z.number().optional(),
+  averageStress: z.number().optional(),
+  averageSleep: z.number().optional(),
+  averageMotivation: z.number().optional(),
+  injuryCount: z.number(),
+  commonTopics: z.array(z.string()),
+});
+export type TeamSummary = z.infer<typeof TeamSummarySchema>;
+
+const PlayerWellnessDataSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  scores: ScoreSchema,
+});
+
+export const TeamAnalysisInputSchema = z.object({
+  teamId: z.string(),
+  teamName: z.string(),
+  playersData: z.array(PlayerWellnessDataSchema),
+});
+export type TeamAnalysisInput = z.infer<typeof TeamAnalysisInputSchema>;
+
+export const StaffUpdateSchema = z.object({
+    title: z.string().describe("Een korte, pakkende titel voor het inzicht."),
+    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een staflid/coach."),
+    category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']).describe("De categorie van het inzicht."),
+});
+
+export const TeamAnalysisOutputSchema = z.object({
+  teamId: z.string(),
+  summary: TeamSummarySchema,
+  insight: StaffUpdateSchema.optional(),
+});
+export type TeamAnalysisOutput = z.infer<typeof TeamAnalysisOutputSchema>;
+
+
+// Schemas for club-analysis-flow
+export const ClubAnalysisInputSchema = z.object({
+  clubId: z.string(),
+  clubName: z.string(),
+  teamSummaries: z.array(z.object({
+      teamName: z.string(),
+      summary: TeamSummarySchema,
+  })),
+});
+export type ClubAnalysisInput = z.infer<typeof ClubAnalysisInputSchema>;
+
+export const ClubUpdateSchema = z.object({
+    title: z.string().describe("Een korte, strategische titel voor het club-brede inzicht."),
+    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een clubverantwoordelijke. Focus op trends, vergelijkingen of aanbevelingen."),
+    category: z.enum(['Club Trends', 'Team Comparison', 'Resource Suggestion']).describe("De meest passende categorie voor het inzicht."),
+});
+export type ClubAnalysisOutput = Omit<z.infer<typeof ClubUpdateSchema>, 'id' | 'date'>;

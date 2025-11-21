@@ -11,29 +11,13 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { TeamSummarySchema } from '@/ai/flows/team-analysis-flow';
-import type { ClubUpdate } from '@/lib/types';
-
-
-// Define the input for the club analysis flow
-export const ClubAnalysisInputSchema = z.object({
-  clubId: z.string(),
-  clubName: z.string(),
-  teamSummaries: z.array(z.object({
-      teamName: z.string(),
-      summary: TeamSummarySchema,
-  })),
-});
-export type ClubAnalysisInput = z.infer<typeof ClubAnalysisInputSchema>;
-
-
-// Define the output schema for the generated insight (ClubUpdate)
-export const ClubUpdateSchema = z.object({
-    title: z.string().describe("Een korte, strategische titel voor het club-brede inzicht."),
-    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een clubverantwoordelijke. Focus op trends, vergelijkingen of aanbevelingen."),
-    category: z.enum(['Club Trends', 'Team Comparison', 'Resource Suggestion']).describe("De meest passende categorie voor het inzicht."),
-});
-export type ClubAnalysisOutput = Omit<z.infer<typeof ClubUpdateSchema>, 'id' | 'date'>;
+import {
+  ClubAnalysisInputSchema,
+  ClubUpdateSchema,
+  type ClubAnalysisInput,
+  type ClubAnalysisOutput,
+  TeamSummarySchema
+} from '@/ai/types';
 
 
 export async function analyzeClubData(

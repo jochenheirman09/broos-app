@@ -10,51 +10,16 @@
 
 import { ai } from "@/ai/genkit";
 import { z } from "genkit";
-import { WellnessScoreSchema } from "@/ai/types";
-
-// Define the shape of a single player's data for input
-const PlayerWellnessDataSchema = z.object({
-  userId: z.string(),
-  name: z.string(),
-  scores: WellnessScoreSchema,
-});
-
-// Define the input for the analysis flow
-export const TeamAnalysisInputSchema = z.object({
-  teamId: z.string(),
-  teamName: z.string(),
-  playersData: z.array(PlayerWellnessDataSchema),
-});
-export type TeamAnalysisInput = z.infer<typeof TeamAnalysisInputSchema>;
-
-// Define the output schema for the team summary (data part)
-export const TeamSummarySchema = z.object({
-  averageMood: z.number().optional(),
-  averageStress: z.number().optional(),
-  averageSleep: z.number().optional(),
-  averageMotivation: z.number().optional(),
-  injuryCount: z.number(),
-  commonTopics: z.array(z.string()),
-});
-export type TeamSummary = z.infer<typeof TeamSummarySchema>;
-
-// Define the output schema for the generated insight (StaffUpdate)
-export const StaffUpdateSchema = z.object({
-    title: z.string().describe("Een korte, pakkende titel voor het inzicht."),
-    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een staflid/coach."),
-    category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']).describe("De categorie van het inzicht."),
-});
-export type StaffUpdate = Omit<z.infer<typeof StaffUpdateSchema>, 'id' | 'date'>;
-
-
-// Define the final output schema for the entire flow
-export const TeamAnalysisOutputSchema = z.object({
-  teamId: z.string(),
-  summary: TeamSummarySchema,
-  insight: StaffUpdateSchema.optional(),
-});
-export type TeamAnalysisOutput = z.infer<typeof TeamAnalysisOutputSchema>;
-
+import {
+  TeamAnalysisInputSchema,
+  TeamAnalysisOutputSchema,
+  TeamSummarySchema,
+  StaffUpdateSchema,
+  type TeamAnalysisInput,
+  type TeamAnalysisOutput,
+  type TeamSummary,
+  type StaffUpdate,
+} from "@/ai/types";
 
 export async function analyzeTeamData(
   input: TeamAnalysisInput
@@ -147,7 +112,7 @@ const teamAnalysisFlow = ai.defineFlow(
     };
 
     // Now, call the insight prompt
-    let insight: StaffUpdate | undefined = undefined;
+    let insight: Omit<StaffUpdate, 'id' | 'date'> | undefined = undefined;
     try {
         const insightResult = await insightPrompt({ teamName, summary, playerCount });
         insight = insightResult.output;
