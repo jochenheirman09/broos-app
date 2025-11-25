@@ -45,7 +45,8 @@ export async function sendNotification(
     };
 
     try {
-      const response = await adminMessaging.send(message as any); // temp any cast for multicast
+      // Firebase Admin SDK's sendMulticast is deprecated, but send handles arrays now.
+      const response = await adminMessaging.send(message as any); 
       console.log('Successfully sent message:', response);
 
       return { success: true, message: "Notification sent successfully." };
