@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -17,7 +16,7 @@ import React, { use } from "react";
 import { PlayerDashboard } from "./player-dashboard";
 import { StaffDashboard } from "./staff-dashboard";
 import { ResponsibleDashboard } from "./responsible-dashboard";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase/client-provider";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";

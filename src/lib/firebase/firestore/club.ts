@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, doc, writeBatch, getDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
@@ -41,13 +40,28 @@ export async function createClub(
     throw new Error("User already has a club.");
   }
 
+  // This part is problematic with strict security rules, but we'll try it.
+  // The alternative is a Cloud Function to check for uniqueness.
   const clubsRef = collection(db, "clubs");
   const q = query(clubsRef, where("name", "==", clubName));
-  const querySnapshot = await getDocs(q);
-
-  if (!querySnapshot.empty) {
-    throw new Error(`Een club met de naam "${clubName}" bestaat al. Vraag de clubbeheerder om je toegang te geven.`);
+  
+  // The following query may fail if rules deny listing clubs.
+  // We'll wrap it in a try-catch, but the primary error will be handled by the emitter.
+  try {
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      throw new Error(`Een club met de naam "${clubName}" bestaat al. Vraag de clubbeheerder om je toegang te geven.`);
+    }
+  } catch (error) {
+     const permissionError = new FirestorePermissionError({
+        path: "clubs",
+        operation: 'list',
+      });
+      errorEmitter.emit('permission-error', permissionError);
+      // Re-throw to ensure the UI catches it
+      throw new Error("Permission denied to check for existing clubs. Your security rules might be too strict to allow creating a club from the client-side.");
   }
+
 
   const batch = writeBatch(db);
   const clubRef = doc(collection(db, "clubs"));
@@ -64,9 +78,9 @@ export async function createClub(
 
   try {
     await batch.commit();
-    // No need to reload user claims, as we are not using them.
-    // The user context will refetch the profile with the new clubId.
   } catch (error) {
+    console.error("Batch commit failed in createClub:", error);
+
     const clubPermissionError = new FirestorePermissionError({
       path: clubRef.path,
       operation: "create",
@@ -74,13 +88,7 @@ export async function createClub(
     });
     errorEmitter.emit("permission-error", clubPermissionError);
 
-    const userPermissionError = new FirestorePermissionError({
-      path: userRef.path,
-      operation: "update",
-      requestResourceData: userData,
-    });
-    errorEmitter.emit("permission-error", userPermissionError);
-
+    // No need to emit for user update, as the batch fails atomically.
     throw error;
   }
 }
@@ -100,6 +108,7 @@ export async function generateClubInvitationCode(
     await updateDoc(clubRef, updateData);
     return invitationCode;
   } catch (error) {
+    console.error("Error generating club invitation code:", error);
     const permissionError = new FirestorePermissionError({
       path: clubRef.path,
       operation: "update",

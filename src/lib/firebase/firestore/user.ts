@@ -1,7 +1,6 @@
+"use client";
 
-'use client';
-
-import { useFirestore } from '@/firebase/client-provider';
+import { useFirestore } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -26,9 +25,9 @@ export async function updateUserProfile({ db, userId, data }: UpdateUserProfileP
   const userRef = doc(db, 'users', userId);
 
   try {
-    // This is now an awaited operation.
     await updateDoc(userRef, data);
   } catch (error) {
+    console.error('Error updating user profile:', error);
     const permissionError = new FirestorePermissionError({
       path: userRef.path,
       operation: 'update',

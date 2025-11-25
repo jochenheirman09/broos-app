@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase/client-provider";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import type { StaffUpdate } from "@/lib/types";

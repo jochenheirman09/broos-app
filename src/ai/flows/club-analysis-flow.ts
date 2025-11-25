@@ -1,72 +1,66 @@
-
 'use server';
-/**
- * @fileOverview A Genkit flow for analyzing aggregated team data at the club level
- * to generate high-level insights for the club responsible.
- *
- * - analyzeClubData - A function that handles the club-level data analysis.
- * - ClubAnalysisInput - The input type for the analyzeClubData function.
- * - ClubAnalysisOutput - The return type for the analyzeClubData function.
- */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-import {
-  ClubAnalysisInputSchema,
-  ClubUpdateSchema,
-  type ClubAnalysisInput,
-  type ClubAnalysisOutput,
-} from '@/ai/types';
+import { googleAI } from '@genkit-ai/google-genai';
+import { ClubAnalysisInputSchema, ClubInsightSchema, type ClubAnalysisInput, type ClubInsight } from '@/ai/types';
 
+// Lazily define the prompt.
+let clubAnalysisPrompt: any;
+function defineClubAnalysisPrompt() {
+    if (clubAnalysisPrompt) return;
 
-export async function analyzeClubData(
-  input: ClubAnalysisInput
-): Promise<ClubAnalysisOutput> {
-  return clubAnalysisFlow(input);
+    clubAnalysisPrompt = ai.definePrompt({
+        name: 'clubDataAnalyzerPrompt',
+        model: googleAI.model('gemini-2.5-flash'),
+        input: { schema: ClubAnalysisInputSchema },
+        output: { schema: ClubInsightSchema },
+        prompt: `
+            Je bent een hoofdanalist voor voetbalclub '{{{clubName}}}'. Je taak is om de samengevatte data van verschillende teams te vergelijken en één hoog-over inzicht te genereren voor de clubverantwoordelijke.
+
+            DATA:
+            {{#each teamSummaries}}
+            - Team {{teamName}}: Gem. Stemming: {{summary.averageMood}}, Gem. Stress: {{summary.averageStress}}, Gem. Slaap: {{summary.averageSleep}}, Aantal Blessures: {{summary.injuryCount}}.
+            {{/each}}
+
+            TAKEN:
+            1.  **Identificeer de meest significante trend of het grootste verschil tussen de teams.**
+            2.  **Genereer één enkel, bruikbaar inzicht (insight) voor de clubverantwoordelijke.**
+                -   **Title:** Een korte, duidelijke titel die het inzicht samenvat.
+                -   **Content:** Leg het inzicht uit in 2-3 zinnen. Focus op het 'waarom' en geef een strategische suggestie op clubniveau.
+                -   **Category:** Kies de meest relevante categorie: 'Club Trends', 'Team Comparison', of 'Resource Suggestion'.
+
+            Voorbeeld Output:
+            {
+              "title": "Slaapkwaliteit U19 Baart Zorgen",
+              "content": "Team U19 slaapt gemiddeld 1.5 uur minder per nacht dan de U15 en U17. Dit kan invloed hebben op herstel en schoolprestaties. Overweeg een clubbrede workshop over slaaphygiëne voor de oudere jeugd.",
+              "category": "Team Comparison"
+            }
+        `,
+    });
 }
 
+/**
+ * Server-side function to analyze club-wide team data and generate insights.
+ */
+export async function analyzeClubData(input: ClubAnalysisInput): Promise<ClubInsight | null> {
+    console.log(`[SERVER ACTION] analyzeClubData invoked for club: ${input.clubName}`);
+    defineClubAnalysisPrompt();
 
-const insightPrompt = ai.definePrompt({
-    name: 'generateClubInsight',
-    input: { schema: ClubAnalysisInputSchema },
-    output: { schema: ClubUpdateSchema },
-    prompt: `
-        You are a high-level sports data analyst providing a strategic insight for the responsible of club '{{{clubName}}}'.
-        Based on the following weekly wellness summaries from all teams in the club, generate ONE significant, actionable insight.
-
-        **Team Data:**
-        {{#each teamSummaries}}
-        - **Team: {{this.teamName}}**
-          - Average Mood: {{this.summary.averageMood}} (1-5)
-          - Average Stress: {{this.summary.averageStress}} (1-5)
-          - Average Sleep: {{this.summary.averageSleep}} (1-5)
-          - Average Motivation: {{this.summary.averageMotivation}} (1-5)
-          - Injuries: {{this.summary.injuryCount}}
-          - Common Topics: {{this.summary.commonTopics}}
-        {{/each}}
-
-        **Task:**
-        1.  Analyze the data to identify the most important club-wide trend, a notable comparison between teams, or a suggestion for a resource.
-        2.  Write a short, clear, strategic title for the insight.
-        3.  Write concise, actionable 'content' explaining the insight for club management.
-        4.  Choose the most appropriate category: 'Club Trends', 'Team Comparison', of 'Resource Suggestion'.
-        5.  **Output MUST be in Dutch.**
-    `
-});
-
-
-const clubAnalysisFlow = ai.defineFlow(
-  {
-    name: "clubAnalysisFlow",
-    inputSchema: ClubAnalysisInputSchema,
-    outputSchema: ClubUpdateSchema,
-  },
-  async (input) => {
-    if (input.teamSummaries.length < 1) {
-        throw new Error("Cannot generate club insight with data from less than one team.");
+    // Do not run analysis if there's only one team, as there's nothing to compare.
+    if (input.teamSummaries.length < 2) {
+        console.log(`[SERVER ACTION] Skipping club analysis for ${input.clubName}: only one team with data.`);
+        return null;
     }
 
-    const { output } = await insightPrompt(input);
-    return output!;
-  }
-);
+    try {
+        const { output } = await clubAnalysisPrompt(input);
+        if (!output) {
+            console.warn('[SERVER ACTION] Club analysis prompt returned no output.');
+            return null;
+        }
+        return output;
+    } catch (error: any) {
+        console.error(`[SERVER ACTION] CRITICAL ERROR IN CLUB ANALYSIS FLOW for club ${input.clubId}:`, error);
+        return null;
+    }
+}

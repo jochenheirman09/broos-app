@@ -1,16 +1,14 @@
 
-
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@/context/user-context";
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase/client-provider";
-import { chatWithBuddy, BuddyOutput } from "@/ai/flows/buddy-flow";
-import { saveWellnessScores, saveAlert } from "@/lib/firebase/firestore/wellness";
+import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { type WellnessAnalysisInput, type WellnessAnalysisOutput, type OnboardingOutput } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SendHorizonal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
@@ -23,81 +21,19 @@ import {
   query,
   orderBy,
   limit,
-  doc,
-  setDoc,
-  Firestore,
 } from "firebase/firestore";
 import { format } from "date-fns";
-import Link from "next/link";
 import { BuddyAvatar } from "./buddy-avatar";
-import { updateUserProfile } from "@/lib/firebase/firestore/user";
+import { chatWithBuddy } from "@/app/actions/chat-actions";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { MessageSquare } from "lucide-react";
 
-function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
-  const { userProfile } = useUser();
-  const isAssistant = message.role === "assistant";
-
-  const getInitials = (name: string = "") => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
-
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-3 my-4",
-        isAssistant ? "justify-start" : "justify-end"
-      )}
-    >
-      {isAssistant && (
-        <Link href="/buddy-profile">
-          <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-        </Link>
-      )}
-      <div
-        className={cn(
-          "max-w-sm md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow-clay-card",
-          isAssistant
-            ? "bg-muted rounded-tl-none"
-            : "bg-primary text-primary-foreground rounded-br-none"
-        )}
-      >
-        <p className="text-base">{message.content}</p>
-      </div>
-      {!isAssistant && userProfile && (
-        <Link href="/profile">
-          <Avatar className="h-10 w-10 border-2 border-secondary">
-            <AvatarImage src={userProfile.photoURL} />
-            <AvatarFallback className="bg-secondary text-secondary-foreground font-bold">
-              {getInitials(userProfile.name)}
-            </AvatarFallback>
-          </Avatar>
-        </Link>
-      )}
-    </div>
-  );
-}
-
-// Helper function to create/update the parent Chat document
-async function saveChatSummary(
-  db: Firestore,
-  userId: string,
-  date: string,
-  summary: string
-) {
-  const chatDocRef = doc(db, "users", userId, "chats", date);
-  const chatData = {
-    id: date,
-    userId: userId,
-    date: date,
-    summary: summary,
-    updatedAt: serverTimestamp(),
-  };
-  // Use setDoc with merge to create or update the summary (non-blocking)
-  setDoc(chatDocRef, chatData, { merge: true });
-}
 
 export function ChatInterface() {
   const { userProfile, user } = useUser();
@@ -107,9 +43,9 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
-  
+
   const buddyName = userProfile?.buddyName || "Broos";
-  const firstName = userProfile?.name?.split(" ")[0];
+  const firstName = userProfile?.name?.split(" ")[0] || "";
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -124,67 +60,63 @@ export function ChatInterface() {
 
   const { data: messages, isLoading: messagesLoading } =
     useCollection<ChatMessageType>(messagesQuery);
-    
-  const addAssistantMessage = useCallback(async (content: string) => {
-    if (!user || !db) return;
-     addDoc(
+
+  const addMessageToDb = useCallback(
+    async (role: 'assistant' | 'user', content: string) => {
+      if (!user || !db) return;
+      // This is a fire-and-forget write to Firestore on the client.
+      addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
         {
-            role: "assistant",
-            content: content,
-            timestamp: serverTimestamp(),
+          role,
+          content,
+          timestamp: serverTimestamp(),
         }
-    );
-  }, [user, db, today]);
-
+      );
+    }, [user, db, today]
+  );
+  
   const handleInitialMessage = useCallback(async () => {
     if (!userProfile || !user || !db || !firstName) return;
-    
+
     setIsLoading(true);
+
     try {
-        const { adaptedResponse, playerInfo, onboardingCompleted } = await chatWithBuddy({
-            buddyName: buddyName,
-            userName: firstName,
-            userAge: userProfile.birthDate
-                ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear()
-                : 18,
-            userGender: userProfile.gender || 'male',
-            userMessage: '', 
-            chatHistory: '', 
-            onboardingCompleted: !!userProfile.onboardingCompleted,
-        });
+      const buddyInput: WellnessAnalysisInput = {
+        buddyName: buddyName,
+        userName: firstName,
+        userMessage: `Start het gesprek voor vandaag.`,
+        chatHistory: '',
+      };
+      
+      console.log("[CLIENT] Sending initial message request to Server Action.");
+      const result = await chatWithBuddy(user.uid, buddyInput);
+      
+      const responseContent = (result as OnboardingOutput | WellnessAnalysisOutput).response;
 
-        await addAssistantMessage(adaptedResponse);
-        saveChatSummary(db, user.uid, today, adaptedResponse);
+      if (!responseContent) {
+        throw new Error('AI returned an empty response.');
+      }
+      
+      await addMessageToDb("assistant", responseContent);
 
-        const updates: any = {};
-        if (playerInfo) {
-            Object.assign(updates, playerInfo);
-        }
-        if (onboardingCompleted) {
-            updates.onboardingCompleted = true;
-        }
-
-        if(Object.keys(updates).length > 0) {
-            await updateUserProfile({ db, userId: user.uid, data: updates });
-        }
-
-    } catch (error) {
-        toast({
-            variant: "destructive",
-            title: "Oh nee!",
-            description: "Kon het gesprek niet starten. Probeer het opnieuw.",
-        });
+    } catch (error: any) {
+      console.error("[CLIENT] Error fetching initial message:", error);
+      toast({
+        variant: "destructive",
+        title: "Oh nee!",
+        description: error.message || "Kon het gesprek niet starten. Probeer de pagina te vernieuwen.",
+      });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-  }, [userProfile, user, db, firstName, buddyName, today, addAssistantMessage, toast]);
+  }, [user, userProfile, db, firstName, buddyName, addMessageToDb, toast]);
 
   useEffect(() => {
-    if (!messagesLoading && messages?.length === 0) {
+    if (!messagesLoading && messages?.length === 0 && firstName) {
       handleInitialMessage();
     }
-  }, [messagesLoading, messages, handleInitialMessage]);
+  }, [messagesLoading, messages, firstName, handleInitialMessage]);
 
   useEffect(() => {
     if (viewportRef.current) {
@@ -202,14 +134,8 @@ export function ChatInterface() {
     const userMessageContent = input;
     setInput("");
 
-    addDoc(
-      collection(db, "users", user.uid, "chats", today, "messages"),
-      {
-        role: "user",
-        content: userMessageContent,
-        timestamp: serverTimestamp(),
-      }
-    );
+    // Optimistically add user message to Firestore
+    await addMessageToDb("user", userMessageContent);
 
     setIsLoading(true);
 
@@ -217,45 +143,39 @@ export function ChatInterface() {
       const chatHistory = (messages || [])
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
-      const agentResponse = messages && messages.length > 0 ? messages[messages.length - 1].content : "";
-
-      const { adaptedResponse, scores, alerts, playerInfo, onboardingCompleted } = await chatWithBuddy({
+      
+      const buddyInput: WellnessAnalysisInput = {
         buddyName: buddyName,
         userName: firstName,
-        userAge: userProfile.birthDate ? new Date().getFullYear() - new Date(userProfile.birthDate).getFullYear() : 18,
-        userGender: userProfile.gender || 'male',
         userMessage: userMessageContent,
         chatHistory: chatHistory,
-        agentResponse: agentResponse,
-        onboardingCompleted: !!userProfile.onboardingCompleted,
-      });
+      };
 
-      addAssistantMessage(adaptedResponse);
+      console.log(`[CLIENT] Sending message: "${userMessageContent}"`);
+      const result = await chatWithBuddy(user.uid, buddyInput);
       
-      saveChatSummary(db, user.uid, today, adaptedResponse);
-      const updates: any = {};
-      if (playerInfo) Object.assign(updates, playerInfo);
-      if (onboardingCompleted && !userProfile.onboardingCompleted) updates.onboardingCompleted = true;
-      if (Object.keys(updates).length > 0) await updateUserProfile({ db, userId: user.uid, data: updates });
-      if (scores && Object.keys(scores).length > 0) saveWellnessScores({ db, userId: user.uid, scores, summary: adaptedResponse });
-      if (alerts && alerts.length > 0) {
-        for (const alert of alerts) {
-          saveAlert({ db, userId: user.uid, alert });
-        }
+      const responseContent = (result as OnboardingOutput | WellnessAnalysisOutput).response;
+      
+      if (!responseContent) {
+        throw new Error('AI returned an empty response.');
       }
+      
+      // Add assistant response to Firestore
+      await addMessageToDb("assistant", responseContent);
 
     } catch (error: any) {
+      console.error("[CLIENT] Error calling Server Action:", error);
       toast({
         variant: "destructive",
         title: "Oh nee!",
-        description: "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
+        description: error.message || "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
       });
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (!userProfile || messagesLoading) {
+  
+  if (messagesLoading) {
     return (
       <div className="flex-grow flex items-center justify-center">
         <Spinner />
@@ -264,46 +184,106 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-grow">
-        <ScrollViewport ref={viewportRef} className="h-full">
-          <div className="px-4">
-            {messages?.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            {isLoading && (
-              <div className="flex items-start gap-3 my-4 justify-start">
-                <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-                <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
-                  <Spinner size="small" />
-                  <span className="text-muted-foreground italic">
-                    {buddyName} denkt na...
-                  </span>
-                </div>
+    <div className="container mx-auto py-8">
+        <Card className="h-[calc(100vh-10rem)] flex flex-col">
+          <CardHeader>
+            <CardTitle className="flex items-center text-2xl">
+              <MessageSquare className="h-6 w-6 mr-3" />
+              Chat met {buddyName}
+            </CardTitle>
+            <CardDescription>
+              Begin hier je gesprek met je persoonlijke AI-buddy.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow flex flex-col overflow-hidden p-0">
+            <div className="flex flex-col h-full">
+              <ScrollArea className="flex-grow">
+                <ScrollViewport ref={viewportRef} className="h-full">
+                  <div className="px-4">
+                    {messages?.map((message) => (
+                      <ChatMessage key={message.id} message={message} />
+                    ))}
+                    {isLoading && (
+                      <div className="flex items-start gap-3 my-4 justify-start">
+                        <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
+                        <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
+                          <Spinner size="small" />
+                          <span className="text-muted-foreground italic">
+                            {buddyName} denkt na...
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollViewport>
+              </ScrollArea>
+              <div className="p-4 border-t">
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Typ je bericht..."
+                    autoComplete="off"
+                    disabled={isLoading || (!messages || messages.length === 0)}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={isLoading || !input.trim() || (!messages || messages.length === 0)}
+                  >
+                    <SendHorizonal className="h-5 w-5" />
+                  </Button>
+                </form>
               </div>
-            )}
-          </div>
-        </ScrollViewport>
-      </ScrollArea>
-
-      <div className="p-4 border-t">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Typ je bericht..."
-            autoComplete="off"
-            disabled={isLoading || (!messages || messages.length === 0)}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={isLoading || !input.trim() || (!messages || messages.length === 0)}
-          >
-            <SendHorizonal className="h-5 w-5" />
-          </Button>
-        </form>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+  );
+}
+
+function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
+  const { userProfile } = useUser();
+  const isUser = message.role === "user";
+  
+  const getInitials = (name: string | undefined) => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
+
+  const initials = getInitials(userProfile?.name);
+
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 my-4",
+        isUser ? "justify-end" : "justify-start"
+      )}
+    >
+      {!isUser && (
+        <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
+      )}
+      <div
+        className={cn(
+          "max-w-md rounded-2xl px-4 py-3 shadow-clay-card",
+          isUser
+            ? "bg-primary text-primary-foreground rounded-br-none"
+            : "bg-muted rounded-tl-none"
+        )}
+      >
+        <p className="whitespace-pre-wrap">{message.content}</p>
+      </div>
+      {isUser && (
+        <Avatar className="h-10 w-10 border-2 border-primary/50">
+          <AvatarFallback className="bg-primary/20 text-primary font-bold">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      )}
     </div>
   );
 }

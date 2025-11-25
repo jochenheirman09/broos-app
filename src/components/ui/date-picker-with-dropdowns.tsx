@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -66,7 +65,7 @@ export function DatePickerWithDropdowns({
       }}
       captionLayout="dropdown-buttons"
       fromYear={currentYear - 100}
-      toYear={currentYear - 5}
+      toYear={currentYear}
       components={{
         Dropdown: ({ value, onChange, children }: DropdownProps) => {
           const options = React.Children.toArray(

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -7,7 +8,7 @@ import { ThemeToggle } from "../theme-toggle";
 import { Logo } from "./logo";
 import { Wordmark } from "./wordmark";
 import Link from "next/link";
-import { User, Info } from "lucide-react";
+import { User, Info, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { ProfileSheet } from "./profile-sheet";
 
@@ -39,6 +40,12 @@ export function AppHeader() {
               <Button variant="ghost" size="icon">
                 <Info className="h-5 w-5" />
                 <span className="sr-only">About</span>
+              </Button>
+            </Link>
+            <Link href="/alerts">
+              <Button variant="ghost" size="icon">
+                <AlertTriangle className="h-5 w-5" />
+                <span className="sr-only">Alerts</span>
               </Button>
             </Link>
             {userProfile && (

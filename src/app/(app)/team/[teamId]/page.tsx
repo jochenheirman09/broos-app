@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useFirestore } from '@/firebase/client-provider';
+import { useFirestore } from '@/firebase';
 import { collection, query, where, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import type { UserProfile, Team, WithId } from '@/lib/types';

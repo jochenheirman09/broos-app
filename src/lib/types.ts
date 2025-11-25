@@ -1,5 +1,4 @@
 
-
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -56,6 +55,7 @@ export interface Team {
 export interface WellnessScore {
   id: string; // YYYY-MM-DD
   date: string; // YYYY-MM-DD
+  todayActivity?: ScheduleActivity | 'individual'; // The main activity for this day
   mood?: number;
   moodReason?: string;
   stress?: number;
@@ -91,10 +91,10 @@ export interface Chat {
 }
 
 export interface ChatMessage {
-  id: string;
+  id?: string; // Optional on write, will be present on read
   role: 'user' | 'assistant';
   content: string;
-  timestamp: any; // Firestore ServerTimestamp
+  timestamp: any; // Firestore ServerTimestamp on write, Timestamp object on read
 }
 
 export type WithId<T> = T & { id: string };
@@ -157,7 +157,6 @@ export interface PlayerTraining {
 export interface KnowledgeDocument {
     id: string;
     name: string;
-    // firestorePath: string; // Path to the document in Firestore knowledge_base collection
     content: string;
     embedding: number[];
     status: 'pending' | 'ingesting' | 'completed' | 'error';
@@ -169,3 +168,21 @@ export interface KnowledgeUsageStat {
     queryCount: number;
     lastQueried: any; // Firestore ServerTimestamp
 }
+
+// Re-exporting types from ai/types for client-side components
+export type { 
+    OnboardingTopic,
+    OnboardingInput,
+    OnboardingOutput,
+    WellnessAnalysisInput,
+    WellnessAnalysisOutput,
+    TeamAnalysisInput,
+    TeamAnalysisOutput,
+    TeamSummary as AITeamSummary,
+    TeamInsight,
+    ClubAnalysisInput,
+    ClubInsight,
+    PlayerUpdateInput,
+    PlayerUpdateOutput,
+    IngestInput
+} from '@/ai/types';

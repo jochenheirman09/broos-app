@@ -17,18 +17,12 @@ import { Sparkles, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoAvatar, TsubasaAvatar, RobotAvatar } from "@/components/app/predefined-avatars";
 import { useUser } from "@/context/user-context";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
 
-
-const predefinedAvatars = [
-  { id: 'logo', component: LogoAvatar },
-  { id: 'tsubasa', component: TsubasaAvatar },
-  { id: 'robot', component: RobotAvatar },
-];
-
-export default function BuddyProfilePage() {
+// Renamed from BuddyProfilePage to avoid conflict with the route page
+export function BuddyProfileCustomizer() {
   const { userProfile, user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
@@ -46,31 +40,28 @@ export default function BuddyProfilePage() {
   }, [userProfile]);
 
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!user) {
       toast({ variant: "destructive", title: "Niet ingelogd" });
       return;
     }
 
     setIsLoading(true);
-    try {
-      const updates = {
-        buddyName,
-        buddyAvatar: selectedAvatar,
-      };
+    
+    const updates = {
+      buddyName,
+      buddyAvatar: selectedAvatar,
+    };
 
-      await updateUserProfile({ db, userId: user.uid, data: updates });
-      
-      toast({
-        title: "Opgeslagen!",
-        description: "De gegevens van je buddy zijn bijgewerkt.",
-      });
-    } catch (error) {
-      // The updateUserProfile function handles emitting the detailed error
-      toast({ variant: "destructive", title: "Fout", description: "Kon de buddy-gegevens niet opslaan." });
-    } finally {
-      setIsLoading(false);
-    }
+    // Use non-blocking write for snappy UI
+    updateUserProfile({ db, userId: user.uid, data: updates });
+    
+    toast({
+      title: "Opgeslagen!",
+      description: "De gegevens van je buddy zijn bijgewerkt.",
+    });
+
+    setIsLoading(false);
   };
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,10 +88,16 @@ export default function BuddyProfilePage() {
   const handleCustomUploadClick = () => {
     fileInputRef.current?.click();
   };
+  
+  const predefinedAvatars = [
+    { id: 'logo', component: LogoAvatar },
+    { id: 'tsubasa', component: TsubasaAvatar },
+    { id: 'robot', component: RobotAvatar },
+  ];
 
   const renderSelectedAvatar = () => {
     if (selectedAvatar && selectedAvatar.startsWith('data:image')) {
-         return <img src={selectedAvatar} alt="Gek选举n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
+         return <img src={selectedAvatar} alt="Gek選舉n avatar" className="h-32 w-32 rounded-full object-cover border-4 border-primary" />;
     }
     const PredefinedComponent = predefinedAvatars.find(a => a.id === selectedAvatar)?.component;
     if (PredefinedComponent) {
@@ -111,62 +108,60 @@ export default function BuddyProfilePage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <span>Pas je Buddy aan</span>
-          </CardTitle>
-          <CardDescription>
-            Geef je AI-buddy een persoonlijke naam en uiterlijk.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="space-y-2">
-            <Label htmlFor="buddy-name">Naam van je Buddy</Label>
-            <Input
-              id="buddy-name"
-              value={buddyName}
-              onChange={(e) => setBuddyName(e.target.value)}
-              placeholder="bv. Broos"
-            />
+    <Card className="max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Sparkles className="h-6 w-6 text-primary" />
+          <span>Pas je Buddy aan</span>
+        </CardTitle>
+        <CardDescription>
+          Geef je AI-buddy een persoonlijke naam en uiterlijk.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-8">
+        <div className="space-y-2">
+          <Label htmlFor="buddy-name">Naam van je Buddy</Label>
+          <Input
+            id="buddy-name"
+            value={buddyName}
+            onChange={(e) => setBuddyName(e.target.value)}
+            placeholder="bv. Broos"
+          />
+        </div>
+
+        <div className="space-y-4">
+          <Label>Avatar van je Buddy</Label>
+          
+          <div className="flex justify-center my-4">
+            {renderSelectedAvatar()}
           </div>
 
-          <div className="space-y-4">
-            <Label>Avatar van je Buddy</Label>
-            
-            <div className="flex justify-center my-4">
-              {renderSelectedAvatar()}
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-                {predefinedAvatars.map(avatar => {
-                    const AvatarComponent = avatar.component;
-                    const isSelected = selectedAvatar === avatar.id;
-                    return (
-                        <div key={avatar.id} onClick={() => setSelectedAvatar(avatar.id)} className={cn("cursor-pointer p-2 rounded-2xl border-2 transition-all", isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted")}>
-                           <AvatarComponent className="w-full h-auto" />
-                        </div>
-                    )
-                })}
-            </div>
-            
-            <div className="!mt-6">
-                <Button variant="outline" className="w-full" onClick={handleCustomUploadClick}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload eigen afbeelding
-                </Button>
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-            </div>
-
+          <div className="grid grid-cols-3 gap-4">
+              {predefinedAvatars.map(avatar => {
+                  const AvatarComponent = avatar.component;
+                  const isSelected = selectedAvatar === avatar.id;
+                  return (
+                      <div key={avatar.id} onClick={() => setSelectedAvatar(avatar.id)} className={cn("cursor-pointer p-2 rounded-2xl border-2 transition-all", isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted")}>
+                         <AvatarComponent className="w-full h-auto" />
+                      </div>
+                  )
+              })}
+          </div>
+          
+          <div className="!mt-6">
+              <Button variant="outline" className="w-full" onClick={handleCustomUploadClick}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload eigen afbeelding
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
           </div>
 
-          <Button onClick={handleSave} className="w-full !mt-8" size="lg" disabled={isLoading}>
-            {isLoading ? <Spinner size="small" className="mr-2" /> : "Wijzigingen Opslaan"}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        <Button onClick={handleSave} className="w-full !mt-8" size="lg" disabled={isLoading}>
+          {isLoading ? <Spinner size="small" className="mr-2" /> : "Wijzigingen Opslaan"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

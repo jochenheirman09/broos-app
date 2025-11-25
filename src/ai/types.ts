@@ -1,156 +1,148 @@
-
-import { z } from 'zod';
-import type { Gender } from '@/lib/types';
-
-export const ScoreSchema = z.object({
-  mood: z.optional(z.number().min(1).max(5)),
-  moodReason: z.optional(z.string().describe("The reasoning behind the mood score.")),
-  stress: z.optional(z.number().min(1).max(5)),
-  stressReason: z.optional(z.string().describe("The reasoning behind the stress score.")),
-  sleep: z.optional(z.number().min(1).max(5)),
-  sleepReason: z.optional(z.string().describe("The reasoning behind the sleep score.")),
-  motivation: z.optional(z.number().min(1).max(5)),
-  motivationReason: z.optional(z.string().describe("The reasoning behind the motivation score.")),
-  rest: z.optional(z.number().min(1).max(5)),
-  restReason: z.optional(z.string().describe("The reasoning behind the rest score.")),
-  familyLife: z.optional(z.number().min(1).max(5)),
-  familyLifeReason: z.optional(z.string().describe("The reasoning behind the family life score.")),
-  school: z.optional(z.number().min(1).max(5)),
-  schoolReason: z.optional(z.string().describe("The reasoning behind the school score.")),
-  hobbys: z.optional(z.number().min(1).max(5)),
-  hobbysReason: z.optional(z.string().describe("The reasoning behind the hobbys score.")),
-  food: z.optional(z.number().min(1).max(5)),
-  foodReason: z.optional(z.string().describe("The reasoning behind the food score.")),
-  injury: z.optional(z.boolean()),
-  injuryReason: z.optional(z.string().describe("The reasoning behind the injury status.")),
-  freeText: z.optional(z.string()),
-  shareWithStaff: z.optional(z.boolean()),
-});
-export type WellnessScore = z.infer<typeof ScoreSchema>;
+import { z } from 'genkit';
+import type { Schedule } from '@/lib/types';
 
 
-export const PlayerInfoSchema = z.object({
-    familySituation: z.optional(z.string().describe("Summary of the player's family life and composition.")),
-    schoolSituation: z.optional(z.string().describe("Summary of the player's school life and social circle.")),
-    personalGoals: z.optional(z.string().describe("Summary of the player's ambitions in football and life.")),
-    matchPreparation: z.optional(z.string().describe("Summary of the player's match preparation routines.")),
-    recoveryHabits: z.optional(z.string().describe("Summary of how the player recovers after physical activity.")),
-    additionalHobbies: z.optional(z.string().describe("Summary of the player's hobbies and relaxation techniques.")),
+// Shared Schemas
+export const WellnessScoresSchema = z.object({
+  mood: z.number().min(1).max(5).optional().describe("Score van 1 (erg negatief) tot 5 (erg positief) voor de algemene stemming."),
+  moodReason: z.string().optional().describe("Beknopte reden voor de stemming-score."),
+  stress: z.number().min(1).max(5).optional().describe("Score van 1 (weinig stress) tot 5 (veel stress) voor het stressniveau."),
+  stressReason: z.string().optional().describe("Beknopte reden voor de stress-score."),
+  sleep: z.number().min(1).max(5).optional().describe("Score van 1 (slecht geslapen) tot 5 (goed geslapen) voor de slaapkwaliteit."),
+  sleepReason: z.string().optional().describe("Beknopte reden voor de slaap-score."),
+  motivation: z.number().min(1).max(5).optional().describe("Score van 1 (niet gemotiveerd) tot 5 (zeer gemotiveerd) voor motivatie."),
+  motivationReason: z.string().optional().describe("Beknopte reden voor de motivatie-score."),
+  rest: z.number().min(1).max(5).optional().describe("Score van 1 (niet uitgerust) tot 5 (goed uitgerust) voor de mate van rust."),
+  restReason: z.string().optional().describe("Beknopte reden voor de rust-score."),
+  familyLife: z.number().min(1).max(5).optional().describe("Score van 1 (slecht) tot 5 (goed) voor de situatie thuis."),
+  familyLifeReason: z.string().optional().describe("Beknopte reden voor de thuis-score."),
+  school: z.number().min(1).max(5).optional().describe("Score van 1 (slecht) tot 5 (goed) voor de situatie op school."),
+  schoolReason: z.string().optional().describe("Beknopte reden voor de school-score."),
+  hobbys: z.number().min(1).max(5).optional().describe("Score van 1 (slecht) tot 5 (goed) voor hobby's/ontspanning."),
+  hobbysReason: z.string().optional().describe("Beknopte reden voor de hobby's-score."),
+  food: z.number().min(1).max(5).optional().describe("Score van 1 (slecht) tot 5 (goed) voor voeding."),
+  foodReason: z.string().optional().describe("Beknopte reden voor de voeding-score."),
+  injury: z.boolean().optional().describe("Geeft aan of de speler een blessure heeft gemeld."),
+  injuryReason: z.string().optional().describe("Details over de gemelde blessure."),
 });
 
-export const AlertSchema = z.object({
-  alertType: z
-    .enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity'])
-    .describe('The category of the detected alert.'),
-  triggeringMessage: z
-    .string()
-    .describe("The user's message that triggered the alert."),
+// For runWellnessAnalysisFlow and runOnboardingFlow
+export const WellnessAnalysisInputSchema = z.object({
+    buddyName: z.string(),
+    userName: z.string(),
+    userMessage: z.string(),
+    chatHistory: z.string().optional(),
+    retrievedDocs: z.any().optional(), // Keeping it simple for now
 });
-export type Alert = z.infer<typeof AlertSchema>;
+export type WellnessAnalysisInput = z.infer<typeof WellnessAnalysisInputSchema>;
 
-export const BuddyInputSchema = z.object({
-  buddyName: z.string().describe('The name of the AI buddy.'),
-  userName: z.string().describe("The user's name."),
-  userAge: z.number().describe("The user's age."),
-  userGender: z.custom<Gender>().describe("The user's gender, either 'male' or 'female'."),
-  userMessage: z.string().describe("The user's latest message."),
-  agentResponse: z.string().optional().describe('The previous response from the agent.'),
-  chatHistory: z
-    .string()
-    .optional()
-    .describe('The history of the conversation so far.'),
-  onboardingCompleted: z.boolean().describe("Flag indicating if the initial 'get-to-know-you' chat sequence is complete."),
+export const WellnessAnalysisOutputSchema = z.object({
+  response: z.string().describe('Een vriendelijk en boeiend antwoord in het Nederlands.'),
+  summary: z.string().optional().describe("Een beknopte, algehele samenvatting van het gehele gesprek van vandaag."),
+  wellnessScores: WellnessScoresSchema.optional(),
+  alert: z.object({
+    alertType: z.enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity']),
+    triggeringMessage: z.string()
+  }).optional(),
 });
-export type BuddyInput = z.infer<typeof BuddyInputSchema>;
+export type WellnessAnalysisOutput = z.infer<typeof WellnessAnalysisOutputSchema>;
 
+// For runOnboardingFlow
+export const OnboardingTopicEnum = z.enum([
+  "familySituation",
+  "schoolSituation",
+  "personalGoals",
+  "matchPreparation",
+  "recoveryHabits",
+  "additionalHobbies",
+]);
+export type OnboardingTopic = z.infer<typeof OnboardingTopicEnum>;
 
-export const BuddyOutputSchema = z.object({
-  adaptedResponse: z
-    .string()
-    .describe(
-      'An empathetic, context-aware, and psychologically sound response.'
-    ),
-  scores: ScoreSchema.optional().describe(
-    'The scores and reasoning generated based on the analysis of the latest user message.'
-  ),
-  playerInfo: PlayerInfoSchema.optional().describe(
-    'Summaries of the player\'s background information, gathered during onboarding.'
-  ),
-  alerts: z
-    .array(AlertSchema)
-    .optional()
-    .describe(
-      'A list of alerts generated if the user message contains alarming signs.'
-    ),
-  onboardingCompleted: z.boolean().optional().describe(
-      "Set to true when the AI determines the initial 'get-to-know-you' phase is complete."
-  )
+export const OnboardingInputSchema = WellnessAnalysisInputSchema.extend({
+    currentTopic: OnboardingTopicEnum,
 });
-export type BuddyOutput = z.infer<typeof BuddyOutputSchema>;
+export type OnboardingInput = z.infer<typeof OnboardingInputSchema>;
 
-// Schemas for team-analysis-flow
-export const TeamSummarySchema = z.object({
-  averageMood: z.number().optional(),
-  averageStress: z.number().optional(),
-  averageSleep: z.number().optional(),
-  averageMotivation: z.number().optional(),
-  injuryCount: z.number(),
-  commonTopics: z.array(z.string()),
+export const OnboardingOutputSchema = z.object({
+  response: z.string(),
+  isTopicComplete: z.boolean(),
+  summary: z.string().optional(),
 });
-export type TeamSummary = z.infer<typeof TeamSummarySchema>;
+export type OnboardingOutput = z.infer<typeof OnboardingOutputSchema>;
 
-export const PlayerWellnessDataSchema = z.object({
-  userId: z.string(),
-  name: z.string(),
-  scores: ScoreSchema,
-});
 
+// For analyzeTeamData flow
 export const TeamAnalysisInputSchema = z.object({
-  teamId: z.string(),
-  teamName: z.string(),
-  playersData: z.array(PlayerWellnessDataSchema),
+    teamId: z.string(),
+    teamName: z.string(),
+    playersData: z.array(z.object({
+        name: z.string(),
+        scores: WellnessScoresSchema,
+    }))
 });
 export type TeamAnalysisInput = z.infer<typeof TeamAnalysisInputSchema>;
 
-export const StaffUpdateSchema = z.object({
-    title: z.string().describe("Een korte, pakkende titel voor het inzicht."),
-    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een staflid/coach."),
-    category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']).describe("De categorie van het inzicht."),
+export const TeamSummarySchema = z.object({
+    averageMood: z.number(),
+    averageStress: z.number(),
+    averageSleep: z.number(),
+    averageMotivation: z.number(),
+    injuryCount: z.number(),
+    commonTopics: z.array(z.string()),
 });
-export type StaffUpdate = Omit<z.infer<typeof StaffUpdateSchema>, 'id' | 'date'>;
+export type AITeamSummary = z.infer<typeof TeamSummarySchema>;
+
+export const TeamInsightSchema = z.object({
+    title: z.string(),
+    content: z.string(),
+    category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']),
+});
+export type TeamInsight = z.infer<typeof TeamInsightSchema>;
 
 export const TeamAnalysisOutputSchema = z.object({
-  teamId: z.string(),
-  summary: TeamSummarySchema,
-  insight: StaffUpdateSchema.optional(),
+    summary: TeamSummarySchema,
+    insight: TeamInsightSchema
 });
 export type TeamAnalysisOutput = z.infer<typeof TeamAnalysisOutputSchema>;
 
 
-// Schemas for club-analysis-flow
+// For analyzeClubData flow
 export const ClubAnalysisInputSchema = z.object({
   clubId: z.string(),
   clubName: z.string(),
   teamSummaries: z.array(z.object({
-      teamName: z.string(),
-      summary: TeamSummarySchema,
-  })),
+    teamName: z.string(),
+    summary: TeamSummarySchema,
+  }))
 });
 export type ClubAnalysisInput = z.infer<typeof ClubAnalysisInputSchema>;
 
-export const ClubUpdateSchema = z.object({
-    title: z.string().describe("Een korte, strategische titel voor het club-brede inzicht."),
-    content: z.string().describe("De gedetailleerde inhoud van het inzicht, geschreven voor een clubverantwoordelijke. Focus op trends, vergelijkingen of aanbevelingen."),
-    category: z.enum(['Club Trends', 'Team Comparison', 'Resource Suggestion']).describe("De meest passende categorie voor het inzicht."),
-});
-export type ClubAnalysisOutput = Omit<z.infer<typeof ClubUpdateSchema>, 'id' | 'date'>;
-
-
-// Schemas for notification-flow
-export const NotificationInputSchema = z.object({
-  userId: z.string(),
+export const ClubInsightSchema = z.object({
   title: z.string(),
-  body: z.string(),
-  link: z.string().optional(),
+  content: z.string(),
+  category: z.enum(['Club Trends', 'Team Comparison', 'Resource Suggestion']),
 });
-export type NotificationInput = z.infer<typeof NotificationInputSchema>;
+export type ClubInsight = z.infer<typeof ClubInsightSchema>;
+
+// For generatePlayerUpdate flow
+export const PlayerUpdateInputSchema = z.object({
+  playerName: z.string(),
+  playerScores: WellnessScoresSchema,
+  teamAverageScores: TeamSummarySchema,
+});
+export type PlayerUpdateInput = z.infer<typeof PlayerUpdateInputSchema>;
+
+export const PlayerUpdateOutputSchema = z.object({
+  title: z.string(),
+  content: z.string(),
+  category: z.enum(['Sleep', 'Nutrition', 'Motivation', 'Stress', 'Wellness']),
+});
+export type PlayerUpdateOutput = z.infer<typeof PlayerUpdateOutputSchema>;
+
+// For ingestDocument flow
+export const IngestInputSchema = z.object({
+  fileName: z.string(),
+  fileContent: z.string(),
+  clubId: z.string(),
+});
+export type IngestInput = z.infer<typeof IngestInputSchema>;

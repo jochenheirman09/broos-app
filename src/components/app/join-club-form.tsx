@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -16,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
 import {
@@ -83,7 +82,7 @@ export function JoinClubForm() {
       };
 
       // Use the centralized update function
-      await updateUserProfile({
+      updateUserProfile({
         db,
         userId: user.uid,
         data: updatedProfile,
@@ -96,6 +95,7 @@ export function JoinClubForm() {
       // The layout will automatically redirect the user upon context update
       
     } catch (queryError) {
+      console.error("Error executing clubs query:", queryError);
       const permissionError = new FirestorePermissionError({
         path: "clubs", // collection group query
         operation: "list",

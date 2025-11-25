@@ -1,6 +1,6 @@
-
 "use client";
 
+import { useFirestore } from "@/firebase";
 import {
   collection,
   writeBatch,
@@ -53,6 +53,13 @@ export async function deleteAllUserChats(
   const wellnessScoresSnapshot = await getDocs(wellnessScoresRef);
   wellnessScoresSnapshot.forEach((scoreDoc) => {
     batch.delete(scoreDoc.ref);
+  });
+
+  // 3. Delete all individual trainings
+  const trainingsRef = collection(db, "users", userId, "trainings");
+  const trainingsSnapshot = await getDocs(query(trainingsRef));
+  trainingsSnapshot.forEach((trainingDoc) => {
+    batch.delete(trainingDoc.ref);
   });
   
   // Commit the batch operation

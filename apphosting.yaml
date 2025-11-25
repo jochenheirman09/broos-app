@@ -1,22 +1,7 @@
-# The name of the backend resource in Firebase App Hosting.
-# The name must be the same as the backend resource name in the Firebase console.
-name: broos-app-backend
-# The location where the backend is hosted.
-# This should match your project's default GCP resource location.
-location: europe-west4
-# The command to run to build your backend.
-build: npm run build
+# Settings to manage and configure a Firebase App Hosting backend.
+# https://firebase.google.com/docs/app-hosting/configure
 
-# The command to run to start your backend.
-run: npm run start
-
-# The minimum number of instances to keep running.
-# Optional. Default is 0.
-minInstances: 0
-
-# This section configures the continuous deployment for the backend.
-deployment:
-  # The repository to deploy from.
-  repository: jochenheirman09/broos-app
-  # The branch to deploy from.
-  branch: main
+runConfig:
+  # Increase this value if you'd like to automatically spin up
+  # more instances in response to increased traffic.
+  maxInstances: 1

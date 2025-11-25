@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -11,21 +10,23 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Users } from "lucide-react";
+import { ArrowRight, Users, Info } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
-import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase/client-provider";
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, limit, query, doc } from "firebase/firestore";
 import { Chat, Team, Club } from "@/lib/types";
 import { RequestNotificationPermission } from "./request-notification-permission";
 import { Spinner } from "../ui/spinner";
+import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
+
 
 export function PlayerDashboard() {
   const { userProfile, user } = useUser();
   const db = useFirestore();
 
-  const firstName = userProfile?.name.split(" ")[0];
+  const firstName = userProfile?.name?.split(" ")[0];
   const buddyName = userProfile?.buddyName || "Broos";
 
   // Fetch team and club data
@@ -53,6 +54,19 @@ export function PlayerDashboard() {
   const hasChatHistory = previousChats ? previousChats.length > 0 : false;
   
   const isLoadingAffiliation = teamLoading || clubLoading;
+
+  if (!firstName) {
+    return (
+        <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Profiel Onvolledig</AlertTitle>
+            <AlertDescription>
+                Je profiel is nog niet volledig ingevuld. 
+                <Link href="/complete-profile" className="font-bold underline ml-1">Klik hier</Link> om het af te maken.
+            </AlertDescription>
+        </Alert>
+    )
+  }
 
   return (
     <div className="space-y-6">

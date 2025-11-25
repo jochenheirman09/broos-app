@@ -18,7 +18,7 @@ export default function CreateClubPage() {
             <div>
               <CardTitle className="text-2xl">Creëer of Sluit je aan bij een Club</CardTitle>
               <CardDescription>
-                Maak een nieuwe club aan of gebruik een code om lid te worden van een bestaande club.
+                Maak een nieuwe club aan of gebruik een code om lid te worden.
               </CardDescription>
             </div>
           </div>

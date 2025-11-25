@@ -4,8 +4,8 @@ This checklist tracks the final steps needed to prepare the Broos 2.0 applicatio
 
 ## Development & Deployment
 
-- [ ] **GitHub Repository**: Ensure the project is linked to a GitHub repository for version control and CI/CD.
-- [ ] **Local Setup**: Clone the project to a local development environment to enable robust E2E testing and development.
+- [x] **GitHub Repository**: Ensure the project is linked to a GitHub repository for version control and CI/CD.
+- [x] **Local Setup**: Clone the project to a local development environment to enable robust E2E testing and development.
 
 ## Feature Enhancements & Legal
 
@@ -15,9 +15,9 @@ This checklist tracks the final steps needed to prepare the Broos 2.0 applicatio
 
 ## Testing & Stability
 
-- [ ] **Extended Test Automation**: Expand the local Playwright E2E test suite to cover all critical user flows, including chat interactions, dashboard data validation, and alert generation.
+- [x] **Extended Test Automation**: Expand the local Playwright E2E test suite to cover all critical user flows, including chat interactions, dashboard data validation, and alert generation.
 
 ## Admin & Data Management
 
 - [ ] **Dashboard Refactoring**: Remove the "Knowledge Base Stats" section from the club responsible's dashboard. Create a separate, global admin dashboard (future feature) to display these and other high-level application statistics.
-- [ ] **Data Storage Confirmation**: All application data (user profiles, chats, wellness scores, club/team info) is stored centrally in the Firestore database. File uploads (like avatars) are stored in Firebase Storage, with the reference URL saved in Firestore. This is confirmed.
+- [x] **Data Storage Confirmation**: All application data (user profiles, chats, wellness scores, club/team info) is stored centrally in the Firestore database. File uploads (like avatars) are stored in Firebase Storage, with the reference URL saved in Firestore. This is confirmed.

@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useMemoFirebase } from '../provider';
 
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
@@ -44,13 +45,15 @@ export function useDoc<T = any>(
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Start with true
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
     const path = memoizedDocRef ? memoizedDocRef.path : 'unknown path';
+    console.log(`[useDoc] Subscribing to: ${path}`);
     
     if (!memoizedDocRef) {
+      console.log(`[useDoc] Subscription skipped (null ref) for: ${path}`);
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -64,14 +67,17 @@ export function useDoc<T = any>(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
+          console.log(`[useDoc] Data received for: ${path}`);
           setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
+          console.warn(`[useDoc] Document does not exist at: ${path}`);
           setData(null);
         }
         setError(null); 
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        console.error(`[useDoc] PERMISSION ERROR on: ${path}`, error);
         const contextualError = new FirestorePermissionError({
           operation: 'get',
           path: memoizedDocRef.path,
@@ -86,6 +92,7 @@ export function useDoc<T = any>(
     );
 
     return () => {
+      console.log(`[useDoc] Unsubscribing from: ${path}`);
       unsubscribe();
     }
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.

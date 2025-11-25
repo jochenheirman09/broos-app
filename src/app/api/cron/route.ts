@@ -2,18 +2,16 @@
 import { NextResponse } from 'next/server';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, App } from 'firebase-admin/app';
-import { analyzeTeamData } from '@/ai/flows/team-analysis-flow';
-import { analyzeClubData } from '@/ai/flows/club-analysis-flow';
+import { TeamAnalysisInput, analyzeTeamData, TeamSummary } from '@/ai/flows/team-analysis-flow';
+import { ClubAnalysisInput, analyzeClubData } from '@/ai/flows/club-analysis-flow';
+import { PlayerUpdateInput, generatePlayerUpdate } from '@/ai/flows/player-update-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
-import type { TeamAnalysisInput, ClubAnalysisInput, TeamSummary } from '@/ai/types';
-import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate } from '@/lib/types';
+import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate, PlayerUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
 
 // Initialize Firebase Admin SDK if it hasn't been already.
 function initializeFirebaseAdmin(): { db: Firestore } {
   if (!getApps().length) {
-    // In a Firebase Hosting environment (or with GOOGLE_APPLICATION_CREDENTIALS set),
-    // initializeApp() discovers credentials automatically.
     initializeApp();
   }
   return { db: getFirestore() };
@@ -40,12 +38,11 @@ async function runAnalysis() {
       
       if (playersSnapshot.empty) continue;
       
-      const playersData = [];
+      const playersData: { userId: string; name: string; scores: WellnessScore; }[] = [];
 
       for (const playerDoc of playersSnapshot.docs) {
         const player = { id: playerDoc.id, ...playerDoc.data() } as WithId<UserProfile>;
         
-        // Send daily check-in notification to players
         try {
             await sendNotification({
                 userId: player.id,
@@ -73,10 +70,8 @@ async function runAnalysis() {
       if (playersData.length > 0) {
         const analysisInput: TeamAnalysisInput = { teamId: team.id, teamName: team.name, playersData };
         const analysisResult = await analyzeTeamData(analysisInput);
-
         const today = new Date();
         
-        // Save the data summary
         if (analysisResult?.summary) {
           const summaryId = `weekly-${getYear(today)}-${getISOWeek(today)}`;
           const summaryRef = teamDoc.ref.collection('summaries').doc(summaryId);
@@ -90,9 +85,42 @@ async function runAnalysis() {
 
           teamSummariesForClub.push({ teamName: team.name, summary: analysisResult.summary });
           analysisCount++;
+
+          // After generating team summary, generate individual player updates
+          for (const playerData of playersData) {
+            try {
+              const playerUpdateInput: PlayerUpdateInput = {
+                playerName: playerData.name.split(' ')[0],
+                playerScores: playerData.scores,
+                teamAverageScores: analysisResult.summary,
+              };
+
+              const playerUpdateResult = await generatePlayerUpdate(playerUpdateInput);
+
+              if (playerUpdateResult) {
+                const updateRef = db.collection('users').doc(playerData.userId).collection('updates').doc();
+                const updateData: PlayerUpdate = {
+                  ...playerUpdateResult,
+                  id: updateRef.id,
+                  date: format(today, 'yyyy-MM-dd'),
+                };
+                await updateRef.set(updateData);
+                
+                // Send notification for the new update
+                await sendNotification({
+                  userId: playerData.userId,
+                  title: `💡 Nieuw Weetje: ${playerUpdateResult.title}`,
+                  body: playerUpdateResult.content.substring(0, 100) + '...',
+                  link: '/dashboard'
+                });
+                notificationCount++;
+              }
+            } catch(e) {
+                console.error(`Failed to generate player update for ${playerData.userId}:`, e);
+            }
+          }
         }
 
-        // Save the generated insight for staff
         if (analysisResult?.insight) {
             const insightRef = teamDoc.ref.collection('staffUpdates').doc();
             const insightData: StaffUpdate = {
@@ -105,7 +133,6 @@ async function runAnalysis() {
       }
     }
     
-    // After processing all teams, run club-level analysis
     if (teamSummariesForClub.length > 0) {
         try {
             const clubAnalysisInput: ClubAnalysisInput = {
@@ -137,8 +164,6 @@ async function runAnalysis() {
  * Protected by checking for a specific header sent by Cloud Scheduler.
  */
 export async function GET(request: Request) {
-  // IMPORTANT: Secure this endpoint.
-  // This header is recommended by Google for Cloud Scheduler invocations.
   if (request.headers.get('X-CloudScheduler') !== 'true' && process.env.NODE_ENV === 'production') {
     return new NextResponse('Forbidden', { status: 403 });
   }

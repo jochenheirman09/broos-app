@@ -1,130 +1,54 @@
+'use server';
 
-"use server";
-/**
- * @fileOverview A Genkit flow for analyzing team wellness data and generating summaries and insights.
- *
- * - analyzeTeamData - A function that handles the team data analysis.
- * - TeamAnalysisInput - The input type for the analyzeTeamData function.
- * - TeamAnalysisOutput - The return type for the analyzeTeamfFlunction.
- */
+import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema, type TeamAnalysisInput, type TeamAnalysisOutput } from '@/ai/types';
 
-import { ai } from "@/ai/genkit";
-import { z } from 'genkit';
-import {
-  TeamAnalysisInputSchema,
-  TeamAnalysisOutputSchema,
-  TeamSummarySchema,
-  StaffUpdateSchema,
-  ScoreSchema,
-  type TeamAnalysisInput,
-  type TeamAnalysisOutput,
-  type TeamSummary,
-} from "@/ai/types";
+// Lazily define the prompt to avoid initialization issues.
+let teamAnalysisPrompt: any;
+function defineTeamAnalysisPrompt() {
+    if (teamAnalysisPrompt) return;
 
-export async function analyzeTeamData(
-  input: TeamAnalysisInput
-): Promise<TeamAnalysisOutput> {
-  return teamAnalysisFlow(input);
+    teamAnalysisPrompt = ai.definePrompt({
+        name: 'teamDataAnalyzerPrompt',
+        model: googleAI.model('gemini-2.5-flash'),
+        input: { schema: TeamAnalysisInputSchema },
+        output: { schema: TeamAnalysisOutputSchema },
+        prompt: `
+            Je bent een sportdata-analist voor een voetbalclub. Je taak is om de anonieme welzijnsdata van team '{{{teamName}}}' te analyseren.
+
+            DATA:
+            {{#each playersData}}
+            - Speler {{name}}: Stemming: {{scores.mood}}, Stress: {{scores.stress}}, Slaap: {{scores.sleep}}, Motivatie: {{scores.motivation}}, Blessure: {{#if scores.injury}}Ja ({{scores.injuryReason}}){{else}}Nee{{/if}}. Redenen: {{scores.moodReason}}, {{scores.stressReason}}, {{scores.sleepReason}}, {{scores.motivationReason}}.
+            {{/each}}
+
+            TAKEN:
+            1.  **Teamoverzicht (summary):** Bereken de gemiddelde scores (afronden op 1 decimaal), tel het totaal aantal blessures, en identificeer 1-2 veelvoorkomende onderwerpen uit de redenen.
+            2.  **Team-inzicht (insight):** Creëer één enkel, bruikbaar inzicht voor de staf. Baseer dit op de meest opvallende trend of correlatie in de data.
+                -   **Title:** Een korte, duidelijke titel voor het inzicht.
+                -   **Content:** Leg het inzicht uit in 2-3 zinnen. Geef een concreet, positief en praktisch advies.
+                -   **Category:** Kies de meest relevante categorie: 'Team Performance', 'Player Wellness', of 'Injury Risk'.
+        `,
+    });
 }
 
 
-const insightPrompt = ai.definePrompt({
-    name: 'generateStaffInsight',
-    input: { schema: z.object({ teamName: z.string(), summary: TeamSummarySchema, playerCount: z.number() }) },
-    output: { schema: StaffUpdateSchema },
-    prompt: `
-        You are a sports data analyst creating a concise insight for a youth football coach.
-        Based on the following weekly wellness summary for team '{{{teamName}}}' with {{{playerCount}}} players, generate one actionable insight.
+/**
+ * Server-side function to analyze team wellness data and generate insights.
+ */
+export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAnalysisOutput | null> {
+    console.log(`[SERVER ACTION] analyzeTeamData invoked for team: ${input.teamName}`);
+    defineTeamAnalysisPrompt();
 
-        **Data:**
-        - Average Mood: {{{summary.averageMood}}} (1-5 scale)
-        - Average Stress: {{{summary.averageStress}}} (1-5 scale)
-        - Average Sleep: {{{summary.averageSleep}}} (1-5 scale)
-        - Average Motivation: {{{summary.averageMotivation}}} (1-5 scale)
-        - Total Injuries: {{{summary.injuryCount}}}
-        - Common Topics Discussed: {{{summary.commonTopics}}}
-
-        **Task:**
-        1.  Analyze the data to find the most significant trend, risk, or positive point.
-        2.  Write a short, clear title.
-        3.  Write a concise, actionable 'content' explaining the insight. If a score is low, suggest action. If it's high, give encouragement. If there's a risk, highlight it.
-        4.  Choose the most appropriate category: 'Player Wellness', 'Injury Risk', or 'Team Performance'.
-        5.  **Output must be in Dutch.**
-    `
-});
-
-
-const teamAnalysisFlow = ai.defineFlow(
-  {
-    name: "teamAnalysisFlow",
-    inputSchema: TeamAnalysisInputSchema,
-    outputSchema: TeamAnalysisOutputSchema,
-  },
-  async (input) => {
-    const { playersData, teamId, teamName } = input;
-    const playerCount = playersData.length;
-
-    if (playerCount === 0) {
-      return {
-        teamId: input.teamId,
-        summary: {
-            injuryCount: 0,
-            commonTopics: [],
-        },
-      };
-    }
-
-    const totals = {
-      mood: 0,
-      stress: 0,
-      sleep: 0,
-      motivation: 0,
-      moodCount: 0,
-      stressCount: 0,
-      sleepCount: 0,
-      motivationCount: 0,
-    };
-    let injuryCount = 0;
-    const allTopics = new Map<string, number>();
-
-    for (const playerData of playersData) {
-      const { scores } = playerData;
-      if (scores.mood) { totals.mood += scores.mood; totals.moodCount++; }
-      if (scores.stress) { totals.stress += scores.stress; totals.stressCount++; }
-      if (scores.sleep) { totals.sleep += scores.sleep; totals.sleepCount++; }
-      if (scores.motivation) { totals.motivation += scores.motivation; totals.motivationCount++; }
-      if (scores.injury) { injuryCount++; }
-      if (scores.freeText) {
-          const topics = scores.freeText.split(" ").filter(t => t.length > 3);
-          for(const topic of topics) {
-              allTopics.set(topic, (allTopics.get(topic) || 0) + 1);
-          }
-      }
-    }
-
-    const summary: TeamSummary = {
-      averageMood: totals.moodCount > 0 ? parseFloat((totals.mood / totals.moodCount).toFixed(1)) : undefined,
-      averageStress: totals.stressCount > 0 ? parseFloat((totals.stress / totals.stressCount).toFixed(1)) : undefined,
-      averageSleep: totals.sleepCount > 0 ? parseFloat((totals.sleep / totals.sleepCount).toFixed(1)) : undefined,
-      averageMotivation: totals.motivationCount > 0 ? parseFloat((totals.motivation / totals.motivationCount).toFixed(1)) : undefined,
-      injuryCount,
-      commonTopics: [...allTopics.entries()].sort((a,b) => b[1] - a[1]).slice(0, 3).map(e => e[0]),
-    };
-
-    // Now, call the insight prompt
-    let insight: TeamAnalysisOutput['insight'] | undefined = undefined;
     try {
-        const { output } = await insightPrompt({ teamName, summary, playerCount });
-        insight = output;
-    } catch (e) {
-        console.error("Failed to generate staff insight:", e);
-        // Do not block the flow, just return summary
+        const { output } = await teamAnalysisPrompt(input);
+        if (!output) {
+            console.warn('[SERVER ACTION] Team analysis prompt returned no output.');
+            return null;
+        }
+        return output;
+    } catch (error: any) {
+        console.error(`[SERVER ACTION] CRITICAL ERROR IN TEAM ANALYSIS FLOW for team ${input.teamId}:`, error);
+        return null;
     }
-
-    return {
-      teamId: input.teamId,
-      summary,
-      insight,
-    };
-  }
-);
+}

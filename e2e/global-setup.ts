@@ -1,23 +1,24 @@
 
-import 'dotenv/config';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import type { FullConfig } from '@playwright/test';
-import path from 'path';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 
-// Load environment variables from .env file
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// NOTE: This setup script is designed to run in a local Node.js environment
+// before the Playwright tests start. It will fail in the Firebase Studio
+// browser-based environment because it requires Node.js APIs and access to
+// a service account key via environment variables.
 
-
-async function globalSetup(config: FullConfig) {
+async function globalSetup() {
   console.log('--- E2E Global Setup: Initializing Firebase Admin ---');
 
+  // Ensure the service account key is available in the environment variables.
+  // This is the primary guard against running in an unsupported environment.
   if (!process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT) {
     throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. This setup is intended for local E2E testing and requires admin credentials. It will not run in the Firebase Studio web terminal.');
   }
 
+  // Initialize Firebase Admin SDK if not already initialized.
   if (!getApps().length) {
     try {
       initializeApp({
@@ -59,6 +60,7 @@ async function globalSetup(config: FullConfig) {
     }
   };
 
+  // Store credentials to be used by tests for logging in via the UI.
   process.env.E2E_PLAYER_EMAIL = testUsers.player.email;
   process.env.E2E_STAFF_EMAIL = testUsers.staff.email;
   process.env.E2E_RESPONSIBLE_EMAIL = testUsers.responsible.email;
@@ -82,7 +84,6 @@ async function globalSetup(config: FullConfig) {
         gender: user.gender,
         emailVerified: true,
         onboardingCompleted: false,
-        clubId: null,
       });
       console.log(`Created test user: ${user.email}`);
     } catch (error: any) {
@@ -94,6 +95,9 @@ async function globalSetup(config: FullConfig) {
       }
     }
   }
+
+  // The setup is complete. Tests will now run and use the credentials
+  // stored in process.env to log in through the application's UI.
   console.log('--- E2E Global Setup: Complete ---');
 }
 

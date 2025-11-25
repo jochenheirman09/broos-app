@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import type { Team, Schedule, DayOfWeek } from "@/lib/types";
 import { updateTeam } from "@/lib/firebase/firestore/team";
 import { Checkbox } from "../ui/checkbox";

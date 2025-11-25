@@ -1,11 +1,16 @@
-
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser } from "firebase/auth";
 import { doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { useUser as useFirebaseUser, useFirestore, useAuth, useDoc, useMemoFirebase } from "@/firebase/client-provider";
+import {
+  useUser as useFirebaseUser,
+  useFirestore,
+  useAuth,
+  useDoc,
+  useMemoFirebase,
+} from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
@@ -44,8 +49,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // loading is true if auth is loading OR if there's a user but their profile hasn't loaded yet.
-  const loading = isAuthLoading || (!!user && !userProfile);
+  // Combine auth loading and profile loading state
+  const loading = isAuthLoading || (!!user && isProfileLoading);
 
   useEffect(() => {
     if (profileError) {
@@ -56,6 +61,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsLoggingOut(true);
     await auth.signOut();
+    // After sign out, the auth listener will set user to null,
+    // which will trigger re-renders and layout changes.
+    // We push to the homepage as a fallback.
     router.push("/");
     setIsLoggingOut(false);
   };

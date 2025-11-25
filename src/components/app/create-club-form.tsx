@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -9,7 +8,7 @@ import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { createClub } from "@/lib/firebase/firestore/club";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import Link from "next/link";
 import { Separator } from "../ui/separator";
 

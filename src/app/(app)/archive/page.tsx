@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -9,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useUser } from "@/context/user-context";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase/client-provider";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import { Archive as ArchiveIcon, MessageSquare, Trash2, ShieldAlert } from "lucide-react";
 import { Chat, WithId } from "@/lib/types";

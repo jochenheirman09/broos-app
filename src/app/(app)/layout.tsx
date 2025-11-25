@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { AppHeader } from "@/components/app/header";
 import { Spinner } from "@/components/ui/spinner";
 import { PlayerLayout } from "@/components/app/player-layout";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

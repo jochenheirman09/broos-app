@@ -2,10 +2,11 @@
 'use client';
 
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { useFirebaseApp } from '@/firebase/client-provider';
+import { useFirebaseApp } from '@/firebase';
 import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import { useEffect } from 'react';
+
 
 // This function can be called from a client component.
 export const useRequestNotificationPermission = () => {
@@ -15,19 +16,21 @@ export const useRequestNotificationPermission = () => {
 
     const requestPermission = async () => {
         if (!app || !user || !("Notification" in window)) {
+            console.log("Notifications not supported or user not logged in.");
             return;
         }
         
+        console.log('Requesting permission...');
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
+            console.log('Notification permission granted.');
             
-            // IMPORTANT: Replace the placeholder below with your actual VAPID key from the Firebase console.
-            // This is a public key, so it's safe to have in client-side code.
-            const vapidKey = "BL921KtlXxkQTzzC4WqKljW4tDBR-2bOC2U828WlzXGWdGAz24u_ZkrtDEnhgLwJw-rIpe-nhK4naJPbt-CoPLo";
+            // For client-side code, Next.js makes NEXT_PUBLIC_ variables directly available on process.env
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
-            if (vapidKey === "BL921KtlXxkQTzzC4WqKljW4tDBR-2bOC2U828WlzXGWdGAz24u_ZkrtDEnhgLwJw-rIpe-nhK4naJPbt-CoPLo") {
-                console.error("VAPID key is not configured. Please add it to src/lib/firebase/messaging.ts");
+            if (!vapidKey) {
+                console.error("VAPID key not available. Make sure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set in your .env file.");
                 return;
             }
 
@@ -36,6 +39,7 @@ export const useRequestNotificationPermission = () => {
                 const currentToken = await getToken(messaging, { vapidKey });
 
                 if (currentToken) {
+                    console.log('FCM Token:', currentToken);
                     // Save the token to Firestore
                     const tokenRef = doc(db, 'users', user.uid, 'fcmTokens', currentToken);
                     await setDoc(tokenRef, {
@@ -62,9 +66,10 @@ export const ForegroundMessageListener = () => {
     const app = useFirebaseApp();
     
     useEffect(() => {
-        if (app && typeof window !== 'undefined' && "Notification" in window && Notification.permission === 'granted') {
+        if (app && typeof window !== 'undefined') {
             const messaging = getMessaging(app);
             const unsubscribe = onMessage(messaging, (payload) => {
+                console.log('Message received. ', payload);
                 // You can show a custom in-app notification here
                 // For now, we'll just log it.
                 new Notification(payload.notification?.title || 'New Message', {

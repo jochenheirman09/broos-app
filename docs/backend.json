@@ -373,15 +373,16 @@
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "KnowledgeDocument",
         "type": "object",
-        "description": "Represents a document in the knowledge base.",
+        "description": "Represents a document in the knowledge base for RAG.",
         "properties": {
             "id": { "type": "string", "description": "Unique identifier for the document." },
             "name": { "type": "string", "description": "The file name of the document." },
-            "firestorePath": { "type": "string", "description": "The path to the document in the Firestore knowledge_base collection." },
+            "content": { "type": "string", "description": "The full text content of the document." },
+            "embedding": { "type": "array", "items": { "type": "number" }, "description": "Vector embedding of the document content." },
             "status": { "type": "string", "enum": ["pending", "ingesting", "completed", "error"], "description": "The ingestion status of the document." },
             "ingestedAt": { "type": "string", "format": "date-time" }
         },
-        "required": ["id", "name", "firestorePath", "status"]
+        "required": ["id", "name", "content", "status"]
     },
     "KnowledgeUsageStat": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -572,7 +573,7 @@
         "definition": {
             "entityName": "KnowledgeDocument",
             "schema": { "$ref": "#/backend/entities/KnowledgeDocument" },
-            "description": "Stores metadata about documents in the knowledge base for RAG.",
+            "description": "Stores documents for the knowledge base, including content and embeddings.",
             "params": [
                 { "name": "docId", "description": "The unique ID of the document." }
             ]
@@ -590,6 +591,6 @@
         }
       }
     ],
-    "reasoning": "This design prioritizes security and scalability for the Broos 2.0 application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages, wellness scores, alerts and player updates are stored in subcollections under the user, ensuring data privacy and easy retrieval. Team summaries are stored under the team, allowing for aggregated analysis. Knowledge base documents and usage statistics are stored in root collections, allowing club responsibles to manage them and the AI to retrieve them efficiently for all users."
+    "reasoning": "This design prioritizes security and scalability for the Broos 2.0 application. User data is stored under `/users/{userId}` ensuring clear ownership and simplifying security rules. The `User` document contains the role information, eliminating the need for custom claims or separate role collections. Email verification status is also stored directly within the `User` document. The Club data is stored under `/clubs/{clubId}` with a one-to-one link to a `User` stored in the `User` document. Since only 'responsible' users create clubs, checking for the club's existence via the `clubId` in the user document is sufficient. The key to authorization independence here is the denormalization of the club id in the `User` document. This avoids needing to read the `Club` document to determine a user's authorization context. This supports the QAPs because list operations are secured by path based rules and no role information needs to be checked in the rules, simplifying and securing list operations. Teams are a subcollection of clubs, enforcing a clear hierarchy. Chat messages, wellness scores, alerts and player updates are stored in subcollections under the user, ensuring data privacy and easy retrieval. Team summaries are stored under the team, allowing for aggregated analysis. Knowledge base documents and usage statistics are stored in root collections, allowing club responsibles to manage them and the AI to retrieve them efficiently for all users. The KnowledgeDocument schema is updated to store content and embeddings directly, preparing for RAG implementation."
   }
 }

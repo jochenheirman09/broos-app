@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase/client-provider";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import type { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
@@ -13,16 +12,45 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, BookOpen, BarChart2, RefreshCw, KeyRound, Copy, Users } from "lucide-react";
+import { Building, BookOpen, AlertTriangle, RefreshCw, KeyRound, Copy, Users, ArrowRight } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
-import { KnowledgeBaseStats } from "./knowledge-base-stats";
+import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { Button } from "../ui/button";
 import { generateClubInvitationCode } from "@/lib/firebase/firestore/club";
 import { useToast } from "@/hooks/use-toast";
+import { PlusCircle } from "lucide-react";
+import Link from "next/link";
+import { AlertList } from "./alert-list";
+
+function ResponsibleNoClub() {
+  return (
+    <Card className="bg-accent/20 border-accent">
+      <CardHeader>
+        <CardTitle className="flex items-center text-2xl">
+          <Building className="h-7 w-7 mr-3 text-accent-foreground" />
+          Creëer Je Club
+        </CardTitle>
+        <CardDescription className="text-accent-foreground/80">
+          Om de app te blijven gebruiken, moet je een club aanmaken voor je
+          account.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Link href="/create-club">
+          <Button variant="accent" size="lg">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Club aanmaken
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
@@ -150,6 +178,30 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
       <Card>
         <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="flex items-center">
+                <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
+                Recente Alerts
+              </CardTitle>
+              <CardDescription>
+                De laatste zorgwekkende signalen van spelers binnen de hele club.
+              </CardDescription>
+            </div>
+            <Link href="/alerts" passHref>
+                <Button variant="ghost">
+                    Bekijk alles <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <AlertList limit={3} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Team Management</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -178,11 +230,11 @@ function ClubManagement({ clubId }: { clubId: string }) {
             Kennisbank Management
           </CardTitle>
            <CardDescription>
-            Overzicht van de documenten die de AI-buddy gebruikt en hoe vaak ze worden geraadpleegd.
+            Beheer hier de documenten die de AI-buddy gebruikt om te leren en antwoorden te geven.
           </CardDescription>
         </CardHeader>
         <CardContent>
-            <KnowledgeBaseStats clubId={club.id} />
+            <KnowledgeBaseManager clubId={club.id} />
         </CardContent>
       </Card>
 
@@ -191,6 +243,9 @@ function ClubManagement({ clubId }: { clubId: string }) {
 }
 
 
-export function ResponsibleDashboard({ clubId }: { clubId: string }) {
+export function ResponsibleDashboard({ clubId }: { clubId?: string }) {
+    if (!clubId) {
+        return <ResponsibleNoClub />;
+    }
   return <ClubManagement clubId={clubId} />;
 }

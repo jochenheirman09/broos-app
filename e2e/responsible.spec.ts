@@ -13,12 +13,11 @@ test.describe('Club Responsible Flow', () => {
     await page.getByLabel('E-mail').fill(process.env.E2E_RESPONSIBLE_EMAIL!);
     await page.getByLabel('Wachtwoord').fill(process.env.E2E_PASSWORD!);
     await page.getByRole('button', { name: 'Log in' }).click();
-    // After login, should be on the dashboard page.
-    await page.waitForURL('/dashboard');
   });
 
   test('should be prompted to create a club and can create a team', async ({ page }) => {
     // 1. Should see the prompt to create a club on the dashboard.
+    await expect(page).toHaveURL('/dashboard');
     await expect(page.getByRole('heading', { name: 'Creëer Je Club' })).toBeVisible();
     
     // 2. Navigate to the create club page.
@@ -27,8 +26,8 @@ test.describe('Club Responsible Flow', () => {
 
     // 3. Fill out and submit the create club form.
     const clubName = `Test Club ${Date.now()}`;
-    await page.getByLabel('Nieuwe Clubnaam').fill(clubName);
-    await page.getByRole('button', { name: 'Nieuwe club aanmaken' }).click();
+    await page.getByLabel('Clubnaam').fill(clubName);
+    await page.getByRole('button', { name: 'Club aanmaken' }).click();
 
     // 4. After creation, land on the dashboard and see the club management UI.
     await expect(page).toHaveURL('/dashboard');
@@ -41,9 +40,8 @@ test.describe('Club Responsible Flow', () => {
 
     // 6. The new team should appear in the list with an invitation code.
     const newTeamCard = page.locator('.card', { hasText: teamName });
-    
-    // Explicitly wait for a definitive element inside the new card to be visible.
-    await expect(newTeamCard.getByRole('button', { name: /Genereer code/})).toBeVisible();
+    await expect(newTeamCard).toBeVisible();
     await expect(newTeamCard.getByText(/Uitnodigingscode/)).toBeVisible();
+    await expect(newTeamCard.getByRole('button', { name: /Genereer code/})).toBeVisible();
   });
 });

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -30,13 +29,16 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   updateProfile,
+  signInWithEmailAndPassword,
 } from "firebase/auth";
-import { useAuth, useFirestore } from "@/firebase/client-provider";
-import { doc, setDoc } from "firebase/firestore";
+import { useAuth, useFirestore, firebaseConfig } from "@/firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import type { UserRole, Gender } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Checkbox } from "../ui/checkbox";
 import Link from "next/link";
+import { User } from 'firebase/auth';
+
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
 const genders: { value: Gender; labelPlayer: string; labelAdult: string }[] = [
@@ -78,6 +80,7 @@ export function RegisterForm() {
   const db = useFirestore();
 
   const selectedRole = searchParams.get("role") as UserRole | null;
+  
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -92,6 +95,27 @@ export function RegisterForm() {
   });
 
   const watchedRole = form.watch("role");
+
+  // This function creates the Firestore user document.
+  // It's used for both new users and existing "ghost" users.
+  const createFirestoreUserDocument = async (user: User, values: z.infer<typeof formSchema>) => {
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      name: values.name,
+      email: values.email,
+      role: values.role,
+      gender: values.gender,
+      emailVerified: user.emailVerified,
+      onboardingCompleted: false,
+      acceptedTerms: true,
+      clubId: values.role === 'responsible' ? null : undefined, // Explicitly null for responsible
+      teamId: undefined, // Will be set in complete-profile
+    });
+    // Also update the auth profile display name
+    if (user.displayName !== values.name) {
+      await updateProfile(user, { displayName: values.name });
+    }
+  };
 
   useEffect(() => {
     if (selectedRole && roles.includes(selectedRole)) {
@@ -110,44 +134,80 @@ export function RegisterForm() {
     }
     setIsLoading(true);
     try {
+      // First, try to create a new user.
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
         values.password
       );
       const user = userCredential.user;
-
-      await updateProfile(user, {
-        displayName: values.name,
-      });
-
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        name: values.name,
-        email: values.email,
-        role: values.role,
-        gender: values.gender,
-        emailVerified: false,
-        onboardingCompleted: false,
-        acceptedTerms: true,
-        clubId: null, // Explicitly set clubId to null
-      });
-
+      
+      // If successful, create their Firestore document.
+      await createFirestoreUserDocument(user, values);
+      
       await sendEmailVerification(user);
 
       toast({
         title: "Registratie succesvol",
-        description:
-          "Er is een verificatie-e-mail verzonden. Controleer je inbox.",
+        description: "Er is een verificatie-e-mail verzonden. Controleer je inbox.",
       });
 
       router.push("/verify-email");
+
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Registratie mislukt",
-        description: error.message,
-      });
+      // If the error is 'auth/email-already-in-use', we handle the "ghost user" case.
+      if (error.code === 'auth/email-already-in-use') {
+        try {
+          // Try to sign in the user. This will fail if the password is wrong.
+          const existingUserCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+          const existingUser = existingUserCredential.user;
+
+          // Check if a Firestore document already exists for this user.
+          const userDocRef = doc(db, "users", existingUser.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (!userDoc.exists()) {
+            // The user exists in Auth, but not in Firestore. Create the doc.
+            await createFirestoreUserDocument(existingUser, values);
+            toast({
+              title: "Account hersteld!",
+              description: "Je account bestond al maar je profiel was incompleet. Dit is nu hersteld.",
+            });
+          }
+          // Whether the doc existed or not, redirect them.
+           if (!existingUser.emailVerified) {
+              // Resend verification just in case and redirect
+              await sendEmailVerification(existingUser);
+              toast({
+                title: "Verificatie vereist",
+                description: "Je e-mailadres is nog niet geverifieerd. Een nieuwe e-mail is onderweg."
+              });
+              router.push('/verify-email');
+           } else {
+              // If verified, proceed to the dashboard.
+              toast({
+                title: "Welkom terug!",
+                description: "Je wordt ingelogd.",
+              });
+              router.push('/dashboard');
+           }
+
+        } catch (signInError: any) {
+          // If sign-in fails, it's likely a wrong password for an existing account.
+          toast({
+            variant: "destructive",
+            title: "Registratie mislukt",
+            description: "Dit e-mailadres is al in gebruik. Als dit jouw account is, probeer dan in te loggen of je wachtwoord te herstellen.",
+          });
+        }
+      } else {
+        // Handle other registration errors.
+        toast({
+          variant: "destructive",
+          title: "Registratie mislukt",
+          description: error.message || "Er is een onbekende fout opgetreden.",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -254,15 +314,9 @@ export function RegisterForm() {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem
-                        key={role}
-                        value={role}
-                        className="capitalize"
-                      >
-                        {role}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="player">Speler</SelectItem>
+                    <SelectItem value="staff">Staf</SelectItem>
+                    <SelectItem value="responsible">Clubverantwoordelijke</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

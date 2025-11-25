@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
 import {
@@ -60,25 +60,33 @@ export function CompleteProfileForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !db) {
+      console.error("[Submit Aborted] No user or db connection.");
       return;
     }
 
     setIsLoading(true);
+    console.log("[Submit Start] Submitting with values:", {
+      birthDate: values.birthDate.toISOString(),
+      teamCode: values.teamCode,
+    });
     
     let foundTeam: { id: string, clubId: string } | null = null;
 
     try {
       // Step 1: Get all clubs. This is allowed by security rules.
+      console.log("[Querying] Fetching all clubs to search for the team code.");
       const clubsQuery = query(collection(db, "clubs"));
       const clubsSnapshot = await getDocs(clubsQuery);
       
       if (clubsSnapshot.empty) {
         throw new Error("Er zijn geen clubs gevonden in het systeem.");
       }
+      console.log(`[Query Result] Found ${clubsSnapshot.docs.length} clubs. Now searching within each...`);
 
       // Step 2: Iterate through each club and query its 'teams' subcollection.
       for (const clubDoc of clubsSnapshot.docs) {
         const club = {id: clubDoc.id, ...clubDoc.data()} as Club;
+        console.log(`[Searching] Looking in club "${club.name}" (ID: ${club.id}) for team code.`);
 
         const teamsRef = collection(db, "clubs", club.id, "teams");
         const teamQuery = query(
@@ -96,11 +104,13 @@ export function CompleteProfileForm() {
             id: teamDoc.id,
             clubId: teamData.clubId, // We get the clubId from the team document itself.
           };
+          console.log(`[SUCCESS] Found team! Team ID: ${foundTeam.id}, Club ID: ${foundTeam.clubId}`);
           break; // Exit the loop once the team is found
         }
       }
 
       if (!foundTeam) {
+        console.error(`[Query Result] No team found across all clubs for code: "${values.teamCode}"`);
         toast({
           variant: "destructive",
           title: "Ongeldige Code",
@@ -117,18 +127,22 @@ export function CompleteProfileForm() {
         clubId: foundTeam.clubId,
       };
       
+      console.log("[Profile Update] Attempting to update user profile with:", updatedProfile);
+
       await updateUserProfile({
         db,
         userId: user.uid,
         data: updatedProfile,
       });
 
+      console.log("[Profile Update] User profile update successful.");
       toast({
         title: "Profiel Bijgewerkt",
         description: "Je bent succesvol aan het team toegevoegd!",
       });
 
     } catch (e: any) {
+      console.error("[Submit Error] An error occurred during profile completion:", e);
       // This will now more likely catch permission errors on the clubs collection if any.
       if (e.code?.includes('permission-denied')) {
         const permissionError = new FirestorePermissionError({ path: "clubs", operation: "list" });
@@ -147,6 +161,7 @@ export function CompleteProfileForm() {
       }
     } finally {
       setIsLoading(false);
+      console.log("[Submit End]");
     }
   }
 

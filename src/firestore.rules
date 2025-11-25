@@ -40,6 +40,11 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
     }
 
+    // This rule is no longer necessary as we are not using a collectionGroup query.
+    // match /{path=**}/teams/{teamId} {
+    //  allow read: if isSignedIn();
+    // }
+
     match /users/{userId} {
       // User can read/write their own document
       allow get: if isOwner(userId);

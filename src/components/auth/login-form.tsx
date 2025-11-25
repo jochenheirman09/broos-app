@@ -21,7 +21,7 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { useAuth } from "@/firebase/client-provider";
+import { useAuth } from "@/firebase";
 import { Spinner } from "../ui/spinner";
 
 const formSchema = z.object({

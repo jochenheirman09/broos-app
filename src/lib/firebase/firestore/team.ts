@@ -1,9 +1,8 @@
-
 "use client";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { Schedule, DayOfWeek } from "@/lib/types";
+import { Schedule } from "@/lib/types";
 import {
   collection,
   deleteDoc,
@@ -48,6 +47,7 @@ export async function createTeam({ db, clubId, teamName, schedule }: CreateTeamP
     await setDoc(newTeamRef, teamData);
     return teamData;
   } catch (error) {
+    console.error("Error creating team:", error);
     const permissionError = new FirestorePermissionError({
       path: newTeamRef.path,
       operation: "create",
@@ -74,6 +74,7 @@ export async function generateTeamInvitationCode(
     await updateDoc(teamRef, updateData);
     return invitationCode;
   } catch (error) {
+    console.error("Error generating team invitation code:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "update",
@@ -106,6 +107,7 @@ export async function updateTeam({
   try {
     await updateDoc(teamRef, teamData);
   } catch (error) {
+    console.error("Error updating team:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "update",
@@ -131,6 +133,7 @@ export async function deleteTeam({ db, clubId, teamId }: DeleteTeamParams) {
   try {
     await deleteDoc(teamRef);
   } catch (error) {
+    console.error("Error deleting team:", error);
     const permissionError = new FirestorePermissionError({
       path: teamRef.path,
       operation: "delete",

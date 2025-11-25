@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
@@ -40,6 +39,7 @@ export async function addPlayerTraining({
   try {
     await setDoc(newTrainingRef, trainingData)
   } catch (error) {
+    console.error("Error adding player training:", error);
     const permissionError = new FirestorePermissionError({
       path: newTrainingRef.path,
       operation: "create",

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -7,7 +6,7 @@ import {
   useDoc,
   useFirestore,
   useMemoFirebase,
-} from "@/firebase/client-provider";
+} from "@/firebase";
 import { collection, doc, query } from "firebase/firestore";
 import type { PlayerTraining, Team, WithId } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
@@ -59,7 +58,7 @@ const daysOfWeek = [
   "sunday",
 ];
 
-export function WeekSchedule() {
+export function WeekSchedule({ refreshKey }: { refreshKey?: number }) {
   const { user, userProfile } = useUser();
   const db = useFirestore();
 
@@ -80,7 +79,7 @@ export function WeekSchedule() {
   const trainingsQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(collection(db, "users", user.uid, "trainings"));
-  }, [db, user]);
+  }, [db, user, refreshKey]); // Add refreshKey as a dependency
   const { data: individualTrainings, isLoading: areTrainingsLoading } =
     useCollection<PlayerTraining>(trainingsQuery);
 

@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import { useFirestore, useMemoFirebase, useCollection } from "@/firebase/client-provider";
+import { useFirestore, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import type { Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";

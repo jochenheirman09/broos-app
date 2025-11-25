@@ -12,12 +12,11 @@ test.describe('Player Flow', () => {
     await page.getByLabel('Wachtwoord').fill(process.env.E2E_PASSWORD!);
     await page.getByRole('button', { name: 'Log in' }).click();
     // After login, the user is redirected to complete their profile
-    await page.waitForURL('/complete-profile');
+    await expect(page).toHaveURL('/complete-profile');
   });
 
 
   test('should be prompted to complete profile and join a team', async ({ page }) => {
-    // Explicitly wait for the heading to ensure the page is loaded.
     await expect(page.getByRole('heading', { name: /Bijna klaar/ })).toBeVisible();
     
     // Fill out the form
@@ -30,7 +29,7 @@ test.describe('Player Flow', () => {
     await page.getByRole('button', { name: 'Profiel Opslaan' }).click();
     
     // Since the team code is invalid, we expect a toast message.
-    await expect(page.getByText('Ongeldige Code')).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText('Ongeldige Code');
     
     // The user should remain on the same page
     await expect(page).toHaveURL('/complete-profile');

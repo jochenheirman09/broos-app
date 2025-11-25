@@ -84,8 +84,10 @@ export function useCollection<T = any>(
 
   useEffect(() => {
     const path = getPathFromQuery(memoizedTargetRefOrQuery);
+    console.log(`[useCollection] Subscribing to: ${path}`);
     
     if (!memoizedTargetRefOrQuery) {
+      console.log(`[useCollection] Subscription skipped (null query) for: ${path}`);
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -98,6 +100,7 @@ export function useCollection<T = any>(
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
+        console.log(`[useCollection] Data received for: ${path}`);
         const results: ResultItemType[] = [];
         for (const doc of snapshot.docs) {
           results.push({ ...(doc.data() as T), id: doc.id });
@@ -107,6 +110,7 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        console.error(`[useCollection] PERMISSION ERROR on: ${path}`, error);
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path,
@@ -122,6 +126,7 @@ export function useCollection<T = any>(
     );
 
     return () => {
+      console.log(`[useCollection] Unsubscribing from: ${path}`);
       unsubscribe();
     }
   }, [memoizedTargetRefOrQuery, refetchTrigger]); // Re-run if the target query/reference or trigger changes.

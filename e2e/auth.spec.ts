@@ -1,4 +1,3 @@
-
 import { test, expect } from '@playwright/test';
 
 test.describe('Authentication', () => {
@@ -15,7 +14,7 @@ test.describe('Authentication', () => {
     // 2. Fill out registration form
     await page.getByLabel('Naam').fill('Test Speler');
     await page.getByLabel('E-mail').fill(userEmail);
-    await page.getByLabel('Wachtwoord', { exact: true }).fill(userPassword);
+    await page.getByLabel('Wachtwoord').fill(userPassword);
     await page.getByLabel('Herhaal wachtwoord').fill(userPassword);
     
     // Select gender
@@ -29,7 +28,7 @@ test.describe('Authentication', () => {
     await page.getByRole('button', { name: 'Account aanmaken' }).click();
 
     // 4. Verify redirect to email verification page
-    await page.waitForURL('/verify-email');
+    await expect(page).toHaveURL('/verify-email');
     await expect(page.getByRole('heading', { name: 'Verifieer je e-mailadres' })).toBeVisible();
     await expect(page.getByText(userEmail)).toBeVisible();
   });
@@ -41,8 +40,9 @@ test.describe('Authentication', () => {
     await page.getByLabel('Wachtwoord').fill('invalidpassword');
     await page.getByRole('button', { name: 'Log in' }).click();
 
-    // Wait for the toast to appear by looking for its specific text.
-    const toast = page.getByText('Inloggen mislukt', { exact: true });
+    // Wait for the toast to appear
+    const toast = page.getByRole('alert');
     await expect(toast).toBeVisible();
+    await expect(toast).toContainText('Inloggen mislukt');
   });
 });

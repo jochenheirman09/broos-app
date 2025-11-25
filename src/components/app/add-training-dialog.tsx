@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -16,13 +15,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
-import { useFirestore } from "@/firebase/client-provider";
+import { useFirestore } from "@/firebase";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "../ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { addPlayerTraining } from "@/lib/firebase/firestore/training";
+import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
 
 interface AddTrainingDialogProps {
   isOpen: boolean;
@@ -41,6 +41,7 @@ export function AddTrainingDialog({
   const [description, setDescription] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [isLoading, setIsLoading] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const handleSubmit = async () => {
     if (!user) {
@@ -59,19 +60,17 @@ export function AddTrainingDialog({
     setIsLoading(true);
     
     try {
-        await addPlayerTraining({
-            db,
-            userId: user.uid,
-            date,
-            description,
-        });
-
-        // Optimistic UI update
-        onTrainingAdded();
-    } catch(error) {
-        // Error is already emitted by the firestore function
+      await addPlayerTraining({
+        db,
+        userId: user.uid,
+        date,
+        description,
+      });
+      onTrainingAdded();
+    } catch(e) {
+      // Error is handled by emitter
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -87,7 +86,7 @@ export function AddTrainingDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="date">Datum van training</Label>
-            <Popover>
+            <Popover open={isPickerOpen} onOpenChange={setIsPickerOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
@@ -101,11 +100,22 @@ export function AddTrainingDialog({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar
+                <DatePickerWithDropdowns
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   initialFocus
+                  footer={
+                    <div className="p-2 border-t">
+                      <Button
+                        className="w-full"
+                        onClick={() => setIsPickerOpen(false)}
+                        disabled={!date}
+                      >
+                        Selecteer datum
+                      </Button>
+                    </div>
+                  }
                 />
               </PopoverContent>
             </Popover>

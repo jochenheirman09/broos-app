@@ -1,19 +1,144 @@
 
 "use client";
 
+import { useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { UploadCloud } from "lucide-react";
+import { Button } from "../ui/button";
+import { Card, CardContent } from "../ui/card";
+import { Spinner } from "../ui/spinner";
+import { UploadCloud, BrainCircuit, FileText, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import type { KnowledgeDocument, WithId } from "@/lib/types";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
+import { useUser } from "@/context/user-context";
+import { ingestDocument } from "@/ai/flows/ingest-flow";
+import { useToast } from "@/hooks/use-toast";
 
-export function KnowledgeBaseStats({ clubId }: { clubId: string }) {
-  // We will not query the knowledge base here to prevent permission errors
-  // if the collection does not exist yet. Instead, we show an informational message.
+// This component is being repurposed into a manager.
+// The name is kept for now to avoid breaking imports, but it's acting as KnowledgeBaseManager.
+
+const statusIcons = {
+  pending: <Clock className="h-4 w-4 text-yellow-500" />,
+  ingesting: <Spinner size="small" />,
+  completed: <CheckCircle className="h-4 w-4 text-green-500" />,
+  error: <AlertCircle className="h-4 w-4 text-red-500" />,
+}
+
+function DocumentItem({ doc }: { doc: WithId<KnowledgeDocument> }) {
   return (
-    <Alert>
-      <UploadCloud className="h-4 w-4" />
-      <AlertTitle>Kennisbank Management</AlertTitle>
-      <AlertDescription>
-        Deze functionaliteit is momenteel in ontwikkeling. Binnenkort kunt u hier documenten beheren om de kennis van de AI-buddy uit te breiden.
-      </AlertDescription>
-    </Alert>
+    <div className="flex items-center justify-between p-3 border-b last:border-b-0">
+      <div className="flex items-center gap-3">
+        <FileText className="h-5 w-5 text-muted-foreground" />
+        <span className="font-medium truncate">{doc.name}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground capitalize">
+        {statusIcons[doc.status]}
+        <span>{doc.status}</span>
+      </div>
+    </div>
+  )
+}
+
+export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
+  const { user } = useUser();
+  const db = useFirestore();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+
+  const docsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(db, `knowledge_base`), orderBy("ingestedAt", "desc"));
+  }, [user, db]);
+
+  const { data: documents, isLoading, error } = useCollection<KnowledgeDocument>(docsQuery);
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !clubId) return;
+
+    setIsUploading(true);
+
+    try {
+        const fileContent = await file.text();
+        const result = await ingestDocument({
+            fileName: file.name,
+            fileContent,
+            clubId,
+        });
+
+        if (result.success) {
+            toast({
+                title: "Upload Geslaagd",
+                description: `Het document "${file.name}" wordt verwerkt.`
+            });
+        } else {
+            throw new Error(result.message);
+        }
+
+    } catch (error: any) {
+        console.error("Upload failed:", error);
+        toast({
+            variant: "destructive",
+            title: "Upload Mislukt",
+            description: error.message || "Kon het bestand niet uploaden."
+        })
+    } finally {
+        setIsUploading(false);
+        // Reset file input
+        if(fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    }
+  };
+
+  return (
+    <Card className="bg-card/30">
+      <CardContent className="p-4 space-y-4">
+        <Button onClick={handleUploadClick} className="w-full" disabled={isUploading}>
+          {isUploading ? <Spinner size="small" className="mr-2"/> : <UploadCloud className="mr-2 h-4 w-4" />}
+          {isUploading ? "Verwerken..." : "Nieuw Document Uploaden (.txt, .md)"}
+        </Button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          className="hidden"
+          accept=".txt,.md"
+          disabled={isUploading}
+        />
+
+        <div className="border rounded-lg">
+          {isLoading && <div className="p-4 text-center"><Spinner /></div>}
+          
+          {!isLoading && error && (
+             <Alert variant="destructive">
+                <AlertTitle>Fout</AlertTitle>
+                <AlertDescription>Kon documenten niet laden.</AlertDescription>
+             </Alert>
+          )}
+
+          {!isLoading && documents && documents.length > 0 && (
+            <div>
+              {documents.map(doc => <DocumentItem key={doc.id} doc={doc} />)}
+            </div>
+          )}
+
+          {!isLoading && (!documents || documents.length === 0) && (
+            <div className="p-8 text-center text-muted-foreground">
+              <BrainCircuit className="mx-auto h-8 w-8 mb-2" />
+              <p>De kennisbank is leeg.</p>
+              <p className="text-xs">Upload documenten om de AI te trainen.</p>
+            </div>
+          )}
+        </div>
+
+      </CardContent>
+    </Card>
   );
 }

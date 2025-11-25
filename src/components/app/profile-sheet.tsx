@@ -1,4 +1,3 @@
-
 "use client";
 import { useUser } from "@/context/user-context";
 import {
@@ -24,7 +23,7 @@ import {
 } from "@/components/ui/form";
 import { useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, useFirestore } from "@/firebase/client-provider";
+import { useAuth, useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { updateProfile as updateAuthProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
@@ -115,6 +114,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
       }
       if (newPhoto) {
         updates.photoURL = newPhoto;
+        authUpdates.photoURL = newPhoto;
       }
 
       if (Object.keys(updates).length > 0) {

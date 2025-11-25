@@ -1,77 +1,43 @@
 
 "use server";
+
+import { z } from 'genkit';
+import { adminDb, ai } from '@/ai/genkit';
+import { serverTimestamp } from 'firebase-admin/firestore';
+import type { KnowledgeDocument } from '@/lib/types';
+import { IngestInputSchema, type IngestInput } from '@/ai/types';
+
 /**
- * @fileOverview A Genkit flow for ingesting documents into the knowledge base.
+ * Server action to ingest a text-based document into the knowledge base.
+ * This is a simplified version and does not yet generate vector embeddings.
  */
-import { ai } from "@/ai/genkit";
-import { z } from "zod";
-import { textEmbeddingGecko } from "@genkit-ai/google-genai";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
+export async function ingestDocument(input: IngestInput): Promise<{ success: boolean, docId?: string, message: string }> {
+  console.log(`[SERVER ACTION] ingestDocument invoked for file: ${input.fileName}`);
+  
+  const { fileName, fileContent, clubId } = input;
 
+  if (!fileName || !fileContent || !clubId) {
+    return { success: false, message: "Bestandsnaam, inhoud en club-ID zijn vereist." };
+  }
 
-// This flow is a placeholder for the document ingestion logic.
-// In a real application, you would add logic here to:
-// 1. Download the file from the provided URL (e.g., from Firebase Storage).
-// 2. Extract text content from the document (e.g., from a PDF).
-// 3. Split the text into manageable chunks.
-// 4. Use the retriever to add these chunks to the vector database.
-//
-// This flow can be triggered by a Cloud Function when a new file is uploaded to Storage.
+  // In a real RAG implementation, you would generate embeddings here.
+  // For now, we'll just store the content and mark it as 'completed'.
 
-const DocInputSchema = z.object({
-  url: z.string().describe("The URL of the document to ingest."),
-});
+  const newDocRef = adminDb.collection('knowledge_base').doc();
+  
+  const documentData: Omit<KnowledgeDocument, 'id' | 'embedding'> = {
+    name: fileName,
+    content: fileContent,
+    status: 'completed', // Simulate immediate completion
+    ingestedAt: serverTimestamp() as any,
+  };
 
-export async function ingestDocument(url: string) {
-  // This is a mock implementation.
-  console.log(`Starting ingestion for document at: ${url}`);
-
-  const firestore = getFirestore();
-  const storage = getStorage().bucket();
-
-  // List all files in your "documents" folder in Firebase Storage
-  const [files] = await storage.getFiles({ prefix: "documents/" });
-
-  for (const file of files) {
-    if (await firestore.collection('knowledge_base').doc(file.name).get().then(d => d.exists)) {
-        console.log(`Skipping ${file.name}, already ingested.`);
-        continue;
-    }
-
-    const [buffer] = await file.download();
-    const text = buffer.toString("utf8");
-
-    // 1️⃣ Generate embedding using Gemini embedding model
-    const { embedding } = await textEmbeddingGecko.embed({ content: text });
-
-    // 2️⃣ Save embedding and metadata in Firestore
-    await firestore.collection("knowledge_base").doc(file.name).set({
-      name: file.name,
-      content: text,
-      embedding,
-      createdAt: new Date(),
-    });
-
-    console.log(`✅ Ingested ${file.name}`);
+  try {
+    await newDocRef.set(documentData);
+    console.log(`[SERVER ACTION] Successfully saved document ${fileName} with ID ${newDocRef.id}`);
+    return { success: true, docId: newDocRef.id, message: "Document succesvol opgeslagen." };
+  } catch (error: any) {
+    console.error("[SERVER ACTION] Error saving document to Firestore:", error);
+    return { success: false, message: "Fout bij het opslaan van het document in de database." };
   }
 }
-
-export const ingestFlow = ai.defineFlow(
-  {
-    name: "ingestDocumentFlow",
-    inputSchema: z.object({ path: z.string() }),
-    outputSchema: z.object({
-      success: z.boolean(),
-      message: z.string(),
-    }),
-  },
-  async ({ path }) => {
-    try {
-        await ingestDocument(path);
-        return { success: true, message: "Document processed successfully." };
-    } catch (e: any) {
-        return { success: false, message: e.message || "Failed to process document." };
-    }
-  }
-);
