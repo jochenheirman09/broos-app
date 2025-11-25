@@ -1,7 +1,7 @@
 
 "use server";
 
-import { adminDb } from "@/ai/genkit";
+import { getFirebaseAdmin } from "@/ai/genkit";
 import type { KnowledgeDocument } from "@/lib/types";
 
 /**
@@ -18,6 +18,7 @@ export async function retrieveSimilarDocuments(
   clubId: string
 ): Promise<KnowledgeDocument[]> {
   console.log(`[Retriever] Searching for documents related to: "${userMessage}"`);
+  const { adminDb } = getFirebaseAdmin();
 
   if (!userMessage.trim()) {
     return [];

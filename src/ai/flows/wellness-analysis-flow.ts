@@ -1,12 +1,11 @@
 'use server';
 
 import { z } from 'genkit';
-import { GenkitError } from 'genkit';
-import { ai } from '@/ai/genkit';
+import { GenkitError, ai as genkitAI } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { retrieveSimilarDocuments } from '@/ai/retriever';
 import { saveWellnessData } from '@/services/firestore-service';
-import type { UserProfile, WellnessAnalysisInput, KnowledgeDocument } from '@/lib/types';
+import type { UserProfile, WellnessAnalysisInput } from '@/lib/types';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { WellnessAnalysisInputSchema, WellnessAnalysisOutputSchema, type WellnessAnalysisOutput } from '@/ai/types';
 
@@ -14,7 +13,13 @@ import { WellnessAnalysisInputSchema, WellnessAnalysisOutputSchema, type Wellnes
 // Define the prompt for the regular chat flow
 let regularBuddyPrompt: any;
 function defineRegularBuddyPrompt() {
-  if (regularBuddyPrompt) return;
+  if (regularBuddyPrompt) return regularBuddyPrompt;
+  
+  const ai = genkitAI({
+    plugins: [googleAI()],
+    logLevel: 'debug',
+    enableTracingAndMetrics: true,
+  });
 
   regularBuddyPrompt = ai.definePrompt({
     name: 'wellnessBuddyPrompt',
@@ -49,6 +54,7 @@ function defineRegularBuddyPrompt() {
         {{{chatHistory}}}
       `,
   });
+  return regularBuddyPrompt;
 }
 
 /**
@@ -61,7 +67,7 @@ export async function runWellnessAnalysisFlow(
   input: WellnessAnalysisInput
 ): Promise<WellnessAnalysisOutput> {
   console.log('[Wellness Flow] Starting...');
-  defineRegularBuddyPrompt();
+  const prompt = defineRegularBuddyPrompt();
 
   try {
     // RAG: Retrieve relevant documents.
@@ -79,7 +85,7 @@ export async function runWellnessAnalysisFlow(
     }
 
     console.log('[Wellness Flow] Executing prompt...');
-    const { output } = await regularBuddyPrompt(parsedInput.data);
+    const { output } = await prompt(parsedInput.data);
 
     if (!output) {
       throw new Error("Wellness AI prompt returned no output.");

@@ -1,8 +1,7 @@
 'use server';
 
 import { z } from 'genkit';
-import { GenkitError } from 'genkit';
-import { ai } from '@/ai/genkit';
+import { GenkitError, ai as genkitAI } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { saveOnboardingSummary } from '@/services/firestore-service';
 import { OnboardingInputSchema, OnboardingOutputSchema, type OnboardingTopic, type OnboardingInput, type OnboardingOutput, OnboardingTopicEnum } from '@/ai/types';
@@ -12,7 +11,13 @@ import type { DocumentReference } from 'firebase-admin/firestore';
 // Define the prompt for the onboarding flow
 let onboardingPrompt: any;
 function defineOnboardingPrompt() {
-  if (onboardingPrompt) return;
+  if (onboardingPrompt) return onboardingPrompt;
+
+  const ai = genkitAI({
+    plugins: [googleAI()],
+    logLevel: 'debug',
+    enableTracingAndMetrics: true,
+  });
 
   onboardingPrompt = ai.definePrompt({
     name: 'onboardingBuddyPrompt',
@@ -36,6 +41,7 @@ function defineOnboardingPrompt() {
       {{{chatHistory}}}
     `,
   });
+  return onboardingPrompt;
 }
 
 
@@ -50,7 +56,7 @@ export async function runOnboardingFlow(
   input: WellnessAnalysisInput // Accepts the generic input from the controller
 ): Promise<OnboardingOutput> {
   console.log('[Onboarding Flow] Starting...');
-  defineOnboardingPrompt();
+  const prompt = defineOnboardingPrompt();
   
   const allTopics = OnboardingTopicEnum.options;
   const nextTopic = allTopics.find(topic => !(topic in userProfile));
@@ -77,7 +83,7 @@ export async function runOnboardingFlow(
   }
 
   console.log(`[Onboarding Flow] Executing prompt for topic: ${nextTopic}`);
-  const { output } = await onboardingPrompt(parsedInput.data);
+  const { output } = await prompt(parsedInput.data);
 
   if (!output) {
     throw new Error("Onboarding AI prompt returned no output.");

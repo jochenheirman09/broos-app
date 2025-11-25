@@ -1,9 +1,9 @@
 'use server';
 
-import { adminDb } from '@/ai/genkit';
+import { getFirebaseAdmin } from '@/ai/genkit';
 import { serverTimestamp } from 'firebase-admin/firestore';
 import { format } from "date-fns";
-import type { Alert, OnboardingTopic, WellnessScore, WellnessAnalysisOutput } from '@/lib/types';
+import type { Alert, OnboardingTopic, UserProfile, WellnessScore, WellnessAnalysisOutput } from '@/lib/types';
 import type { DocumentReference } from 'firebase-admin/firestore';
 
 
@@ -56,6 +56,7 @@ export async function saveWellnessData(
   aiOutput: WellnessAnalysisOutput
 ) {
   console.log(`[Firestore Service] Saving wellness data for user: ${userId}`);
+  const { adminDb } = getFirebaseAdmin();
   const today = format(new Date(), 'yyyy-MM-dd');
   
   // We don't use a batch here because each write is to a different subcollection

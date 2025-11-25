@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from 'genkit';
-import { adminDb, ai } from '@/ai/genkit';
+import { getFirebaseAdmin } from '@/ai/genkit';
 import { serverTimestamp } from 'firebase-admin/firestore';
 import type { KnowledgeDocument } from '@/lib/types';
 import { IngestInputSchema, type IngestInput } from '@/ai/types';
@@ -13,6 +13,7 @@ import { IngestInputSchema, type IngestInput } from '@/ai/types';
  */
 export async function ingestDocument(input: IngestInput): Promise<{ success: boolean, docId?: string, message: string }> {
   console.log(`[SERVER ACTION] ingestDocument invoked for file: ${input.fileName}`);
+  const { adminDb } = getFirebaseAdmin();
   
   const { fileName, fileContent, clubId } = input;
 

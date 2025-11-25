@@ -1,13 +1,19 @@
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { ai as genkitAI } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { ClubAnalysisInputSchema, ClubInsightSchema, type ClubAnalysisInput, type ClubInsight } from '@/ai/types';
 
 // Lazily define the prompt.
 let clubAnalysisPrompt: any;
 function defineClubAnalysisPrompt() {
-    if (clubAnalysisPrompt) return;
+    if (clubAnalysisPrompt) return clubAnalysisPrompt;
+    
+    const ai = genkitAI({
+        plugins: [googleAI()],
+        logLevel: 'debug',
+        enableTracingAndMetrics: true,
+    });
 
     clubAnalysisPrompt = ai.definePrompt({
         name: 'clubDataAnalyzerPrompt',
@@ -37,6 +43,7 @@ function defineClubAnalysisPrompt() {
             }
         `,
     });
+    return clubAnalysisPrompt;
 }
 
 /**
@@ -44,7 +51,7 @@ function defineClubAnalysisPrompt() {
  */
 export async function analyzeClubData(input: ClubAnalysisInput): Promise<ClubInsight | null> {
     console.log(`[SERVER ACTION] analyzeClubData invoked for club: ${input.clubName}`);
-    defineClubAnalysisPrompt();
+    const prompt = defineClubAnalysisPrompt();
 
     // Do not run analysis if there's only one team, as there's nothing to compare.
     if (input.teamSummaries.length < 2) {
@@ -53,7 +60,7 @@ export async function analyzeClubData(input: ClubAnalysisInput): Promise<ClubIns
     }
 
     try {
-        const { output } = await clubAnalysisPrompt(input);
+        const { output } = await prompt(input);
         if (!output) {
             console.warn('[SERVER ACTION] Club analysis prompt returned no output.');
             return null;

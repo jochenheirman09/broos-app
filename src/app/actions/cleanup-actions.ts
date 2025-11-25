@@ -1,34 +1,8 @@
 
 "use server";
 
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
-
-// This function is now self-contained within the server action file.
-function initializeAndGetDB(): Firestore {
-  if (getApps().length) {
-    console.log('[CLEANUP_ACTION] Using existing Firebase Admin SDK instance.');
-    return getFirestore();
-  }
-
-  console.log('[CLEANUP_ACTION] Initializing Firebase Admin SDK for Cleanup Action...');
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
-
-  if (serviceAccountEnv) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountEnv);
-      initializeApp({ credential: cert(serviceAccount) });
-      console.log('[CLEANUP_ACTION] Firebase Admin SDK initialized SUCCESSFULLY.');
-      return getFirestore();
-    } catch (e: any) {
-      console.error('[CLEANUP_ACTION] FATAL: Failed to parse FIREBASE_ADMIN_SERVICE_ACCOUNT.', e.stack);
-      throw new Error("Could not initialize Firebase Admin SDK. Service account JSON is likely invalid.");
-    }
-  } else {
-    console.error('[CLEANUP_ACTION] FATAL: FIREBASE_ADMIN_SERVICE_ACCOUNT not found in .env.');
-    throw new Error("Firebase Admin Service Account is not configured in environment variables.");
-  }
-}
+import { Firestore } from 'firebase-admin/firestore';
+import { adminDb } from '@/ai/genkit';
 
 async function deleteCollection(
   db: Firestore,
@@ -60,7 +34,7 @@ async function cleanupDatabase(): Promise<{
   deletedUsers: number;
   deletedClubs: number;
 }> {
-  const db = initializeAndGetDB();
+  const db: Firestore = adminDb;
   let deletedUsers = 0;
   let deletedClubs = 0;
 

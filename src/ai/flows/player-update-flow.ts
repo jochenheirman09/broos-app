@@ -1,14 +1,20 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { ai as genkitAI } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { PlayerUpdateInputSchema, PlayerUpdateOutputSchema, type PlayerUpdateInput, type PlayerUpdateOutput } from '@/ai/types';
 
 // Lazily define the prompt to avoid initialization issues during build.
 let playerUpdatePrompt: any;
 function definePlayerUpdatePrompt() {
-    if (playerUpdatePrompt) return;
+    if (playerUpdatePrompt) return playerUpdatePrompt;
+
+    const ai = genkitAI({
+        plugins: [googleAI()],
+        logLevel: 'debug',
+        enableTracingAndMetrics: true,
+    });
 
     playerUpdatePrompt = ai.definePrompt({
         name: 'playerUpdateGeneratorPrompt',
@@ -47,6 +53,7 @@ function definePlayerUpdatePrompt() {
             }
         `,
     });
+    return playerUpdatePrompt;
 }
 
 /**
@@ -54,10 +61,10 @@ function definePlayerUpdatePrompt() {
  */
 export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<PlayerUpdateOutput | null> {
     console.log('[SERVER ACTION] generatePlayerUpdate invoked for player:', input.playerName);
-    definePlayerUpdatePrompt();
+    const prompt = definePlayerUpdatePrompt();
 
     try {
-        const { output } = await playerUpdatePrompt(input);
+        const { output } = await prompt(input);
         if (!output) {
             console.warn('[SERVER ACTION] Player update prompt returned no output.');
             return null;

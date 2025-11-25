@@ -1,13 +1,19 @@
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { ai as genkitAI } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema, type TeamAnalysisInput, type TeamAnalysisOutput } from '@/ai/types';
 
 // Lazily define the prompt to avoid initialization issues.
 let teamAnalysisPrompt: any;
 function defineTeamAnalysisPrompt() {
-    if (teamAnalysisPrompt) return;
+    if (teamAnalysisPrompt) return teamAnalysisPrompt;
+
+    const ai = genkitAI({
+        plugins: [googleAI()],
+        logLevel: 'debug',
+        enableTracingAndMetrics: true,
+    });
 
     teamAnalysisPrompt = ai.definePrompt({
         name: 'teamDataAnalyzerPrompt',
@@ -30,6 +36,7 @@ function defineTeamAnalysisPrompt() {
                 -   **Category:** Kies de meest relevante categorie: 'Team Performance', 'Player Wellness', of 'Injury Risk'.
         `,
     });
+    return teamAnalysisPrompt;
 }
 
 
@@ -38,10 +45,10 @@ function defineTeamAnalysisPrompt() {
  */
 export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAnalysisOutput | null> {
     console.log(`[SERVER ACTION] analyzeTeamData invoked for team: ${input.teamName}`);
-    defineTeamAnalysisPrompt();
+    const prompt = defineTeamAnalysisPrompt();
 
     try {
-        const { output } = await teamAnalysisPrompt(input);
+        const { output } = await prompt(input);
         if (!output) {
             console.warn('[SERVER ACTION] Team analysis prompt returned no output.');
             return null;

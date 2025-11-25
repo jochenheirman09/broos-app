@@ -1,7 +1,7 @@
 'use server';
 
 import { GenkitError } from 'genkit';
-import { adminDb } from '@/ai/genkit';
+import { getFirebaseAdmin } from '@/ai/genkit';
 import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
 import type { UserProfile, WellnessAnalysisInput } from '@/lib/types';
@@ -20,6 +20,7 @@ export async function chatWithBuddy(
   input: WellnessAnalysisInput
 ) {
   console.log('[Chat Action] chatWithBuddy invoked for user:', userId);
+  const { adminDb } = getFirebaseAdmin();
 
   // --- 1. GET USER PROFILE ---
   const userRef = adminDb.collection('users').doc(userId);

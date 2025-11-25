@@ -1,24 +1,17 @@
 
 import { NextResponse } from 'next/server';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, App } from 'firebase-admin/app';
-import { TeamAnalysisInput, analyzeTeamData, TeamSummary } from '@/ai/flows/team-analysis-flow';
+import { Firestore } from 'firebase-admin/firestore';
+import { TeamAnalysisInput, analyzeTeamData, type AITeamSummary } from '@/ai/flows/team-analysis-flow';
 import { ClubAnalysisInput, analyzeClubData } from '@/ai/flows/club-analysis-flow';
 import { PlayerUpdateInput, generatePlayerUpdate } from '@/ai/flows/player-update-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, ClubUpdate, PlayerUpdate } from '@/lib/types';
 import { format, getISOWeek, getYear } from 'date-fns';
-
-// Initialize Firebase Admin SDK if it hasn't been already.
-function initializeFirebaseAdmin(): { db: Firestore } {
-  if (!getApps().length) {
-    initializeApp();
-  }
-  return { db: getFirestore() };
-}
+import { getFirebaseAdmin } from '@/ai/genkit';
 
 async function runAnalysis() {
-  const { db } = initializeFirebaseAdmin();
+  const { adminDb } = getFirebaseAdmin();
+  const db: Firestore = adminDb;
   let analysisCount = 0;
   let notificationCount = 0;
 
@@ -28,7 +21,7 @@ async function runAnalysis() {
     const club = { id: clubDoc.id, ...clubDoc.data() } as WithId<Pick<Club, 'id' | 'name'>>;
     const teamsSnapshot = await clubDoc.ref.collection('teams').get();
     
-    const teamSummariesForClub: { teamName: string; summary: TeamSummary }[] = [];
+    const teamSummariesForClub: { teamName: string; summary: AITeamSummary }[] = [];
 
     for (const teamDoc of teamsSnapshot.docs) {
       const team = { id: teamDoc.id, ...teamDoc.data() } as WithId<Team>;
