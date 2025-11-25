@@ -2,7 +2,7 @@
 "use server";
 
 import { Firestore } from 'firebase-admin/firestore';
-import { adminDb } from '@/ai/genkit';
+import { getFirebaseAdmin } from '@/ai/genkit';
 
 async function deleteCollection(
   db: Firestore,
@@ -34,7 +34,7 @@ async function cleanupDatabase(): Promise<{
   deletedUsers: number;
   deletedClubs: number;
 }> {
-  const db: Firestore = adminDb;
+  const { adminDb: db } = getFirebaseAdmin();
   let deletedUsers = 0;
   let deletedClubs = 0;
 
