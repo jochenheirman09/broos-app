@@ -14,9 +14,6 @@ import { useUser } from "@/context/user-context";
 import { ingestDocument } from "@/ai/flows/ingest-flow";
 import { useToast } from "@/hooks/use-toast";
 
-// This component is being repurposed into a manager.
-// The name is kept for now to avoid breaking imports, but it's acting as KnowledgeBaseManager.
-
 const statusIcons = {
   pending: <Clock className="h-4 w-4 text-yellow-500" />,
   ingesting: <Spinner size="small" />,
@@ -40,7 +37,7 @@ function DocumentItem({ doc }: { doc: WithId<KnowledgeDocument> }) {
 }
 
 export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
-  const { user } = useUser();
+  const { userProfile } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,9 +45,11 @@ export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
 
 
   const docsQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    // CRITICAL FIX: Only build the query if the user is a 'responsible'.
+    // This prevents the useCollection hook from firing for unauthorized roles.
+    if (userProfile?.role !== 'responsible') return null;
     return query(collection(db, `knowledge_base`), orderBy("ingestedAt", "desc"));
-  }, [user, db]);
+  }, [userProfile?.role, db]);
 
   const { data: documents, isLoading, error } = useCollection<KnowledgeDocument>(docsQuery);
 
@@ -96,6 +95,12 @@ export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
         }
     }
   };
+  
+  // If the user is not a responsible, don't render anything.
+  // This is a secondary safeguard. The primary one is the query being null.
+  if (userProfile?.role !== 'responsible') {
+    return null;
+  }
 
   return (
     <Card className="bg-card/30">
@@ -119,7 +124,7 @@ export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
           {!isLoading && error && (
              <Alert variant="destructive">
                 <AlertTitle>Fout</AlertTitle>
-                <AlertDescription>Kon documenten niet laden.</AlertDescription>
+                <AlertDescription>Kon documenten niet laden. Controleer of je de juiste permissies hebt.</AlertDescription>
              </Alert>
           )}
 

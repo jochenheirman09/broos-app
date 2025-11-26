@@ -1,24 +1,15 @@
 'use server';
-import { z } from 'genkit';
 import { getFirebaseAdmin } from '@/ai/genkit';
 import type { FcmToken } from '@/lib/types';
 import type { Message } from 'firebase-admin/messaging';
-
-
-export const NotificationInputSchema = z.object({
-  userId: z.string(),
-  title: z.string(),
-  body: z.string(),
-  link: z.string().optional(),
-});
-export type NotificationInput = z.infer<typeof NotificationInputSchema>;
+import { type NotificationInput } from '@/ai/types';
 
 
 export async function sendNotification(
   input: NotificationInput
 ): Promise<{ success: boolean; message: string }> {
     const { userId, title, body, link } = input;
-    const { adminDb, adminMessaging } = getFirebaseAdmin();
+    const { adminDb, adminMessaging } = await getFirebaseAdmin();
 
     const tokensSnapshot = await adminDb.collection('users').doc(userId).collection('fcmTokens').get();
     

@@ -1,98 +1,86 @@
+
 'use server';
 
-import { z } from 'genkit';
-import { GenkitError, ai as genkitAI } from 'genkit';
+import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
-import { saveOnboardingSummary } from '@/services/firestore-service';
-import { OnboardingInputSchema, OnboardingOutputSchema, type OnboardingTopic, type OnboardingInput, type OnboardingOutput, OnboardingTopicEnum } from '@/ai/types';
-import type { UserProfile, WellnessAnalysisInput } from '@/lib/types';
+import { z } from 'zod';
 import type { DocumentReference } from 'firebase-admin/firestore';
-
-// Define the prompt for the onboarding flow
-let onboardingPrompt: any;
-function defineOnboardingPrompt() {
-  if (onboardingPrompt) return onboardingPrompt;
-
-  const ai = genkitAI({
-    plugins: [googleAI()],
-    logLevel: 'debug',
-    enableTracingAndMetrics: true,
-  });
-
-  onboardingPrompt = ai.definePrompt({
-    name: 'onboardingBuddyPrompt',
-    model: googleAI.model('gemini-2.5-flash'),
-    input: { schema: OnboardingInputSchema },
-    output: { schema: OnboardingOutputSchema },
-    prompt: `
-      Je bent een empathische AI-psycholoog voor een jonge atleet genaamd {{{userName}}}.
-      Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker beter te leren kennen.
-      Je antwoord ('response') MOET in het Nederlands zijn.
-
-      Het huidige onderwerp is '{{{currentTopic}}}'.
-      - Leid het gesprek op een natuurlijke manier rond dit onderwerp. Stel vervolgvragen als de reactie van de gebruiker kort is om meer details te krijgen.
-      - BELANGRIJK: Wees niet te opdringerig. Als de gebruiker aangeeft niet verder te willen praten over een detail (bv. met "ik weet het niet" of "geen idee"), respecteer dat dan en probeer het onderwerp vanuit een andere, bredere hoek te benaderen, of rond het af.
-      - Als je vindt dat het onderwerp voldoende is besproken (of als de gebruiker aangeeft niet verder te willen), stel dan 'isTopicComplete' in op true.
-      - Als 'isTopicComplete' waar is, geef dan een beknopte samenvatting (2-3 zinnen) van de input van de gebruiker voor dit onderwerp in het 'summary' veld, en eindig je 'response' met een vraag zoals "Ben je er klaar voor om het over iets anders te hebben?"
-      - Anders, stel 'isTopicComplete' in op false en houd het gesprek gaande.
-
-      Bericht van de gebruiker: "{{{userMessage}}}"
-      Gespreksgeschiedenis over dit onderwerp:
-      {{{chatHistory}}}
-    `,
-  });
-  return onboardingPrompt;
-}
+import { saveOnboardingSummary } from '@/services/firestore-service';
+import type { UserProfile, WellnessAnalysisInput, OnboardingInput, OnboardingOutput, OnboardingTopic } from '@/lib/types';
 
 
-/**
- * Executes the onboarding logic for a user.
- * It identifies the current topic, runs the AI prompt, and saves the summary
- * if a topic is completed.
- */
 export async function runOnboardingFlow(
-  userRef: DocumentReference,
-  userProfile: UserProfile,
-  input: WellnessAnalysisInput // Accepts the generic input from the controller
+    userRef: DocumentReference,
+    userProfile: UserProfile,
+    input: WellnessAnalysisInput
 ): Promise<OnboardingOutput> {
-  console.log('[Onboarding Flow] Starting...');
-  const prompt = defineOnboardingPrompt();
-  
-  const allTopics = OnboardingTopicEnum.options;
-  const nextTopic = allTopics.find(topic => !(topic in userProfile));
-  
-  if (!nextTopic) {
-    console.log('[Onboarding Flow] All topics are complete. Updating profile and finishing.');
-    await userRef.update({ onboardingCompleted: true });
-    // This case should ideally be handled by the controller, but as a fallback:
-    throw new GenkitError({
-      status: 'FAILED_PRECONDITION', 
-      message: 'Onboarding was already complete. The main controller should have routed to the wellness flow.'
+
+    // Insurance Policy: API Key check
+    if (!process.env.GEMINI_API_KEY) {
+        console.error("[Onboarding Flow] CRITICAL: GEMINI_API_KEY is not set.");
+        return { 
+            response: "Mijn excuses, mijn configuratie is onvolledig. Ik kan nu niet verder.", 
+            isTopicComplete: true, 
+            summary: "Configuratiefout" 
+        };
+    }
+    
+    const ai = genkit({
+        plugins: [googleAI()],
     });
-  }
+    
+    const OnboardingOutputSchema = z.object({
+        response: z.string().describe("Het antwoord van de AI-buddy."),
+        isTopicComplete: z.boolean().describe("True als het onderwerp voldoende is besproken."),
+        summary: z.string().optional().describe("Een beknopte samenvatting (2-3 zinnen) van de input van de gebruiker voor het huidige onderwerp, alleen als isTopicComplete waar is."),
+    });
 
-  const onboardingInput: OnboardingInput = {
-    ...input,
-    currentTopic: nextTopic,
-  };
-  
-  const parsedInput = OnboardingInputSchema.safeParse(onboardingInput);
-  if (!parsedInput.success) {
-    console.error('[Onboarding Flow] Invalid input:', parsedInput.error);
-    throw new GenkitError({ status: 'INVALID_ARGUMENT', message: 'Invalid input for onboarding prompt.' });
-  }
+    const onboardingTopics: OnboardingTopic[] = [
+        "familySituation", "schoolSituation", "personalGoals", 
+        "matchPreparation", "recoveryHabits", "additionalHobbies"
+    ];
+    
+    const nextTopic = onboardingTopics.find(topic => !userProfile[topic]);
 
-  console.log(`[Onboarding Flow] Executing prompt for topic: ${nextTopic}`);
-  const { output } = await prompt(parsedInput.data);
+    if (!nextTopic) {
+        console.warn("[Onboarding Flow] Onboarding is already complete, but flow was called.");
+        return { response: "Het lijkt erop dat we elkaar al kennen! Waar wil je het vandaag over hebben?", isTopicComplete: true, summary: "Onboarding was al voltooid." };
+    }
 
-  if (!output) {
-    throw new Error("Onboarding AI prompt returned no output.");
-  }
+    const onboardingBuddyPrompt = ai.definePrompt({
+        name: 'onboardingBuddyPrompt_v2_isolated',
+        model: 'googleai/gemini-2.5-flash',
+        input: { schema: z.any() },
+        output: { schema: OnboardingOutputSchema },
+        prompt: `
+            Je bent een empathische AI-psycholoog voor een jonge atleet genaamd {{{userName}}}.
+            Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker beter te leren kennen.
+            Je antwoord ('response') MOET in het Nederlands zijn.
 
-  // If the topic is complete, save the summary and potentially finalize onboarding.
-  if (output.isTopicComplete && output.summary) {
-    await saveOnboardingSummary(userRef, userProfile, nextTopic, output.summary);
-  }
-  
-  return output;
+            Het huidige onderwerp is '{{{currentTopic}}}'.
+            - Leid het gesprek op een natuurlijke manier rond dit onderwerp. Stel vervolgvragen als de reactie van de gebruiker kort is.
+            - BELANGRIJK: Wees niet te opdringerig. Als de gebruiker aangeeft niet verder te willen praten over een detail, of als een onderwerp een simpele, alledaagse kwestie lijkt (zoals een ruzie met een broer), respecteer dat dan en rond het onderwerp af.
+            - Als je vindt dat het onderwerp voldoende is besproken, stel dan 'isTopicComplete' in op true.
+            - Als 'isTopicComplete' waar is, geef dan een beknopte samenvatting (2-3 zinnen) van de input in het 'summary' veld, en eindig je 'response' met een vraag zoals "Klaar voor het volgende?"
+            - Anders, stel 'isTopicComplete' in op false en houd het gesprek gaande.
+
+            Bericht van de gebruiker: "{{{userMessage}}}"
+            Gespreksgeschiedenis over dit onderwerp:
+            {{{chatHistory}}}
+        `,
+    });
+    
+    const onboardingInput: OnboardingInput = { ...input, currentTopic: nextTopic };
+    
+    const { output } = await onboardingBuddyPrompt(onboardingInput);
+
+    if (!output) throw new Error("Onboarding prompt returned no output.");
+
+    if (output.isTopicComplete && output.summary) {
+        saveOnboardingSummary(userRef, userProfile, nextTopic, output.summary).catch(err => {
+             console.error("[Onboarding Flow] Background summary save failed:", err);
+        });
+    }
+
+    return output;
 }

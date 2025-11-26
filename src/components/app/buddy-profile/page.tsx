@@ -21,7 +21,6 @@ import { useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
 
-// Renamed from BuddyProfilePage to avoid conflict with the route page
 export function BuddyProfileCustomizer() {
   const { userProfile, user } = useUser();
   const db = useFirestore();
@@ -53,7 +52,6 @@ export function BuddyProfileCustomizer() {
       buddyAvatar: selectedAvatar,
     };
 
-    // Use non-blocking write for snappy UI
     updateUserProfile({ db, userId: user.uid, data: updates });
     
     toast({
@@ -67,7 +65,6 @@ export function BuddyProfileCustomizer() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Basic size check (e.g., 2MB)
       if (file.size > 2 * 1024 * 1024) {
           toast({
               variant: "destructive",
@@ -79,7 +76,7 @@ export function BuddyProfileCustomizer() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        setSelectedAvatar(result); // Set the data URL as the selected avatar
+        setSelectedAvatar(result); 
       };
       reader.readAsDataURL(file);
     }
@@ -103,7 +100,6 @@ export function BuddyProfileCustomizer() {
     if (PredefinedComponent) {
         return <PredefinedComponent className="h-32 w-32" />;
     }
-    // Fallback to default if nothing is selected or found
     return <LogoAvatar className="h-32 w-32" />;
   }
 

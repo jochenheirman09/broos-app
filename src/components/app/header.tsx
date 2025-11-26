@@ -42,12 +42,6 @@ export function AppHeader() {
                 <span className="sr-only">About</span>
               </Button>
             </Link>
-            <Link href="/alerts">
-              <Button variant="ghost" size="icon">
-                <AlertTriangle className="h-5 w-5" />
-                <span className="sr-only">Alerts</span>
-              </Button>
-            </Link>
             {userProfile && (
               <Button
                 variant="ghost"

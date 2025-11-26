@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -49,8 +50,20 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Combine auth loading and profile loading state
+  // The main loading state is now simpler: it's true if auth is loading or if we have a user but are still waiting for their profile.
   const loading = isAuthLoading || (!!user && isProfileLoading);
+  
+  useEffect(() => {
+    if (!loading && !user) {
+      if (
+        !window.location.pathname.startsWith('/login') &&
+        !window.location.pathname.startsWith('/register') &&
+        window.location.pathname !== '/'
+      ) {
+        router.replace("/login");
+      }
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     if (profileError) {
@@ -61,9 +74,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsLoggingOut(true);
     await auth.signOut();
-    // After sign out, the auth listener will set user to null,
-    // which will trigger re-renders and layout changes.
-    // We push to the homepage as a fallback.
     router.push("/");
     setIsLoggingOut(false);
   };

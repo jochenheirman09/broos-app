@@ -1,24 +1,34 @@
 
 'use server';
 
-import { ai as genkitAI } from 'genkit';
+import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
-import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema, type TeamAnalysisInput, type TeamAnalysisOutput } from '@/ai/types';
+import { z } from 'zod';
+import type { TeamAnalysisInput, TeamAnalysisOutput } from '@/ai/types';
+import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema } from '@/ai/types';
 
-// Lazily define the prompt to avoid initialization issues.
-let teamAnalysisPrompt: any;
-function defineTeamAnalysisPrompt() {
-    if (teamAnalysisPrompt) return teamAnalysisPrompt;
 
-    const ai = genkitAI({
-        plugins: [googleAI()],
+/**
+ * Server-side function to analyze team wellness data and generate insights.
+ */
+export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAnalysisOutput | null> {
+    // Insurance Policy: API Key check
+    if (!process.env.GEMINI_API_KEY) {
+        console.error("[AI Flow - Team Analysis] CRITICAL: GEMINI_API_KEY is not set.");
+        return null;
+    }
+
+    console.log(`[AI Flow - Team Analysis] Invoked for team: ${input.teamName}`);
+
+    const ai = genkit({
+        plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
         logLevel: 'debug',
         enableTracingAndMetrics: true,
     });
 
-    teamAnalysisPrompt = ai.definePrompt({
+    const teamAnalysisPrompt = ai.definePrompt({
         name: 'teamDataAnalyzerPrompt',
-        model: googleAI.model('gemini-2.5-flash'),
+        model: 'googleai/gemini-2.5-flash',
         input: { schema: TeamAnalysisInputSchema },
         output: { schema: TeamAnalysisOutputSchema },
         prompt: `
@@ -37,26 +47,17 @@ function defineTeamAnalysisPrompt() {
                 -   **Category:** Kies de meest relevante categorie: 'Team Performance', 'Player Wellness', of 'Injury Risk'.
         `,
     });
-    return teamAnalysisPrompt;
-}
 
-
-/**
- * Server-side function to analyze team wellness data and generate insights.
- */
-export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAnalysisOutput | null> {
-    console.log(`[SERVER ACTION] analyzeTeamData invoked for team: ${input.teamName}`);
-    const prompt = defineTeamAnalysisPrompt();
 
     try {
-        const { output } = await prompt(input);
+        const { output } = await teamAnalysisPrompt(input);
         if (!output) {
-            console.warn('[SERVER ACTION] Team analysis prompt returned no output.');
+            console.warn('[AI Flow - Team Analysis] Prompt returned no output.');
             return null;
         }
         return output;
     } catch (error: any) {
-        console.error(`[SERVER ACTION] CRITICAL ERROR IN TEAM ANALYSIS FLOW for team ${input.teamId}:`, error);
+        console.error(`[AI Flow - Team Analysis] CRITICAL ERROR for team ${input.teamId}:`, error);
         return null;
     }
 }

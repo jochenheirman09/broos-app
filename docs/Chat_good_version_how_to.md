@@ -1,270 +1,130 @@
+'use server';
 
-"use client";
-
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useUser } from "@/context/user-context";
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { type WellnessAnalysisInput, type WellnessAnalysisOutput, type OnboardingOutput } from '@/lib/types';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { SendHorizonal } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
-import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import { getFirebaseAdmin } from '@/ai/genkit';
+import { saveOnboardingSummary, saveWellnessData } from '@/services/firestore-service';
+import { retrieveSimilarDocuments } from '@/ai/retriever';
+import type { UserProfile, WellnessAnalysisInput, OnboardingInput } from '@/lib/types';
 import {
-  collection,
-  addDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-import { format } from "date-fns";
-import { BuddyAvatar } from "./buddy-avatar";
-import { chatWithBuddy } from "@/app/actions/chat-actions";
+  OnboardingOutputSchema,
+  WellnessAnalysisOutputSchema,
+  type OnboardingOutput,
+  type WellnessAnalysisOutput,
+  OnboardingInputSchema,
+  WellnessAnalysisInputSchema
+} from '@/ai/types';
 
-export function ChatInterface() {
-  const { userProfile, user } = useUser();
-  const db = useFirestore();
-  const { toast } = useToast();
+// ================================================================================================
+// This file is a backup of the complex chat logic before the step-by-step rebuild.
+// This logic will be re-integrated in a future step.
+// ================================================================================================
 
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const viewportRef = useRef<HTMLDivElement>(null);
-
-  const buddyName = userProfile?.buddyName || "Broos";
-  const firstName = userProfile?.name?.split(" ")[0] || "";
-
-  const today = format(new Date(), "yyyy-MM-dd");
-
-  const messagesQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(
-      collection(db, "users", user.uid, "chats", today, "messages"),
-      orderBy("timestamp", "asc"),
-      limit(50)
-    );
-  }, [user, db, today]);
-
-  const { data: messages, isLoading: messagesLoading } =
-    useCollection<ChatMessageType>(messagesQuery);
-
-  const addMessageToDb = useCallback(
-    async (role: 'assistant' | 'user', content: string) => {
-      if (!user || !db) return;
-      // This is a fire-and-forget write to Firestore on the client.
-      addDoc(
-        collection(db, "users", user.uid, "chats", today, "messages"),
-        {
-          role,
-          content,
-          timestamp: serverTimestamp(),
-        }
-      );
-    }, [user, db, today]
-  );
+export async function chatWithBuddy(
+  userId: string,
+  input: WellnessAnalysisInput
+): Promise<OnboardingOutput | WellnessAnalysisOutput> {
   
-  const handleInitialMessage = useCallback(async () => {
-    if (!userProfile || !user || !db || !firstName) return;
+  const ai = genkit({
+    plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
+    logLevel: 'debug',
+    enableTracingAndMetrics: true,
+  });
 
-    setIsLoading(true);
+  const { adminDb } = await getFirebaseAdmin();
+  const userRef = adminDb.collection('users').doc(userId);
+  const userDoc = await userRef.get();
+  if (!userDoc.exists) {
+    throw new Error('User profile not found.');
+  }
+  const userProfile = userDoc.data() as UserProfile;
 
-    try {
-      const buddyInput: WellnessAnalysisInput = {
-        buddyName: buddyName,
-        userName: firstName,
-        userMessage: `Start het gesprek voor vandaag.`,
-        chatHistory: '',
-      };
-      
-      console.log("[CLIENT] Sending initial message request to Server Action.");
-      const result = await chatWithBuddy(user.uid, buddyInput);
-      
-      const responseContent = (result as OnboardingOutput | WellnessAnalysisOutput).response;
+  // --- Onboarding Logic ---
+  if (!userProfile.onboardingCompleted) {
+    const onboardingTopics: (keyof UserProfile)[] = [
+      "familySituation", "schoolSituation", "personalGoals", 
+      "matchPreparation", "recoveryHabits", "additionalHobbies"
+    ];
+    
+    const nextTopic = onboardingTopics.find(topic => !userProfile[topic]) as keyof UserProfile | undefined;
 
-      if (!responseContent) {
-        throw new Error('AI returned an empty response.');
+    if (nextTopic) {
+        const onboardingBuddyPrompt = ai.definePrompt({
+            name: 'onboardingBuddyPrompt',
+            model: 'gemini-1.5-flash',
+            input: { schema: OnboardingInputSchema },
+            output: { schema: OnboardingOutputSchema },
+            prompt: `
+                Je bent een empathische AI-psycholoog voor een jonge atleet.
+                Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker beter te leren kennen.
+                Je antwoord ('response') MOET in het Nederlands zijn.
+
+                Het huidige onderwerp is '{{{currentTopic}}}'.
+                - Leid het gesprek op een natuurlijke manier rond dit onderwerp. Stel vervolgvragen als de reactie van de gebruiker kort is.
+                - Als je vindt dat het onderwerp voldoende is besproken, stel dan 'isTopicComplete' in op true.
+                - Als 'isTopicComplete' waar is, geef dan een beknopte samenvatting (2-3 zinnen) van de input in het 'summary' veld, en eindig je 'response' met een vraag zoals "Klaar voor het volgende?"
+                - Anders, stel 'isTopicComplete' in op false en houd het gesprek gaande.
+
+                Bericht van de gebruiker: "{{{userMessage}}}"
+                Gespreksgeschiedenis over dit onderwerp:
+                {{{chatHistory}}}
+            `,
+        });
+        
+      const onboardingInput: OnboardingInput = { ...input, currentTopic: nextTopic as any };
+      const { output } = await onboardingBuddyPrompt(onboardingInput);
+      if (!output) throw new Error("Onboarding prompt returned no output.");
+
+      if (output.isTopicComplete && output.summary) {
+        await saveOnboardingSummary(userRef, userProfile, nextTopic as any, output.summary);
       }
-      
-      await addMessageToDb("assistant", responseContent);
-
-    } catch (error: any) {
-      console.error("[CLIENT] Error fetching initial message:", error);
-      toast({
-        variant: "destructive",
-        title: "Oh nee!",
-        description: error.message || "Kon het gesprek niet starten. Probeer de pagina te vernieuwen.",
-      });
-    } finally {
-      setIsLoading(false);
+      return output;
     }
-  }, [user, userProfile, db, firstName, buddyName, addMessageToDb, toast]);
-
-  useEffect(() => {
-    if (!messagesLoading && messages?.length === 0 && firstName) {
-      handleInitialMessage();
-    }
-  }, [messagesLoading, messages, firstName, handleInitialMessage]);
-
-  useEffect(() => {
-    if (viewportRef.current) {
-      viewportRef.current.scrollTo({
-        top: viewportRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [messages, isLoading]);
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !userProfile || !user || !db || !firstName) return;
-
-    const userMessageContent = input;
-    setInput("");
-
-    // Optimistically add user message to Firestore
-    await addMessageToDb("user", userMessageContent);
-
-    setIsLoading(true);
-
-    try {
-      const chatHistory = (messages || [])
-        .map((m) => `${m.role}: ${m.content}`)
-        .join("\n");
-      
-      const buddyInput: WellnessAnalysisInput = {
-        buddyName: buddyName,
-        userName: firstName,
-        userMessage: userMessageContent,
-        chatHistory: chatHistory,
-      };
-
-      console.log(`[CLIENT] Sending message: "${userMessageContent}"`);
-      const result = await chatWithBuddy(user.uid, buddyInput);
-      
-      const responseContent = (result as OnboardingOutput | WellnessAnalysisOutput).response;
-      
-      if (!responseContent) {
-        throw new Error('AI returned an empty response.');
-      }
-      
-      // Add assistant response to Firestore
-      await addMessageToDb("assistant", responseContent);
-
-    } catch (error: any) {
-      console.error("[CLIENT] Error calling Server Action:", error);
-      toast({
-        variant: "destructive",
-        title: "Oh nee!",
-        description: error.message || "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  if (messagesLoading) {
-    return (
-      <div className="flex-grow flex items-center justify-center">
-        <Spinner />
-      </div>
-    );
   }
 
-  return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col bg-card rounded-2xl shadow-clay-card">
-      <div className="flex-grow flex flex-col overflow-hidden">
-        <div className="p-4 border-b">
-            <h2 className="text-xl font-bold">Chat met {buddyName}</h2>
-        </div>
-        <ScrollArea className="flex-grow">
-          <ScrollViewport ref={viewportRef} className="h-full">
-            <div className="p-4">
-              {messages?.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))}
-              {isLoading && (
-                <div className="flex items-start gap-3 my-4 justify-start">
-                  <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-                  <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
-                    <Spinner size="small" />
-                    <span className="text-muted-foreground italic">
-                      {buddyName} denkt na...
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollViewport>
-        </ScrollArea>
-        <div className="p-4 border-t">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Typ je bericht..."
-              autoComplete="off"
-              disabled={isLoading || (!messages || messages.length === 0)}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={isLoading || !input.trim() || (!messages || messages.length === 0)}
-            >
-              <SendHorizonal className="h-5 w-5" />
-            </Button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
+  // --- Wellness Analysis Logic ---
+  const wellnessBuddyPrompt = ai.definePrompt({
+    name: 'wellnessBuddyPrompt',
+    model: 'gemini-1.5-flash',
+    input: { schema: WellnessAnalysisInputSchema },
+    output: { schema: WellnessAnalysisOutputSchema },
+    prompt: `
+        Je bent {{{buddyName}}}, een vriendelijke AI-buddy. Je antwoord ('response') MOET in het Nederlands zijn.
+        Baseer je antwoord EERST op 'Relevante Documenten'.
 
-function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
-  const { userProfile } = useUser();
-  const isUser = message.role === "user";
-  
-  const getInitials = (name: string | undefined) => {
-    if (!name) return "?";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
+        Relevante Documenten:
+        ---
+        {{#if retrievedDocs}}
+            {{#each retrievedDocs}}- Document '{{name}}': {{{content}}}{{/each}}
+        {{else}}
+            Geen.
+        {{/if}}
+        ---
 
-  const initials = getInitials(userProfile?.name);
+        ANALYSEER het gesprek.
+        1. Samenvatting: Geef een beknopte, algehele samenvatting (1-2 zinnen) van het gesprek in het 'summary' veld.
+        2. Welzijnsscores: Extraheer scores (1-5) en redenen. Vul ALLEEN de velden in waarover de gebruiker info geeft.
+        3. Alerts: Analyseer 'userMessage'. Als je een duidelijk signaal detecteert, vul het 'alert' object.
 
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-3 my-4",
-        isUser ? "justify-end" : "justify-start"
-      )}
-    >
-      {!isUser && (
-        <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-      )}
-      <div
-        className={cn(
-          "max-w-md rounded-2xl px-4 py-3 shadow-clay-card",
-          isUser
-            ? "bg-primary text-primary-foreground rounded-br-none"
-            : "bg-muted rounded-tl-none"
-        )}
-      >
-        <p className="whitespace-pre-wrap">{message.content}</p>
-      </div>
-      {isUser && (
-        <Avatar className="h-10 w-10 border-2 border-primary/50">
-          <AvatarFallback className="bg-primary/20 text-primary font-bold">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-      )}
-    </div>
-  );
+        Naam gebruiker: {{{userName}}}
+        Bericht gebruiker: "{{{userMessage}}}"
+        Gespreksgeschiedenis (context):
+        {{{chatHistory}}}
+      `,
+  });
+
+  try {
+    const retrievedDocs = await retrieveSimilarDocuments(input.userMessage, userProfile.clubId || '');
+    const augmentedInput = { ...input, retrievedDocs };
+    
+    const { output } = await wellnessBuddyPrompt(augmentedInput);
+    if (!output) throw new Error("Wellness prompt returned no output.");
+    
+    await saveWellnessData(userId, output);
+    
+    return output;
+  } catch (error: any) {
+    const detail = error.message || 'Unknown error';
+    throw new Error(`Kon de AI-buddy niet bereiken. Server-log bevat details. Fout: ${detail}`);
+  }
 }

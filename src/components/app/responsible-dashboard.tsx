@@ -12,19 +12,20 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, BookOpen, AlertTriangle, RefreshCw, KeyRound, Copy, Users, ArrowRight } from "lucide-react";
+import { Building, BookOpen, RefreshCw, KeyRound, Copy, Users } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
-import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { Button } from "../ui/button";
 import { generateClubInvitationCode } from "@/lib/firebase/firestore/club";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { AlertList } from "./alert-list";
+import { useUser } from "@/context/user-context";
+import { StaffUpdates } from "./staff-updates";
+import { KnowledgeBaseManager } from "./knowledge-base-stats";
 
 function ResponsibleNoClub() {
   return (
@@ -54,6 +55,7 @@ function ResponsibleNoClub() {
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
+  const { userProfile } = useUser();
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -141,7 +143,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
                     {club.name}
                   </CardTitle>
                   <CardDescription>
-                    Bekijk hieronder club-brede inzichten die dagelijks automatisch worden bijgewerkt.
+                    Bekijk hieronder club-brede inzichten en team-inzichten die dagelijks automatisch worden bijgewerkt.
                   </CardDescription>
               </div>
                <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -172,31 +174,17 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <ClubUpdates clubId={club.id} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
-                Recente Alerts
-              </CardTitle>
-              <CardDescription>
-                De laatste zorgwekkende signalen van spelers binnen de hele club.
-              </CardDescription>
-            </div>
-            <Link href="/alerts" passHref>
-                <Button variant="ghost">
-                    Bekijk alles <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-            </Link>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-muted-foreground">Club-brede Inzichten</h3>
+            <ClubUpdates clubId={club.id} />
           </div>
-        </CardHeader>
-        <CardContent>
-          <AlertList limit={3} />
+          <Separator />
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-muted-foreground flex items-center gap-2">
+                Team Inzichten
+            </h3>
+            <StaffUpdates clubId={club.id} />
+          </div>
         </CardContent>
       </Card>
 
@@ -223,21 +211,22 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <BookOpen className="h-6 w-6 mr-3 text-primary" />
-            Kennisbank Management
-          </CardTitle>
-           <CardDescription>
-            Beheer hier de documenten die de AI-buddy gebruikt om te leren en antwoorden te geven.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <KnowledgeBaseManager clubId={club.id} />
-        </CardContent>
-      </Card>
-
+      {userProfile?.role === 'responsible' && (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <BookOpen />
+                    Kennisbank
+                </CardTitle>
+                <CardDescription>
+                    Beheer de documenten die de AI-buddy gebruikt om contextuele antwoorden te geven.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <KnowledgeBaseManager clubId={clubId} />
+            </CardContent>
+        </Card>
+      )}
     </>
   );
 }

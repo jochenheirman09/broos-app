@@ -1,0 +1,18 @@
+{
+  "hosting": [
+    {
+      "target": "broos-2-0",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ]
+    },
+    {
+      "target": "broos-2-0",
+      "source": ".",
+      "frameworksBackend": {}
+    }
+  ]
+}

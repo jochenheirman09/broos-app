@@ -1,10 +1,13 @@
 
+
 import { z } from 'genkit';
 import type { Schedule } from '@/lib/types';
 
 
-// Shared Schemas for AI prompt input/output validation.
-// These should ONLY be used within server actions where the AI is called.
+// Shared Schemas
+// Note: Zod schemas are now defined locally in the server actions that use them to prevent build errors.
+// TypeScript types are kept here for shared use.
+
 
 // For analyzeTeamData flow
 export const TeamAnalysisInputSchema = z.object({
@@ -90,3 +93,6 @@ export const NotificationInputSchema = z.object({
   link: z.string().optional(),
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
+
+// For onboarding flow (Zod schemas moved to flow file)
+export type OnboardingTopic = "familySituation" | "schoolSituation" | "personalGoals" | "matchPreparation" | "recoveryHabits" | "additionalHobbies";

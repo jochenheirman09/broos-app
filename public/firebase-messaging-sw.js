@@ -1,34 +1,36 @@
 
-// This file must be in the public directory
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+// This file must be in the public directory.
 
-// Your web app's Firebase configuration
+// Give the service worker access to Firebase Messaging.
+// Note that you can only use Firebase Messaging here, other Firebase services
+// are not available in the service worker.
+import { initializeApp } from "firebase/app";
+import { getMessaging } from "firebase/messaging/sw";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBDyKYdIZpO0WFKtnY6t01qzBIkIVDGCrU",
+  apiKey: "AIzaSyBVOId-CRlTD6oKqvZ0CxKSFxObOoHEHd8",
   authDomain: "studio-5690519872-e0869.firebaseapp.com",
   projectId: "studio-5690519872-e0869",
-  storageBucket: "studio-5690519872-e0869.firebasestorage.app",
+  storageBucket: "studio-5690519872-e0869.appspot.com",
   messagingSenderId: "796529432751",
-  appId: "1:796529432751:web:da147b13f407d67aaf9c5a"
+  appId: "1:796529432751:web:da147b13f407d67aaf9c5a",
+  measurementId: "G-14976CYFEK"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+// Initialize the Firebase app in the service worker with the same config
+const app = initializeApp(firebaseConfig);
+const messaging = getMessaging(app);
 
-// Retrieve an instance of Firebase Messaging so that it can handle background
-// messages.
-const messaging = firebase.messaging();
+// If you need to handle background messages, you can do so here.
+// self.addEventListener('push', (event) => {
+//   console.log('Push received', event);
+//   const { title, body } = event.data.json().notification;
+//   event.waitUntil(
+//     self.registration.showNotification(title, {
+//       body: body,
+//       icon: '/icons/icon-192x192.png'
+//     })
+//   );
+// });
 
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  // Customize notification here
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/icons/icon-192x192.png'
-  };
-
-  self.registration.showNotification(notificationTitle,
-    notificationOptions);
-});
+console.log("Firebase Messaging Service Worker initialized.");

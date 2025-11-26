@@ -22,7 +22,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "../ui/sheet";
+} from "@/components/ui/sheet";
 
 const chartConfig = {
   mood: { label: "Stemming", color: "hsl(var(--chart-1))" },
@@ -65,7 +65,7 @@ const CustomBar = (props: any) => {
         className="text-lg"
       >
         {emoji}
-      </text>
+       </text>
     </g>
   );
 };

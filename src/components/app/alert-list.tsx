@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useFirestore } from '@/firebase';
-import { collectionGroup, query, where, getDocs, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, getDocs, orderBy, limit as firestoreLimit } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import type { UserProfile, Alert as AlertType, WithId } from '@/lib/types';
 import { Spinner } from '../ui/spinner';
@@ -18,6 +18,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 // Helper function to get initials from a name
 const getInitials = (name: string = '') => {
@@ -65,7 +68,7 @@ function AlertCard({ alert, player }: { alert: WithId<AlertType>, player: WithId
 
 
 export function AlertList({ limit }: { limit?: number }) {
-  const { userProfile } = useUser();
+  const { userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   const [alerts, setAlerts] = useState<WithId<AlertType>[]>([]);
   const [players, setPlayers] = useState<Map<string, WithId<UserProfile>>>(new Map());
@@ -73,80 +76,122 @@ export function AlertList({ limit }: { limit?: number }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userProfile || !db) return;
+    // CRITICAL: Wait until the user profile is fully loaded before doing anything.
+    if (userLoading) {
+      console.log('[AlertList] Effect skipped: user is loading.');
+      return;
+    }
+    
+    // CRITICAL: Ensure all necessary data is present before proceeding.
+    if (!db || !userProfile) {
+      console.log('[AlertList] Effect skipped: profile or db not available. Setting loading to false.');
+      setIsLoading(false);
+      return;
+    }
 
     const fetchAlertsAndPlayers = async () => {
+      console.log(`[AlertList] Starting fetch for user role: ${userProfile.role}`);
       setIsLoading(true);
       setError(null);
       
       try {
-        let alertsQuery;
-        let queryConstraints = [orderBy('createdAt', 'desc')];
-        if (limit) {
-            queryConstraints.push(firestoreLimit(limit));
-        }
+        let playerIds: string[] = [];
 
-        // Responsible users query the collection group across the entire database
-        if (userProfile.role === 'responsible') {
-            alertsQuery = query(collectionGroup(db, 'alerts'), ...queryConstraints);
-        } 
-        // Staff users fetch players in their team first, then query alerts for those players
-        else if (userProfile.role === 'staff' && userProfile.teamId) {
-           const teamMembersQuery = query(collection(db, 'users'), where('teamId', '==', userProfile.teamId));
-           const teamMembersSnapshot = await getDocs(teamMembersQuery);
-           const playerIds = teamMembersSnapshot.docs.map(doc => doc.id);
+        // Step 1: Determine which players' alerts to fetch based on role
+        if (userProfile.role === 'responsible' && userProfile.clubId) {
+            console.log(`[AlertList] Role is 'responsible'. Fetching players for clubId: ${userProfile.clubId}`);
+            const playersQuery = query(collection(db, 'users'), where('clubId', '==', userProfile.clubId));
+            const playersSnapshot = await getDocs(playersQuery);
+            playerIds = playersSnapshot.docs.map(doc => doc.id);
+            console.log(`[AlertList] Found ${playerIds.length} players in club.`);
 
-           if (playerIds.length === 0) {
+        } else if (userProfile.role === 'staff' && userProfile.teamId) {
+            console.log(`[AlertList] Role is 'staff'. Fetching players for teamId: ${userProfile.teamId}`);
+            const playersQuery = query(collection(db, 'users'), where('teamId', '==', userProfile.teamId));
+            const playersSnapshot = await getDocs(playersQuery);
+            playerIds = playersSnapshot.docs.map(doc => doc.id);
+            console.log(`[AlertList] Found ${playerIds.length} players in team.`);
+        } else {
+             console.log("[AlertList] User is not a staff or responsible, or is missing required IDs. Halting alert fetch.");
              setIsLoading(false);
              return;
-           }
-           
-           alertsQuery = query(
-               collectionGroup(db, 'alerts'), 
-               where('userId', 'in', playerIds),
-               ...queryConstraints
-            );
-        } else {
-            // Players should not see any alerts.
-            setIsLoading(false);
-            return;
         }
 
-        const alertsSnapshot = await getDocs(alertsQuery);
-        const fetchedAlerts = alertsSnapshot.docs.map(doc => ({ ...doc.data() as AlertType, id: doc.id }));
-        setAlerts(fetchedAlerts);
+        if (playerIds.length === 0) {
+          console.log('[AlertList] No playerIds found to query alerts for. Exiting fetch.');
+          setAlerts([]);
+          setIsLoading(false);
+          return;
+        }
+
+        const allAlerts: WithId<AlertType>[] = [];
         
-        // Fetch unique player profiles for the fetched alerts
-        const userIds = [...new Set(fetchedAlerts.map(a => a.userId))];
-        if (userIds.length > 0) {
-            // Firestore 'in' queries are limited to 30 items. If more are needed, run multiple queries.
-            const playerPromises = [];
-            for (let i = 0; i < userIds.length; i += 30) {
-                const chunk = userIds.slice(i, i + 30);
-                playerPromises.push(getDocs(query(collection(db, 'users'), where('uid', 'in', chunk))));
-            }
+        console.log('[AlertList] Fetching alerts in chunks of 30 playerIds...');
+        // Step 2: Fetch alerts in chunks of 30 playerIds (Firestore 'in' query limit)
+        for (let i = 0; i < playerIds.length; i += 30) {
+            const chunk = playerIds.slice(i, i + 30);
+            console.log(`[AlertList] Querying alerts for playerIds chunk ${Math.floor(i / 30) + 1}:`, chunk);
             
-            const playersSnapshots = await Promise.all(playerPromises);
+            const alertsQueryConstraints = [
+                where('userId', 'in', chunk),
+                orderBy('createdAt', 'desc'),
+            ];
+            // Apply limit only if specified, as applying it per chunk would be incorrect.
+            // A client-side slice will be used later if a limit is needed.
+            
+            const alertsQuery = query(collectionGroup(db, 'alerts'), ...alertsQueryConstraints);
+            const alertsSnapshot = await getDocs(alertsQuery);
+            const fetchedAlerts = alertsSnapshot.docs.map(doc => ({ ...doc.data() as AlertType, id: doc.id }));
+            console.log(`[AlertList] Found ${fetchedAlerts.length} alerts in this chunk.`);
+            allAlerts.push(...fetchedAlerts);
+        }
+        
+        // Step 3: Sort combined alerts by date client-side because we fetched in chunks
+        console.log(`[AlertList] Total alerts found: ${allAlerts.length}. Sorting...`);
+        allAlerts.sort((a, b) => ((b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)));
+        const finalAlerts = limit ? allAlerts.slice(0, limit) : allAlerts;
+        setAlerts(finalAlerts);
+        console.log(`[AlertList] Final alerts count after limit: ${finalAlerts.length}`);
+        
+        // Step 4: Fetch unique player profiles for the fetched alerts, if any alerts were found
+        const userIdsToFetch = [...new Set(finalAlerts.map(a => a.userId))];
+        console.log(`[AlertList] Need to fetch profiles for ${userIdsToFetch.length} unique users.`);
+        if (userIdsToFetch.length > 0) {
             const playersMap = new Map<string, WithId<UserProfile>>();
-            playersSnapshots.forEach(snapshot => {
-                snapshot.forEach(doc => {
+            // Fetch player data in chunks as well
+            for (let i = 0; i < userIdsToFetch.length; i += 30) {
+                const chunk = userIdsToFetch.slice(i, i + 30);
+                console.log(`[AlertList] Fetching player profiles chunk ${Math.floor(i / 30) + 1}:`, chunk);
+                // Use 'uid' field as per Firestore rules for listing users.
+                const playersQuery = query(collection(db, 'users'), where('uid', 'in', chunk));
+                const playersSnapshot = await getDocs(playersQuery);
+                playersSnapshot.forEach(doc => {
                     playersMap.set(doc.id, { ...doc.data() as UserProfile, id: doc.id });
                 });
-            });
-            setPlayers(playersMap);
+            }
+             setPlayers(playersMap);
+             console.log('[AlertList] Player profiles loaded.');
+        } else {
+            console.log('[AlertList] No alerts found, no player profiles to fetch.');
         }
 
       } catch (e: any) {
-        console.error("Error fetching alerts:", e);
-        setError("Kon de alerts niet ophalen. Controleer de console voor meer details.");
+        console.error("[AlertList] >>> CRITICAL ERROR during fetchAlertsAndPlayers:", e);
+        const permissionError = new FirestorePermissionError({
+            path: `alerts (collection group)`,
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        setError("Kon de alerts niet ophalen. Dit is waarschijnlijk een permissieprobleem. Controleer de Firestore-regels en de console voor de exacte query die mislukt.");
       } finally {
+        console.log('[AlertList] Fetch process finished.');
         setIsLoading(false);
       }
     };
 
     fetchAlertsAndPlayers();
 
-  }, [userProfile, db, limit]);
+  }, [userProfile, userLoading, db, limit]);
 
   if (isLoading) {
     return (

@@ -55,7 +55,7 @@ export function PlayerDashboard() {
   
   const isLoadingAffiliation = teamLoading || clubLoading;
 
-  if (!firstName) {
+  if (!firstName || !userProfile?.teamId) {
     return (
         <Alert variant="destructive">
             <Info className="h-4 w-4" />

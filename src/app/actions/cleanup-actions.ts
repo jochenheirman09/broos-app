@@ -34,7 +34,7 @@ async function cleanupDatabase(): Promise<{
   deletedUsers: number;
   deletedClubs: number;
 }> {
-  const { adminDb: db } = getFirebaseAdmin();
+  const { adminDb: db } = await getFirebaseAdmin();
   let deletedUsers = 0;
   let deletedClubs = 0;
 

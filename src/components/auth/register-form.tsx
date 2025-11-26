@@ -12,7 +12,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,24 +27,18 @@ import { useToast } from "@/hooks/use-toast";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
-  updateProfile,
-  signInWithEmailAndPassword,
 } from "firebase/auth";
-import { useAuth, useFirestore, firebaseConfig } from "@/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { useAuth, useFirestore } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
 import type { UserRole, Gender } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Checkbox } from "../ui/checkbox";
-import Link from "next/link";
-import { User } from 'firebase/auth';
-
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
 const genders: { value: Gender; labelPlayer: string; labelAdult: string }[] = [
   { value: "male", labelPlayer: "Jongen", labelAdult: "Man" },
   { value: "female", labelPlayer: "Meisje", labelAdult: "Vrouw" },
 ];
-
 
 const formSchema = z
   .object({
@@ -61,9 +54,8 @@ const formSchema = z
     gender: z.enum(["male", "female"], {
       required_error: "Selecteer je geslacht.",
     }),
-    acceptedTerms: z.boolean().refine((val) => val === true, {
-      message:
-        "Je moet akkoord gaan met het privacybeleid en de voorwaarden.",
+    acceptedTerms: z.literal<boolean>(true, {
+      errorMap: () => ({ message: "Je moet akkoord gaan met de voorwaarden." }),
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -80,7 +72,6 @@ export function RegisterForm() {
   const db = useFirestore();
 
   const selectedRole = searchParams.get("role") as UserRole | null;
-  
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -96,27 +87,6 @@ export function RegisterForm() {
 
   const watchedRole = form.watch("role");
 
-  // This function creates the Firestore user document.
-  // It's used for both new users and existing "ghost" users.
-  const createFirestoreUserDocument = async (user: User, values: z.infer<typeof formSchema>) => {
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      name: values.name,
-      email: values.email,
-      role: values.role,
-      gender: values.gender,
-      emailVerified: user.emailVerified,
-      onboardingCompleted: false,
-      acceptedTerms: true,
-      clubId: values.role === 'responsible' ? null : undefined, // Explicitly null for responsible
-      teamId: undefined, // Will be set in complete-profile
-    });
-    // Also update the auth profile display name
-    if (user.displayName !== values.name) {
-      await updateProfile(user, { displayName: values.name });
-    }
-  };
-
   useEffect(() => {
     if (selectedRole && roles.includes(selectedRole)) {
       form.setValue("role", selectedRole);
@@ -124,27 +94,26 @@ export function RegisterForm() {
   }, [selectedRole, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!db || !auth) {
-      toast({
-        variant: "destructive",
-        title: "Registratie mislukt",
-        description: "Firebase is niet beschikbaar.",
-      });
-      return;
-    }
     setIsLoading(true);
     try {
-      // First, try to create a new user.
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
         values.password
       );
       const user = userCredential.user;
-      
-      // If successful, create their Firestore document.
-      await createFirestoreUserDocument(user, values);
-      
+
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        name: values.name,
+        email: values.email,
+        role: values.role,
+        gender: values.gender,
+        emailVerified: false,
+        onboardingCompleted: false,
+        acceptedTerms: values.acceptedTerms,
+      });
+
       await sendEmailVerification(user);
 
       toast({
@@ -153,61 +122,15 @@ export function RegisterForm() {
       });
 
       router.push("/verify-email");
-
     } catch (error: any) {
-      // If the error is 'auth/email-already-in-use', we handle the "ghost user" case.
-      if (error.code === 'auth/email-already-in-use') {
-        try {
-          // Try to sign in the user. This will fail if the password is wrong.
-          const existingUserCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-          const existingUser = existingUserCredential.user;
-
-          // Check if a Firestore document already exists for this user.
-          const userDocRef = doc(db, "users", existingUser.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          if (!userDoc.exists()) {
-            // The user exists in Auth, but not in Firestore. Create the doc.
-            await createFirestoreUserDocument(existingUser, values);
-            toast({
-              title: "Account hersteld!",
-              description: "Je account bestond al maar je profiel was incompleet. Dit is nu hersteld.",
-            });
-          }
-          // Whether the doc existed or not, redirect them.
-           if (!existingUser.emailVerified) {
-              // Resend verification just in case and redirect
-              await sendEmailVerification(existingUser);
-              toast({
-                title: "Verificatie vereist",
-                description: "Je e-mailadres is nog niet geverifieerd. Een nieuwe e-mail is onderweg."
-              });
-              router.push('/verify-email');
-           } else {
-              // If verified, proceed to the dashboard.
-              toast({
-                title: "Welkom terug!",
-                description: "Je wordt ingelogd.",
-              });
-              router.push('/dashboard');
-           }
-
-        } catch (signInError: any) {
-          // If sign-in fails, it's likely a wrong password for an existing account.
-          toast({
-            variant: "destructive",
-            title: "Registratie mislukt",
-            description: "Dit e-mailadres is al in gebruik. Als dit jouw account is, probeer dan in te loggen of je wachtwoord te herstellen.",
-          });
-        }
-      } else {
-        // Handle other registration errors.
-        toast({
-          variant: "destructive",
-          title: "Registratie mislukt",
-          description: error.message || "Er is een onbekende fout opgetreden.",
-        });
-      }
+      toast({
+        variant: "destructive",
+        title: "Registratie mislukt",
+        description:
+          error.code === "auth/email-already-in-use"
+            ? "Dit e-mailadres is al in gebruik."
+            : error.message || "Er is een onbekende fout opgetreden.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -322,14 +245,13 @@ export function RegisterForm() {
                 <FormMessage />
               </FormItem>
             )}
-          />
         )}
         
         <FormField
           control={form.control}
           name="acceptedTerms"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-clay-inset">
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 shadow-clay-inset">
               <FormControl>
                 <Checkbox
                   checked={field.value}
@@ -338,14 +260,22 @@ export function RegisterForm() {
               </FormControl>
               <div className="space-y-1 leading-none">
                 <FormLabel>
-                  Ik ga akkoord met het{" "}
-                  <Link href="/privacy-policy" className="text-primary hover:underline" target="_blank">
-                    Privacybeleid
-                  </Link>{" "}
-                  en de{" "}
-                  <Link href="/terms-and-conditions" className="text-primary hover:underline" target="_blank">
-                    Algemene Voorwaarden
-                  </Link>
+                  Ik ga akkoord met de{" "}
+                  <a
+                    href="/terms-and-conditions"
+                    target="_blank"
+                    className="text-primary hover:underline"
+                  >
+                    algemene voorwaarden
+                  </a>{" "}
+                  en het{" "}
+                  <a
+                    href="/privacy-policy"
+                    target="_blank"
+                    className="text-primary hover:underline"
+                  >
+                    privacybeleid
+                  </a>
                   .
                 </FormLabel>
                 <FormMessage />
@@ -353,8 +283,7 @@ export function RegisterForm() {
             </FormItem>
           )}
         />
-
-
+        
         <Button
           type="submit"
           className="w-full"

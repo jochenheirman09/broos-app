@@ -4,12 +4,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { type WellnessAnalysisInput, type WellnessAnalysisOutput, type OnboardingOutput } from '@/lib/types';
+import { type WellnessAnalysisInput, type WellnessAnalysisOutput, type OnboardingOutput, type FullWellnessAnalysisOutput } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { SendHorizonal } from "lucide-react";
+import { SendHorizonal, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,11 @@ import {
 } from "@/components/ui/card";
 import { MessageSquare } from "lucide-react";
 
+// Extend the output type to include potential error states
+type BuddyResponse = (OnboardingOutput | FullWellnessAnalysisOutput) & {
+    error?: 'service_unavailable' | 'configuration_error';
+};
+
 
 export function ChatInterface() {
   const { userProfile, user } = useUser();
@@ -42,6 +47,9 @@ export function ChatInterface() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [lastFailedMessage, setLastFailedMessage] = useState<WellnessAnalysisInput | null>(null);
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const buddyName = userProfile?.buddyName || "Broos";
@@ -64,53 +72,64 @@ export function ChatInterface() {
   const addMessageToDb = useCallback(
     async (role: 'assistant' | 'user', content: string) => {
       if (!user || !db) return;
-      // This is a fire-and-forget write to Firestore on the client.
       addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
-        {
-          role,
-          content,
-          timestamp: serverTimestamp(),
-        }
+        { role, content, timestamp: serverTimestamp() }
       );
     }, [user, db, today]
   );
   
-  const handleInitialMessage = useCallback(async () => {
-    if (!userProfile || !user || !db || !firstName) return;
-
+  const executeChat = useCallback(async (buddyInput: WellnessAnalysisInput, isRetry = false) => {
+    if (!user) return;
+    
     setIsLoading(true);
+    setLastFailedMessage(null);
+    setRetryMessage(null);
 
+    // Don't add user message to DB again on retry
+    if (!isRetry && buddyInput.userMessage !== `Start het gesprek voor vandaag.`) {
+      await addMessageToDb("user", buddyInput.userMessage);
+    }
+    
     try {
-      const buddyInput: WellnessAnalysisInput = {
-        buddyName: buddyName,
-        userName: firstName,
-        userMessage: `Start het gesprek voor vandaag.`,
-        chatHistory: '',
-      };
-      
-      console.log("[CLIENT] Sending initial message request to Server Action.");
-      const result = await chatWithBuddy(user.uid, buddyInput);
-      
-      const responseContent = (result as OnboardingOutput | WellnessAnalysisOutput).response;
+      const result: BuddyResponse = await chatWithBuddy(user.uid, buddyInput);
 
-      if (!responseContent) {
-        throw new Error('AI returned an empty response.');
+      if (result.error) {
+        setLastFailedMessage(buddyInput);
+        setRetryMessage(result.response);
+        return; // Stop execution, let the UI show the retry button
       }
-      
+
+      const responseContent = result.response;
+      if (!responseContent) throw new Error('AI returned an empty response.');
+
       await addMessageToDb("assistant", responseContent);
 
     } catch (error: any) {
-      console.error("[CLIENT] Error fetching initial message:", error);
+      console.error("[CLIENT] Error in executeChat:", error);
+      setLastFailedMessage(buddyInput); // Also set failed state on general error
+      setRetryMessage("Er is een onverwachte fout opgetreden. Probeer het opnieuw.");
       toast({
         variant: "destructive",
         title: "Oh nee!",
-        description: error.message || "Kon het gesprek niet starten. Probeer de pagina te vernieuwen.",
+        description: error.message || "Kon het gesprek niet voortzetten.",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [user, userProfile, db, firstName, buddyName, addMessageToDb, toast]);
+  }, [user, addMessageToDb, toast]);
+
+
+  const handleInitialMessage = useCallback(async () => {
+    if (!userProfile || !firstName) return;
+    const buddyInput: WellnessAnalysisInput = {
+      buddyName: buddyName,
+      userName: firstName,
+      userMessage: `Start het gesprek voor vandaag.`,
+      chatHistory: '',
+    };
+    executeChat(buddyInput);
+  }, [firstName, buddyName, executeChat, userProfile]);
 
   useEffect(() => {
     if (!messagesLoading && messages?.length === 0 && firstName) {
@@ -125,62 +144,34 @@ export function ChatInterface() {
         behavior: "smooth",
       });
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, retryMessage]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !userProfile || !user || !db || !firstName) return;
+    if (!input.trim() || !userProfile || !firstName) return;
 
     const userMessageContent = input;
     setInput("");
-
-    // Optimistically add user message to Firestore
-    await addMessageToDb("user", userMessageContent);
-
-    setIsLoading(true);
-
-    try {
-      const chatHistory = (messages || [])
-        .map((m) => `${m.role}: ${m.content}`)
-        .join("\n");
-      
-      const buddyInput: WellnessAnalysisInput = {
-        buddyName: buddyName,
-        userName: firstName,
-        userMessage: userMessageContent,
-        chatHistory: chatHistory,
-      };
-
-      console.log(`[CLIENT] Sending message: "${userMessageContent}"`);
-      const result = await chatWithBuddy(user.uid, buddyInput);
-      
-      const responseContent = (result as OnboardingOutput | WellnessAnalysisOutput).response;
-      
-      if (!responseContent) {
-        throw new Error('AI returned an empty response.');
-      }
-      
-      // Add assistant response to Firestore
-      await addMessageToDb("assistant", responseContent);
-
-    } catch (error: any) {
-      console.error("[CLIENT] Error calling Server Action:", error);
-      toast({
-        variant: "destructive",
-        title: "Oh nee!",
-        description: error.message || "Er is iets misgegaan. Je bericht is niet verzonden, probeer het opnieuw.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    
+    const chatHistory = (messages || []).map((m) => `${m.role}: ${m.content}`).join("\n");
+    const buddyInput: WellnessAnalysisInput = {
+      buddyName: buddyName,
+      userName: firstName,
+      userMessage: userMessageContent,
+      chatHistory: chatHistory,
+    };
+    
+    executeChat(buddyInput);
   };
   
+  const handleRetry = () => {
+    if (lastFailedMessage) {
+        executeChat(lastFailedMessage, true);
+    }
+  }
+
   if (messagesLoading) {
-    return (
-      <div className="flex-grow flex items-center justify-center">
-        <Spinner />
-      </div>
-    );
+    return <div className="flex-grow flex items-center justify-center"><Spinner /></div>;
   }
 
   return (
@@ -191,9 +182,7 @@ export function ChatInterface() {
               <MessageSquare className="h-6 w-6 mr-3" />
               Chat met {buddyName}
             </CardTitle>
-            <CardDescription>
-              Begin hier je gesprek met je persoonlijke AI-buddy.
-            </CardDescription>
+            <CardDescription>Begin hier je gesprek met je persoonlijke AI-buddy.</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow flex flex-col overflow-hidden p-0">
             <div className="flex flex-col h-full">
@@ -208,9 +197,19 @@ export function ChatInterface() {
                         <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
                         <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
                           <Spinner size="small" />
-                          <span className="text-muted-foreground italic">
-                            {buddyName} denkt na...
-                          </span>
+                          <span className="text-muted-foreground italic">{buddyName} denkt na...</span>
+                        </div>
+                      </div>
+                    )}
+                    {retryMessage && !isLoading && (
+                      <div className="flex items-start gap-3 my-4 justify-start">
+                        <BuddyAvatar className="h-10 w-10 border-2 border-destructive" />
+                        <div className="bg-destructive/10 rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex flex-col items-start gap-2">
+                            <p className="text-destructive/90">{retryMessage}</p>
+                            <Button variant="destructive" size="sm" onClick={handleRetry}>
+                                <RotateCw className="h-4 w-4 mr-2" />
+                                Opnieuw proberen
+                            </Button>
                         </div>
                       </div>
                     )}
@@ -248,25 +247,14 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
   
   const getInitials = (name: string | undefined) => {
     if (!name) return "?";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 
   const initials = getInitials(userProfile?.name);
 
   return (
-    <div
-      className={cn(
-        "flex items-start gap-3 my-4",
-        isUser ? "justify-end" : "justify-start"
-      )}
-    >
-      {!isUser && (
-        <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-      )}
+    <div className={cn("flex items-start gap-3 my-4", isUser ? "justify-end" : "justify-start")}>
+      {!isUser && <BuddyAvatar className="h-10 w-10 border-2 border-primary" />}
       <div
         className={cn(
           "max-w-md rounded-2xl px-4 py-3 shadow-clay-card",

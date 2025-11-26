@@ -11,11 +11,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
-import { Info, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 import { AlertList } from "./alert-list";
-import { Button } from "../ui/button";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
@@ -42,30 +39,7 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="flex items-center">
-                <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
-                Recente Alerts
-              </CardTitle>
-              <CardDescription>
-                De laatste zorgwekkende signalen van spelers in je team.
-              </CardDescription>
-            </div>
-            <Link href="/alerts" passHref>
-                <Button variant="ghost">
-                    Bekijk alles <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <AlertList limit={3} />
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Team Inzichten</CardTitle>
@@ -77,6 +51,21 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
           <StaffUpdates clubId={clubId} teamId={teamId} />
         </CardContent>
       </Card>
-    </>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
+            Individuele Alerts
+          </CardTitle>
+          <CardDescription>
+            Een overzicht van zorgwekkende signalen die de AI heeft gedetecteerd bij spelers in jouw team.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertList />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

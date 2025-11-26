@@ -1,24 +1,22 @@
 
 'use server';
 
-import { ai as genkitAI } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { ai } from '@/ai/genkit';
 import { PlayerUpdateInputSchema, PlayerUpdateOutputSchema, type PlayerUpdateInput, type PlayerUpdateOutput } from '@/ai/types';
 
-// Lazily define the prompt to avoid initialization issues during build.
-let playerUpdatePrompt: any;
-function definePlayerUpdatePrompt() {
-    if (playerUpdatePrompt) return playerUpdatePrompt;
+/**
+ * Server-side function to generate a personalized "weetje" for a player.
+ */
+export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<PlayerUpdateOutput | null> {
+    // Insurance Policy: API Key check
+    if (!process.env.GEMINI_API_KEY) {
+        console.error("[AI Flow - Player Update] CRITICAL: GEMINI_API_KEY is not set.");
+        return null;
+    }
 
-    const ai = genkitAI({
-        plugins: [googleAI()],
-        logLevel: 'debug',
-        enableTracingAndMetrics: true,
-    });
-
-    playerUpdatePrompt = ai.definePrompt({
+    const playerUpdatePrompt = ai.definePrompt({
         name: 'playerUpdateGeneratorPrompt',
-        model: googleAI.model('gemini-2.5-flash'),
+        model: 'googleai/gemini-2.5-flash',
         input: { schema: PlayerUpdateInputSchema },
         output: { schema: PlayerUpdateOutputSchema },
         prompt: `
@@ -53,18 +51,11 @@ function definePlayerUpdatePrompt() {
             }
         `,
     });
-    return playerUpdatePrompt;
-}
-
-/**
- * Server-side function to generate a personalized "weetje" for a player.
- */
-export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<PlayerUpdateOutput | null> {
+    
     console.log('[SERVER ACTION] generatePlayerUpdate invoked for player:', input.playerName);
-    const prompt = definePlayerUpdatePrompt();
 
     try {
-        const { output } = await prompt(input);
+        const { output } = await playerUpdatePrompt(input);
         if (!output) {
             console.warn('[SERVER ACTION] Player update prompt returned no output.');
             return null;
@@ -72,8 +63,6 @@ export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<Pl
         return output;
     } catch (error: any) {
         console.error('[SERVER ACTION] CRITICAL ERROR IN PLAYER UPDATE FLOW:', error);
-        // Do not re-throw, as this might break the entire cron job.
-        // Just log the error and return null.
         return null;
     }
 }

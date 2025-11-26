@@ -12,6 +12,8 @@ const categoryIcons: { [key: string]: React.ReactNode } = {
   Sleep: <Lightbulb className="h-5 w-5 text-primary" />,
   Nutrition: <BrainCircuit className="h-5 w-5 text-primary" />,
   Motivation: <Sparkles className="h-5 w-5 text-primary" />,
+  Stress: <Info className="h-5 w-5 text-yellow-500" />,
+  Wellness: <Sparkles className="h-5 w-5 text-primary" />,
   default: <Info className="h-5 w-5 text-primary" />,
 };
 

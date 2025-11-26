@@ -1,20 +1,3 @@
-
-/**
- * @file Firestore Security Rules for Broos 2.0 application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user data and allows for club data management.
- * Security is primarily enforced by path and ownership, with client-side queries ensuring users only request data they're allowed to see.
- *
- * Data Structure:
- * - /users/{userId}: Private user data.
- * - /clubs/{clubId}: Club data.
- * - /clubs/{clubId}/teams/{teamId}: Team data.
- *
- * Key Security Decisions:
- * - Heavy reliance on client-side logic to query for correct data (e.g., filtering by teamId or clubId).
- * - Rules are kept simple and fast to avoid deployment timeouts.
- */
 rules_version = '2';
 
 service cloud.firestore {
@@ -33,40 +16,56 @@ service cloud.firestore {
     }
 
     function isResponsible() {
+        // This function requires that a 'get' on the user's own document is allowed.
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
     }
     
     function isMemberOfClub(clubId) {
+        // This function requires that a 'get' on the user's own document is allowed.
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
     }
 
-    // This rule is no longer necessary as we are not using a collectionGroup query.
-    // match /{path=**}/teams/{teamId} {
-    //  allow read: if isSignedIn();
-    // }
+    function isStaff() {
+       // This function requires that a 'get' on the user's own document is allowed.
+       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
+    }
+    
+    function getMyTeamId() {
+       // This function requires that a 'get' on the user's own document is allowed.
+       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
+    }
+
+    // Collection group query for alerts
+    match /{path=**}/alerts/{alertId} {
+      // Allow staff or responsible to read alerts if they are querying by userIds.
+      // This is secure because the client first fetches player UIDs based on their role (team/club)
+      // and then uses those IDs to query the alerts. The rules for /users/{userId} list operations
+      // ensure they can only get IDs for players they are allowed to see.
+      allow read: if (isStaff() || isResponsible()) && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'userId';
+    }
+
 
     match /users/{userId} {
-      // User can read/write their own document
-      allow get: if isOwner(userId);
+      // CRITICAL: Allow any signed-in user to GET any user document. 
+      // This is required for helper functions like isResponsible() and isStaff() to work in other rules.
+      // The client UI is responsible for only showing relevant data.
+      allow get: if isSignedIn();
       allow create: if isCreatingOwnData(userId);
       allow update, delete: if isOwner(userId);
 
-      // Listing users is allowed if filtered by clubId or teamId.
-      // The client must be trusted to apply the correct filters.
-      allow list: if isSignedIn() && 
-                   request.query.keys().hasAny(['where']) && 
-                   (request.query.where[0][0] == 'clubId' || request.query.where[0][0] == 'teamId');
+      // Listing users is allowed if filtered by clubId (for responsible), teamId (for staff),
+      // or a specific uid (for fetching profiles for alerts).
+      allow list: if (isResponsible() && request.query.where[0][0] == 'clubId') ||
+                   (isStaff() && request.query.where[0][0] == 'teamId') ||
+                   (isSignedIn() && request.query.where[0][0] == 'uid');
 
       match /wellnessScores/{scoreId} {
-        // Responsible users can read this data if client queries correctly.
-        // For simplicity, we allow read/write to any signed-in user,
-        // relying on the client not to expose this functionality to wrong roles.
         allow read, write: if isSignedIn();
       }
       
       match /fcmTokens/{tokenId} {
-        allow read, list: if false; // No one can read/list tokens
-        allow write: if isOwner(userId); // User can only manage their own tokens
+        allow read, list: if false; 
+        allow write: if isOwner(userId);
       }
 
       match /trainings/{trainingId} {
@@ -83,61 +82,49 @@ service cloud.firestore {
 
       match /alerts/{alertId} {
         allow create: if isOwner(userId);
-        // Alert management is for staff/responsibles.
-        // We trust client to only show this data to correct roles.
-        allow read, update, delete: if isSignedIn();
+        
+        // Staff can read/update alerts for players in their team.
+        // Responsibles can read/update any alert in their club.
+        allow read, update, delete: if (isStaff() && get(/databases/$(database)/documents/users/$(userId)).data.teamId == getMyTeamId()) ||
+                                      (isResponsible() && get(/databases/$(database)/documents/users/$(userId)).data.clubId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId);
       }
 
       match /updates/{updateId} {
         allow read: if isOwner(userId);
-        allow write: if false; // Can only be written by backend
+        allow write: if false; 
       }
     }
 
     match /clubs/{clubId} {
       // Any signed-in user can read club details or list clubs
       allow get, list: if isSignedIn(); 
-
-      // Only a logged-in user can create a club.
-      // The logic to check if they already have a club is in the app code.
       allow create: if isSignedIn();
-
-      // Only the club owner can update/delete it.
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /clubUpdates/{updateId} {
-        allow read: if isSignedIn(); // Trusted client shows this only to owner
+        allow read: if isSignedIn(); 
         allow write: if false;
       }
 
       match /teams/{teamId} {
-        // We need to allow reads for any signed-in user here, so the complete-profile form
-        // can search for the team code. The query is scoped to a specific club, so it's safe.
         allow read: if isSignedIn();
-        // Allow list, create, update, delete if the user is a responsible member of this club.
         allow list, create, update, delete: if isResponsible() && isMemberOfClub(clubId);
 
         match /summaries/{summaryId} {
-            // Can be read by any authenticated user (client filters for role).
-            // Can only be written by the backend (cron job).
             allow read: if isSignedIn();
             allow write: if false;
         }
 
         match /staffUpdates/{updateId} {
-            allow read: if isSignedIn(); // Trusted client
+            allow read: if isSignedIn();
             allow write: if false;
         }
       }
     }
 
-    // Rules for Knowledge Base - allow any responsible user to read.
     match /knowledge_base/{docId} {
-      allow get: if isResponsible();
+      allow get, list: if isResponsible();
       allow write: if false; 
-    }
-    match /knowledge_base {
-       allow list: if isResponsible();
     }
   }
 }

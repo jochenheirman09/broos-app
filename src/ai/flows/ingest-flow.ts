@@ -1,4 +1,3 @@
-
 "use server";
 
 import { z } from 'genkit';
@@ -13,7 +12,7 @@ import { IngestInputSchema, type IngestInput } from '@/ai/types';
  */
 export async function ingestDocument(input: IngestInput): Promise<{ success: boolean, docId?: string, message: string }> {
   console.log(`[SERVER ACTION] ingestDocument invoked for file: ${input.fileName}`);
-  const { adminDb } = getFirebaseAdmin();
+  const { adminDb } = await getFirebaseAdmin();
   
   const { fileName, fileContent, clubId } = input;
 
