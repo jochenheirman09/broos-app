@@ -1,8 +1,7 @@
 
 'use server';
 
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { TeamAnalysisInput, TeamAnalysisOutput } from '@/ai/types';
 import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema } from '@/ai/types';
@@ -20,15 +19,9 @@ export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAna
 
     console.log(`[AI Flow - Team Analysis] Invoked for team: ${input.teamName}`);
 
-    const ai = genkit({
-        plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
-        logLevel: 'debug',
-        enableTracingAndMetrics: true,
-    });
-
     const teamAnalysisPrompt = ai.definePrompt({
         name: 'teamDataAnalyzerPrompt',
-        model: 'googleai/gemini-2.5-flash',
+        model: 'gemini-2.5-flash',
         input: { schema: TeamAnalysisInputSchema },
         output: { schema: TeamAnalysisOutputSchema },
         prompt: `

@@ -1,8 +1,7 @@
 
 'use server';
 
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { saveOnboardingSummary } from '@/services/firestore-service';
@@ -15,7 +14,7 @@ export async function runOnboardingFlow(
     input: WellnessAnalysisInput
 ): Promise<OnboardingOutput> {
 
-    // Insurance Policy: API Key check
+    // Insurance Policy: API Key check (remains as a safeguard)
     if (!process.env.GEMINI_API_KEY) {
         console.error("[Onboarding Flow] CRITICAL: GEMINI_API_KEY is not set.");
         return { 
@@ -24,10 +23,6 @@ export async function runOnboardingFlow(
             summary: "Configuratiefout" 
         };
     }
-    
-    const ai = genkit({
-        plugins: [googleAI()],
-    });
     
     const OnboardingOutputSchema = z.object({
         response: z.string().describe("Het antwoord van de AI-buddy."),
@@ -49,7 +44,7 @@ export async function runOnboardingFlow(
 
     const onboardingBuddyPrompt = ai.definePrompt({
         name: 'onboardingBuddyPrompt_v2_isolated',
-        model: 'googleai/gemini-2.5-flash',
+        model: 'gemini-2.5-flash',
         input: { schema: z.any() },
         output: { schema: OnboardingOutputSchema },
         prompt: `

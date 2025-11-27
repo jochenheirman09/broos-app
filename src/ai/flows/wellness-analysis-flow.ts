@@ -1,8 +1,7 @@
 
 'use server';
 
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import type { UserProfile, WellnessAnalysisInput, FullWellnessAnalysisOutput } from '@/lib/types';
@@ -15,17 +14,11 @@ export async function runWellnessAnalysisFlow(
     input: WellnessAnalysisInput & { todayActivity?: string }
 ): Promise<FullWellnessAnalysisOutput> {
     
-    // Insurance Policy: API Key check
+    // Insurance Policy: API Key check (remains as a safeguard)
     if (!process.env.GEMINI_API_KEY) {
         console.error("[Wellness Flow] CRITICAL: GEMINI_API_KEY is not set.");
         throw new Error("AI Service is not configured. API Key is missing.");
     }
-
-    const ai = genkit({
-        plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
-        logLevel: 'debug',
-        enableTracingAndMetrics: true,
-    });
 
     const WellnessScoresSchema = z.object({
         mood: z.number().min(1).max(5).optional().describe("Score van 1 (erg negatief) tot 5 (erg positief) voor de algemene stemming."),
@@ -50,7 +43,7 @@ export async function runWellnessAnalysisFlow(
 
     const wellnessBuddyPrompt = ai.definePrompt({
         name: 'wellnessBuddyPrompt_v3_schedule_aware',
-        model: 'googleai/gemini-2.5-flash',
+        model: 'gemini-2.5-flash',
         input: { schema: z.any() },
         output: { schema: FullWellnessAnalysisOutputSchema },
         prompt: `

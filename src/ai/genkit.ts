@@ -1,10 +1,25 @@
 
 'use server';
 
+import { genkit, configureGenkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { getAuth, type Auth } from 'firebase-admin/auth';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
+
+// --- Genkit AI Initialization ---
+// This is now the SINGLE source of truth for AI configuration.
+// The API key is explicitly passed here, ensuring it's available for all flows.
+configureGenkit({
+  plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
+  logLevel: 'debug',
+  enableTracingAndMetrics: true,
+});
+
+// Export the globally configured ai instance for use in all flows.
+export { genkit as ai };
+
 
 // --- Firebase Admin SDK ---
 let _firebaseAdminApp: App | null = null;
