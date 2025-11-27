@@ -28,6 +28,7 @@ export async function getFirebaseAdmin() {
     };
   }
 
+  // This change forces a new build to load secrets.
   const serviceAccountKey = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
   if (!serviceAccountKey) {
     throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable is not set. This is required for server-side actions.');
