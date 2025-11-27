@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,11 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
 } from "firebase/auth";
-import { useAuth, useFirestore } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase/provider";
 import { doc, setDoc } from "firebase/firestore";
 import type { UserRole, Gender } from "@/lib/types";
-import { Spinner } from "../ui/spinner";
-import { Checkbox } from "../ui/checkbox";
+import { Spinner } from "@/components/ui/spinner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
 const genders: { value: Gender; labelPlayer: string; labelAdult: string }[] = [
@@ -137,7 +137,7 @@ export function RegisterForm() {
   }
 
   return (
-    <Form {...form}>
+    <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
@@ -294,6 +294,6 @@ export function RegisterForm() {
           {isLoading ? "Account aanmaken..." : "Account aanmaken"}
         </Button>
       </form>
-    </Form>
+    </FormProvider>
   );
 }

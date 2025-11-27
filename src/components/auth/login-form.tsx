@@ -21,8 +21,8 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { useAuth } from "@/firebase";
-import { Spinner } from "../ui/spinner";
+import { useAuth } from "@/firebase/provider";
+import { Spinner } from "@/components/ui/spinner";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Voer een geldig e-mailadres in." }),
