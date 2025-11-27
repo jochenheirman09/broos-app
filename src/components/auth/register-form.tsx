@@ -1,11 +1,11 @@
-
 "use client";
 
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
+  Form,
   FormControl,
   FormField,
   FormItem,
@@ -136,7 +136,7 @@ export function RegisterForm() {
   }
 
   return (
-    <FormProvider {...form}>
+    <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
@@ -293,6 +293,6 @@ export function RegisterForm() {
           {isLoading ? "Account aanmaken..." : "Account aanmaken"}
         </Button>
       </form>
-    </FormProvider>
+    </Form>
   );
 }
