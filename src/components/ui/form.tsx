@@ -10,8 +10,8 @@ import {
   type ControllerProps,
   type FieldPath,
   type FieldValues,
+  FormProvider,
 } from "react-hook-form"
-import FormProvider from "react-hook-form/dist/context";
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
