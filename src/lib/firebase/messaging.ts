@@ -7,7 +7,6 @@ import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import { useEffect } from 'react';
 
-
 // This function can be called from a client component.
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();

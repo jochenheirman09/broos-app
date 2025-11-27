@@ -1,96 +1,85 @@
+
 'use server';
 
-import { getFirebaseAdmin } from '@/ai/genkit';
-import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
-import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
-import type { UserProfile, WellnessAnalysisInput, ScheduleActivity } from '@/lib/types';
-import { GenkitError } from 'genkit';
-import { format, getDay } from 'date-fns';
+import { z } from 'zod';
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import type { WellnessAnalysisInput, WellnessAnalysisOutput, FullWellnessAnalysisOutput } from '@/lib/types';
 
-const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
-  0: 'sunday',
-  1: 'monday',
-  2: 'tuesday',
-  3: 'wednesday',
-  4: 'thursday',
-  5: 'friday',
-  6: 'saturday',
-};
 
-/**
- * Main controller for handling chat interactions.
- * This server action acts as a router, determining whether to invoke the
- * onboarding flow or the regular wellness analysis flow based on the user's profile.
- * It also enriches the input with the player's activity for the day.
- *
- * @param userId The ID of the user initiating the chat.
- * @param input The basic chat input from the client.
- * @returns The output from either the onboarding or wellness analysis flow, or an error object.
- */
 export async function chatWithBuddy(
   userId: string,
-  input: WellnessAnalysisInput
-) {
-  // Insurance Policy: Check for API Key
-  if (!process.env.GEMINI_API_KEY) {
-    console.error("[Chat Action] CRITICAL: GEMINI_API_KEY is not set.");
-    return {
-      error: 'configuration_error',
-      response: "Mijn excuses, ik kan momenteel niet functioneren omdat mijn configuratie onvolledig is. Neem contact op met de beheerder.",
-    };
-  }
+  input: WellnessAnalysisInput,
+): Promise<WellnessAnalysisOutput> {
+  console.log(`[Chat Action - STAP 3A] Received message: ${input.userMessage}`);
 
-  console.log('[Chat Action] chatWithBuddy invoked for user:', userId);
+  // Alle Genkit en Zod definities staan nu binnen de async functie om build-fouten te voorkomen.
+  const ai = genkit({
+    plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
+    logLevel: 'debug',
+    enableTracingAndMetrics: true,
+  });
+
+  const WellnessScoresSchema = z.object({
+    mood: z.number().min(1).max(5).optional().describe("Score van 1 (erg negatief) tot 5 (erg positief) voor de algemene stemming."),
+    moodReason: z.string().optional().describe("Beknopte reden voor de stemming-score."),
+    stress: z.number().min(1).max(5).optional().describe("Score van 1 (weinig stress) tot 5 (veel stress) voor het stressniveau."),
+    stressReason: z.string().optional().describe("Beknopte reden voor de stress-score."),
+    sleep: z.number().min(1).max(5).optional().describe("Score van 1 (slecht geslapen) tot 5 (goed geslapen) voor de slaapkwaliteit."),
+    sleepReason: z.string().optional().describe("Beknopte reden voor de slaap-score."),
+    motivation: z.number().min(1).max(5).optional().describe("Score van 1 (niet gemotiveerd) tot 5 (zeer gemotiveerd) voor motivatie."),
+    motivationReason: z.string().optional().describe("Beknopte reden voor de motivatie-score."),
+  });
   
+  const FullWellnessAnalysisOutputSchema = z.object({
+    response: z.string().describe("Het antwoord van de AI buddy op de gebruiker."),
+    summary: z.string().optional().describe("Een beknopte, algehele samenvatting van het gehele gesprek van vandaag."),
+    wellnessScores: WellnessScoresSchema.optional(),
+    alert: z.object({
+      alertType: z.enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity']),
+      triggeringMessage: z.string()
+    }).optional(),
+  });
+  
+  const wellnessBuddyPrompt = ai.definePrompt({
+      name: 'wellnessBuddyPrompt_Step3a_Revert',
+      model: 'googleai/gemini-2.5-flash',
+      input: { schema: z.any() },
+      output: { schema: FullWellnessAnalysisOutputSchema },
+      prompt: `
+          Je bent {{{buddyName}}}, een vriendelijke en behulpzame AI-buddy.
+          Je antwoord ('response') MOET in het Nederlands zijn. Hou je antwoorden beknopt en boeiend.
+
+          ANALYSEER het gesprek op de achtergrond.
+          1.  **Samenvatting:** Geef een beknopte, algehele samenvatting (1-2 zinnen) van het gehele gesprek van vandaag in het 'summary' veld.
+          2.  **Welzijnsscores:** Extraheer scores (1-5) en redenen voor welzijnsaspecten. Vul ALLEEN de velden in 'wellnessScores' waarover de gebruiker expliciete informatie geeft.
+          3.  **Alerts:** Analyseer de 'userMessage' op zorgwekkende signalen. Als je een duidelijk signaal detecteert, vul dan het 'alert' object.
+
+          Naam gebruiker: {{{userName}}}
+          Bericht gebruiker: "{{{userMessage}}}"
+          Gespreksgeschiedenis (voor context):
+          {{{chatHistory}}}
+      `,
+  });
+
   try {
-    const { adminDb } = await getFirebaseAdmin();
-
-    const userRef = adminDb.collection('users').doc(userId);
-    const userDoc = await userRef.get();
-    if (!userDoc.exists) {
-      throw new GenkitError({ status: 'NOT_FOUND', message: 'User profile not found.' });
+    const { output } = await wellnessBuddyPrompt(input);
+    
+    if (!output?.response) {
+      throw new Error("AI returned no valid response text.");
     }
-    const userProfile = userDoc.data() as UserProfile;
+    
+    // Voor nu loggen we alleen de volledige output om te verifiëren.
+    console.log('[Chat Action - STAP 3A] Full AI Output for verification:', JSON.stringify(output, null, 2));
 
-    let todayActivity: ScheduleActivity | 'individual' = 'rest';
-    const today = new Date();
-    const todayId = format(today, "yyyy-MM-dd");
-    const dayName = dayMapping[getDay(today)];
+    // We slaan de data nog NIET op. We geven alleen de tekstrespons terug.
+    return {
+      response: output.response,
+    };
 
-    const individualTrainingQuery = userRef.collection('trainings').where('date', '==', todayId).limit(1);
-    const individualTrainingSnapshot = await individualTrainingQuery.get();
-
-    if (!individualTrainingSnapshot.empty) {
-      todayActivity = 'individual';
-    } else if (userProfile.teamId && userProfile.clubId) {
-      const teamDocRef = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').doc(userProfile.teamId);
-      const teamDoc = await teamDocRef.get();
-      if (teamDoc.exists) {
-        const teamData = teamDoc.data();
-        if (teamData?.schedule && teamData.schedule[dayName]) {
-          todayActivity = teamData.schedule[dayName];
-        }
-      }
-    }
-
-    const enrichedInput = { ...input, todayActivity };
-
-    if (!userProfile.onboardingCompleted) {
-      console.log('[Chat Action] Routing to onboarding flow.');
-      return await runOnboardingFlow(userRef, userProfile, enrichedInput);
-    } else {
-      console.log('[Chat Action] Routing to wellness analysis flow.');
-      return await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
-    }
   } catch (error: any) {
-    console.error("[Chat Action] Error in chatWithBuddy:", error.message);
-    if (error.message && (error.message.includes('503') || error.message.toLowerCase().includes('overloaded'))) {
-      return {
-        error: 'service_unavailable',
-        response: "Mijn excuses, ik heb het even te druk. Probeer het over een momentje opnieuw.",
-      };
-    }
-    // For other errors, re-throw to let the client handle a generic failure.
-    throw error;
+    const detail = error.message || 'Unknown error';
+    console.error(`[Chat Action - STAP 3A] CRITICAL ERROR IN AI FLOW:`, error);
+    throw new Error(`Kon de AI-buddy niet bereiken. Fout: ${detail}`);
   }
 }
