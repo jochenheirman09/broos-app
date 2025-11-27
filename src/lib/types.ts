@@ -1,6 +1,8 @@
 
 
 
+
+
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -25,6 +27,7 @@ export interface UserProfile {
   recoveryHabits?: string;
   additionalHobbies?: string;
   acceptedTerms?: boolean;
+  schedule?: Schedule;
 }
 
 export interface FcmToken {
@@ -171,7 +174,7 @@ export interface KnowledgeUsageStat {
     lastQueried: any; // Firestore ServerTimestamp
 }
 
-// Client-safe types, moved from ai/types.ts
+// Client-safe types
 export type OnboardingTopic = "familySituation" | "schoolSituation" | "personalGoals" | "matchPreparation" | "recoveryHabits" | "additionalHobbies";
 
 export interface WellnessAnalysisInput {
@@ -182,20 +185,14 @@ export interface WellnessAnalysisInput {
     retrievedDocs?: any;
 }
 
-// This is the full output from the AI, including the text response
 export interface FullWellnessAnalysisOutput {
   response: string;
   summary?: string;
-  wellnessScores?: Partial<WellnessScore>;
+  wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt">>;
   alert?: {
     alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
     triggeringMessage: string;
   };
-}
-
-// This is the output that the server action returns to the client (for now)
-export interface WellnessAnalysisOutput {
-  response: string;
 }
 
 

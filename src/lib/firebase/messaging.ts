@@ -7,6 +7,7 @@ import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import { useEffect } from 'react';
 
+
 // This function can be called from a client component.
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
@@ -66,18 +67,22 @@ export const ForegroundMessageListener = () => {
     
     useEffect(() => {
         if (app && typeof window !== 'undefined') {
-            const messaging = getMessaging(app);
-            const unsubscribe = onMessage(messaging, (payload) => {
-                console.log('Message received. ', payload);
-                // You can show a custom in-app notification here
-                // For now, we'll just log it.
-                new Notification(payload.notification?.title || 'New Message', {
-                    body: payload.notification?.body,
-                    icon: payload.notification?.icon
+            try {
+                const messaging = getMessaging(app);
+                const unsubscribe = onMessage(messaging, (payload) => {
+                    console.log('Message received. ', payload);
+                    // You can show a custom in-app notification here
+                    // For now, we'll just log it.
+                    new Notification(payload.notification?.title || 'New Message', {
+                        body: payload.notification?.body,
+                        icon: payload.notification?.icon
+                    });
                 });
-            });
 
-            return () => unsubscribe();
+                return () => unsubscribe();
+            } catch (error) {
+                console.warn('Firebase Messaging not available in this environment:', error);
+            }
         }
     }, [app]);
     

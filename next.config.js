@@ -1,3 +1,4 @@
+
 /** @type {import('next').NextConfig} */
 
 const withPWA = require('next-pwa')({
@@ -36,6 +37,9 @@ const nextConfig = {
       },
     ],
   },
+  // Adding this empty experimental block can sometimes help resolve complex build issues
+  // in newer Next.js versions by ensuring default flags are set correctly.
+  experimental: {},
 };
 
 module.exports = withPWA(nextConfig);
