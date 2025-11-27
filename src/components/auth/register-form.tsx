@@ -243,9 +243,10 @@ export function RegisterForm() {
                   </SelectContent>
                 </Select>
                 <FormMessage />
-              </FormItem>
-            )}
-        )}
+</FormItem>
+            )} 
+          /> 
+        )} 
         
         <FormField
           control={form.control}
