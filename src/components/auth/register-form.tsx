@@ -245,6 +245,7 @@ export function RegisterForm() {
                 <FormMessage />
               </FormItem>
             )}
+          />
         )}
         
         <FormField
