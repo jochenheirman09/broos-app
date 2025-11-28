@@ -12,20 +12,34 @@ import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 
 // --- Genkit AI Configuratie ---
 
-// BELANGRIJK: We initialiseren Genkit, maar exporteren het resultaat NIET direct.
-// We wrappen de Genkit-instantie in een async functie, of maken een interne instantie.
-const genkitInstance = genkit({
-    plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })],
-    logLevel: 'debug',
-    enableTracingAndMetrics: true,
-});
+// We maken een Genkit-instantie aan die we hergebruiken
+let genkitInstance: ReturnType<typeof genkit> | null = null;
 
-/**
- * Functie om de Genkit-instantie op te halen.
- * Next.js laat toe om ASYNC functies te exporteren.
- * * @returns De geconfigureerde Genkit-instantie.
- */
-export async function getAiInstance() {
+export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
+    if (genkitInstance) {
+        return genkitInstance;
+    }
+
+    // Haal de API-sleutel op van de environment variables (Secret Manager live)
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // ----- START DEBUGGING LOGS -----
+    console.log("[DEBUG Genkit] Attempting to initialize Genkit...");
+    console.log(`[DEBUG Genkit] API Key Status: ${apiKey ? 'Available (Length: ' + apiKey.length + ')' : 'MISSING'}`);
+    
+    if (!apiKey) {
+        console.error("[DEBUG Genkit] CRITICAL: GEMINI_API_KEY is undefined. Configuration is incomplete.");
+        // We behouden de bestaande logica die de client de 'onvolledige' fout geeft
+        throw new Error("Mijn excuses, ik kan momenteel niet functioneren omdat mijn configuratie onvolledig is.");
+    }
+    // ----- EINDE DEBUGGING LOGS -----
+
+    genkitInstance = genkit({
+        plugins: [googleAI({ apiKey: apiKey })], 
+        logLevel: 'debug',
+        enableTracingAndMetrics: true,
+    });
+    
     return genkitInstance;
 }
 
