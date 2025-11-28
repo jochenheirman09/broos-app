@@ -25,6 +25,7 @@ export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
     const apiKey = process.env.GEMINI_API_KEY;
 
     // ----- START DEBUGGING LOGS -----
+    console.log(`[DEBUG GENKIT] Raw process.env value: ${process.env.GEMINI_API_KEY}`);
     console.log("[DEBUG Genkit] Attempting to initialize Genkit...");
     console.log(`[DEBUG Genkit] API Key Status: ${apiKey ? 'Available (Length: ' + apiKey.length + ')' : 'MISSING'}`);
     
