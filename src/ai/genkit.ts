@@ -12,7 +12,8 @@ import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 
 // --- Genkit AI Configuratie ---
 
-// We maken een Genkit-instantie aan die we hergebruiken
+// We maken een Genkit-instantie aan die we hergebruiken.
+// Deze wordt nu pas geïnitialiseerd wanneer getAiInstance() wordt aangeroepen.
 let genkitInstance: ReturnType<typeof genkit> | null = null;
 
 export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
@@ -28,12 +29,12 @@ export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
     console.log(`[DEBUG Genkit] API Key Status: ${apiKey ? 'Available (Length: ' + apiKey.length + ')' : 'MISSING'}`);
     
     if (!apiKey) {
-        console.error("[DEBUG Genkit] CRITICAL: GEMINI_API_KEY is undefined. Configuration is incomplete.");
-        // We behouden de bestaande logica die de client de 'onvolledige' fout geeft
+        console.error("[DEBUG Genkit] CRITICAL: GEMINI_API_KEY is undefined. Cannot initialize Genkit.");
         throw new Error("Mijn excuses, ik kan momenteel niet functioneren omdat mijn configuratie onvolledig is.");
     }
     // ----- EINDE DEBUGGING LOGS -----
 
+    // DE FIX: Initialiseer HIER pas, wanneer de sleutel geverifieerd is!
     genkitInstance = genkit({
         plugins: [googleAI({ apiKey: apiKey })], 
         logLevel: 'debug',
