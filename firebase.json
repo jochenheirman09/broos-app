@@ -12,7 +12,9 @@
     {
       "target": "broos-2-0",
       "source": ".",
-      "frameworksBackend": {}
+      "frameworksBackend": {
+        "secrets": ["GEMINI_API_KEY"]
+      }
     }
   ]
 }
