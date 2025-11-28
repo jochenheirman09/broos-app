@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
+import { getFirebaseAdmin } from '@/ai/genkit';
 import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
 import type { UserProfile, WellnessAnalysisInput, ScheduleActivity } from '@/lib/types';

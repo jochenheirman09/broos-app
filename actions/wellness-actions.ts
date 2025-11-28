@@ -62,9 +62,9 @@ export async function saveWellnessData(payload: SavePayload) {
   // 3. Save Chat Summary if present
   if (summary) {
     batch.set(chatDocRef, {
-        id: todayId,
+        id: today,
         userId,
-        date: todayId,
+        date: today,
         summary: summary,
         updatedAt: serverTimestamp(),
     }, { merge: true });
@@ -72,11 +72,11 @@ export async function saveWellnessData(payload: SavePayload) {
 
   // 4. Save Wellness Scores if present
   if (wellnessScores && Object.keys(wellnessScores).length > 0) {
-      const scoresDocRef = userDocRef.collection('wellnessScores').doc(todayId);
+      const scoresDocRef = userDocRef.collection('wellnessScores').doc(today);
       const scoreData = {
         ...wellnessScores,
-        id: todayId,
-        date: todayId,
+        id: today,
+        date: today,
         updatedAt: serverTimestamp(),
       };
       batch.set(scoresDocRef, scoreData, { merge: true });
@@ -89,7 +89,7 @@ export async function saveWellnessData(payload: SavePayload) {
           ...alert,
           id: alertDocRef.id,
           userId,
-          date: todayId,
+          date: today,
           status: 'new',
           createdAt: serverTimestamp(),
       };

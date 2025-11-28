@@ -7,3 +7,5 @@ runConfig:
   maxInstances: 1
 secrets:
   - name: GEMINI_API_KEY
+    # Grant the service account permissions to access the secret.
+    # roles/secretmanager.secretAccessor
