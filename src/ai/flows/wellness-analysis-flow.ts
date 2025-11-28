@@ -1,12 +1,13 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import type { UserProfile, WellnessAnalysisInput, FullWellnessAnalysisOutput } from '@/lib/types';
 import { retrieveSimilarDocuments } from '@/ai/retriever';
-import { saveWellnessData } from '@/services/firestore-service';
+import { saveWellnessData as saveWellnessDataAction } from '@/app/actions/wellness-actions';
+import { getAiInstance } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 
 export async function runWellnessAnalysisFlow(
     userRef: DocumentReference,
@@ -14,11 +15,7 @@ export async function runWellnessAnalysisFlow(
     input: WellnessAnalysisInput & { todayActivity?: string }
 ): Promise<FullWellnessAnalysisOutput> {
     
-    // Insurance Policy: API Key check (remains as a safeguard)
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("[Wellness Flow] CRITICAL: GEMINI_API_KEY is not set.");
-        throw new Error("AI Service is not configured. API Key is missing.");
-    }
+    const ai = await getAiInstance();
 
     const WellnessScoresSchema = z.object({
         mood: z.number().min(1).max(5).optional().describe("Score van 1 (erg negatief) tot 5 (erg positief) voor de algemene stemming."),
@@ -43,7 +40,7 @@ export async function runWellnessAnalysisFlow(
 
     const wellnessBuddyPrompt = ai.definePrompt({
         name: 'wellnessBuddyPrompt_v3_schedule_aware',
-        model: 'gemini-2.5-flash',
+        model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.any() },
         output: { schema: FullWellnessAnalysisOutputSchema },
         prompt: `
@@ -86,17 +83,16 @@ export async function runWellnessAnalysisFlow(
             throw new Error("Wellness prompt returned no output.");
         }
         
-        // Pass the activity to the saving function
-        const wellnessDataWithActivity = {
-            ...output,
-            wellnessScores: {
-                ...output.wellnessScores,
-                todayActivity: input.todayActivity,
-            }
-        };
-
-        saveWellnessData(userRef.id, wellnessDataWithActivity, input.userMessage).catch(err => {
-            console.error("[Wellness Flow] Background data save failed:", err);
+        // This is a fire-and-forget call to the isolated server action
+        saveWellnessDataAction({
+            userId: userRef.id,
+            userMessage: input.userMessage,
+            assistantResponse: output.response,
+            summary: output.summary,
+            wellnessScores: output.wellnessScores,
+            alert: output.alert,
+        }).catch(err => {
+            console.error("[Wellness Flow] Background data save via action failed:", err);
         });
         
         return output;

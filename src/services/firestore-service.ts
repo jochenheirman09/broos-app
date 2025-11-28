@@ -32,6 +32,11 @@ export async function saveOnboardingSummary(
     }
 }
 
+/**
+ * @deprecated This function is now superseded by the isolated server action
+ * in `src/app/actions/wellness-actions.ts`. This is kept temporarily for reference
+ * but should be removed in the future.
+ */
 export async function saveWellnessData(
   userId: string,
   output: FullWellnessAnalysisOutput,
@@ -95,4 +100,3 @@ export async function saveWellnessData(
      console.error(`[Firestore Service] CRITICAL: Batch commit failed for user ${userId}:`, e);
   }
 }
-

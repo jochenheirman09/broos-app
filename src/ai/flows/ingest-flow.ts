@@ -1,7 +1,8 @@
+
 "use server";
 
 import { z } from 'genkit';
-import { getFirebaseAdmin } from '@/ai/genkit';
+import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
 import { serverTimestamp } from 'firebase-admin/firestore';
 import type { KnowledgeDocument } from '@/lib/types';
 import { IngestInputSchema, type IngestInput } from '@/ai/types';
@@ -13,6 +14,7 @@ import { IngestInputSchema, type IngestInput } from '@/ai/types';
 export async function ingestDocument(input: IngestInput): Promise<{ success: boolean, docId?: string, message: string }> {
   console.log(`[SERVER ACTION] ingestDocument invoked for file: ${input.fileName}`);
   const { adminDb } = await getFirebaseAdmin();
+  const ai = await getAiInstance(); // Although not used, it's good practice for consistency
   
   const { fileName, fileContent, clubId } = input;
 

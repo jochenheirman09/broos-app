@@ -1,23 +1,19 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { getAiInstance } from '@/ai/genkit';
 import { ClubAnalysisInputSchema, ClubInsightSchema, type ClubAnalysisInput, type ClubInsight } from '@/ai/types';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * Server-side function to analyze club-wide team data and generate insights.
  */
 export async function analyzeClubData(input: ClubAnalysisInput): Promise<ClubInsight | null> {
-    // Insurance Policy: API Key check
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("[AI Flow - Club Analysis] CRITICAL: GEMINI_API_KEY is not set.");
-        // Return null to prevent a hard crash, the cron job will log this.
-        return null;
-    }
+    const ai = await getAiInstance();
 
     const clubAnalysisPrompt = ai.definePrompt({
         name: 'clubDataAnalyzerPrompt',
-        model: 'googleai/gemini-2.5-flash',
+        model: googleAI.model('gemini-2.5-flash'),
         input: { schema: ClubAnalysisInputSchema },
         output: { schema: ClubInsightSchema },
         prompt: `

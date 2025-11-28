@@ -1,27 +1,24 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { getAiInstance } from '@/ai/genkit';
 import { z } from 'zod';
 import type { TeamAnalysisInput, TeamAnalysisOutput } from '@/ai/types';
 import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema } from '@/ai/types';
+import { googleAI } from '@genkit-ai/google-genai';
 
 
 /**
  * Server-side function to analyze team wellness data and generate insights.
  */
 export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAnalysisOutput | null> {
-    // Insurance Policy: API Key check
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("[AI Flow - Team Analysis] CRITICAL: GEMINI_API_KEY is not set.");
-        return null;
-    }
-
     console.log(`[AI Flow - Team Analysis] Invoked for team: ${input.teamName}`);
+    
+    const ai = await getAiInstance();
 
     const teamAnalysisPrompt = ai.definePrompt({
         name: 'teamDataAnalyzerPrompt',
-        model: 'gemini-2.5-flash',
+        model: googleAI.model('gemini-2.5-flash'),
         input: { schema: TeamAnalysisInputSchema },
         output: { schema: TeamAnalysisOutputSchema },
         prompt: `

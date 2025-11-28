@@ -1,22 +1,19 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { getAiInstance } from '@/ai/genkit';
 import { PlayerUpdateInputSchema, PlayerUpdateOutputSchema, type PlayerUpdateInput, type PlayerUpdateOutput } from '@/ai/types';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * Server-side function to generate a personalized "weetje" for a player.
  */
 export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<PlayerUpdateOutput | null> {
-    // Insurance Policy: API Key check
-    if (!process.env.GEMINI_API_KEY) {
-        console.error("[AI Flow - Player Update] CRITICAL: GEMINI_API_KEY is not set.");
-        return null;
-    }
+    const ai = await getAiInstance();
 
     const playerUpdatePrompt = ai.definePrompt({
         name: 'playerUpdateGeneratorPrompt',
-        model: 'googleai/gemini-2.5-flash',
+        model: googleAI.model('gemini-2.5-flash'),
         input: { schema: PlayerUpdateInputSchema },
         output: { schema: PlayerUpdateOutputSchema },
         prompt: `
