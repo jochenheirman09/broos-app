@@ -5,7 +5,14 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  
 secrets:
+  # 1. GEMINI_API_KEY (De sleutel die uw app mist)
   - name: GEMINI_API_KEY
     # Grant the service account permissions to access the secret.
-    # roles/secretmanager.secretAccessor
+    # roles/secretmanager.secretAccessor is vereist op het service account.
+    
+  # 2. FIREBASE_ADMIN_SERVICE_ACCOUNT (De Firebase Admin JSON)
+  - name: FIREBASE_ADMIN_SERVICE_ACCOUNT
+    # Deze variabele wordt gebruikt om de Firebase Admin SDK te initialiseren.
+    # Zorg ervoor dat de volledige, geminimaliseerde JSON is opgeslagen als Secret.
