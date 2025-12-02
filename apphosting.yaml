@@ -2,7 +2,8 @@
 # https://firebase.google.com/docs/app-hosting/configure
 #
 # This file configures the secrets that the backend will have access to.
-# These secrets are securely fetched from Google Secret Manager.
+# These secrets are securely fetched from Google Secret Manager during deployment.
+# Do NOT add hardcoded secret values to this file.
 
 runConfig:
   # Increase this value to automatically spin up more instances
