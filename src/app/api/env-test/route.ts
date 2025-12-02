@@ -1,19 +1,19 @@
+import { NextResponse } from 'next/server';
 
-// app/api/env-test/route.ts
-
-// Zorg ervoor dat dit een Server Component/Route Handler is
 export async function GET() {
     const apiKey = process.env.GEMINI_API_KEY;
-    const adminKey = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT ? 'SET' : 'NOT SET';
+    const adminKey = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
+    
+    // Log de status in de Cloud Run logs (essentieel voor debuggen)
+    console.log(`[FINAL ENV TEST LOG] GEMINI_API_KEY status: ${apiKey ? 'SET' : 'MISSING'}`);
+    console.log(`[FINAL ENV TEST LOG] GEMINI_API_KEY length: ${apiKey ? apiKey.length : 0}`);
 
-    console.log(`[ENV TEST LOG] GEMINI_API_KEY raw value: ${apiKey}`);
-    console.log(`[ENV TEST LOG] FIREBASE_ADMIN_SERVICE_ACCOUNT status: ${adminKey}`);
-
-    // Stuur een object terug naar de client, maar toon de volledige sleutel NIET.
-    return Response.json({
+    // Stuur een object terug naar de client.
+    return NextResponse.json({
         success: true,
-        apiKeyStatus: apiKey ? 'AVAILABLE' : 'MISSING',
-        apiKeyLength: apiKey ? apiKey.length : 0,
-        adminKeyStatus: adminKey
+        test: "Secret Injection Check Status",
+        geminiApiKeyStatus: apiKey && apiKey.length > 10 ? 'AVAILABLE' : 'MISSING',
+        geminiApiKeyLength: apiKey ? apiKey.length : 0,
+        firebaseAdminKeyStatus: adminKey && adminKey.length > 100 ? 'AVAILABLE' : 'MISSING',
     });
 }
