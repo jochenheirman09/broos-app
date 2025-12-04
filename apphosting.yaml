@@ -10,9 +10,8 @@ runConfig:
   # in response to increased traffic.
   maxInstances: 1
   
-secrets:
-  # The API key for the Gemini model.
-  - name: GEMINI_API_KEY
-    
-  # The full JSON service account key required for the Firebase Admin SDK.
-  - name: FIREBASE_ADMIN_SERVICE_ACCOUNT
+env:
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+  - variable: FIREBASE_ADMIN_SERVICE_ACCOUNT
+    secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
