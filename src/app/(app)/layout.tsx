@@ -31,16 +31,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (userProfile) {
+      // Logic for player/staff
       const isPlayerStaffProfileIncomplete = (userProfile.role === 'player' || userProfile.role === 'staff') && (!userProfile.teamId || !userProfile.birthDate);
       
       if (isPlayerStaffProfileIncomplete && pathname !== '/complete-profile') {
         console.log('[AppLayout] Player/Staff profile incomplete, redirecting to /complete-profile.');
         router.replace('/complete-profile');
       } else if (!isPlayerStaffProfileIncomplete && pathname === '/complete-profile') {
-        // **DE FIX:** Als het profiel compleet is en we zijn nog steeds op de profielpagina, stuur door!
         console.log('[AppLayout] Profile is now complete, redirecting from /complete-profile to /dashboard.');
         router.replace('/dashboard');
       }
+
+      // Logic for responsible user
+      const isResponsibleProfileIncomplete = userProfile.role === 'responsible' && !userProfile.clubId;
+      if (!isResponsibleProfileIncomplete && (pathname === '/create-club' || pathname === '/join-club')) {
+        console.log('[AppLayout] Responsible profile is complete, redirecting from club creation page to /dashboard.');
+        router.replace('/dashboard');
+      }
+
     }
     
   }, [user, userProfile, loading, router, pathname]);
@@ -62,7 +70,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <PlayerLayout>{children}</PlayerLayout>;
   }
   
-  console.log('[AppLayout] Rendering Standard App Layout.');
+  console.log('[AppLayout] Rendering Standard App Layout for staff/responsible.');
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
