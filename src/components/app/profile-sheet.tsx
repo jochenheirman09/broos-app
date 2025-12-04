@@ -22,7 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
@@ -51,6 +51,7 @@ import {
   SheetTitle,
   SheetDescription
 } from "@/components/ui/sheet";
+import { BuddyProfileCustomizer } from "./buddy-profile/page";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -70,6 +71,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAddTrainingOpen, setIsAddTrainingOpen] = useState(false);
   const [refreshSchedule, setRefreshSchedule] = useState(0);
+  const [showBuddyCustomizer, setShowBuddyCustomizer] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -157,6 +159,13 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
     });
   }
 
+  // Reset internal state when sheet is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setShowBuddyCustomizer(false);
+    }
+  }, [isOpen]);
+
   if (!userProfile) return null;
 
   return (
@@ -164,12 +173,23 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="w-full max-w-md p-0">
           <SheetHeader className="p-6">
-            <SheetTitle>Jouw Profiel</SheetTitle>
+            <SheetTitle>
+                {showBuddyCustomizer ? "Buddy Aanpassen" : "Jouw Profiel"}
+            </SheetTitle>
             <SheetDescription>
-              Bekijk en bewerk hier je persoonlijke gegevens en planning.
+              {showBuddyCustomizer 
+                ? "Geef je AI-buddy een persoonlijke naam en uiterlijk." 
+                : "Bekijk en bewerk hier je persoonlijke gegevens en planning."
+              }
             </SheetDescription>
           </SheetHeader>
           <div className="overflow-y-auto h-[calc(100vh-8rem)] pb-6">
+            {showBuddyCustomizer ? (
+              <BuddyProfileCustomizer onSave={() => {
+                setShowBuddyCustomizer(false); 
+                onOpenChange(false);
+              }} />
+            ) : (
             <div className="px-6 space-y-8">
               <div className="flex items-center gap-6">
                 <div className="relative">
@@ -235,12 +255,10 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                         <CalendarPlus className="mr-2 h-4 w-4" />
                         Individuele Training Toevoegen
                       </Button>
-                      <Link href="/buddy-profile" passHref>
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                      <Button variant="outline" onClick={() => setShowBuddyCustomizer(true)}>
                           <Sparkles className="mr-2 h-4 w-4" />
                           Buddy Aanpassen
-                        </Button>
-                      </Link>
+                      </Button>
                     </div>
                   </div>
                 </>
@@ -274,6 +292,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                 </AlertDialog>
               </div>
             </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

@@ -1,3 +1,4 @@
+
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -178,6 +179,8 @@ export interface WellnessAnalysisInput {
     userMessage: string;
     chatHistory?: string;
     retrievedDocs?: any;
+    todayActivity?: string;
+    currentTime?: string;
 }
 
 export interface FullWellnessAnalysisOutput {
@@ -199,4 +202,6 @@ export interface OnboardingOutput {
   response: string;
   isTopicComplete: boolean;
   summary?: string;
+  isLastTopic?: boolean;
+  lastTopic?: OnboardingTopic;
 }

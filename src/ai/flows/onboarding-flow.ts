@@ -18,7 +18,7 @@ export async function runOnboardingFlow(
     const OnboardingOutputSchema = z.object({
         response: z.string().describe("Het antwoord van de AI-buddy."),
         isTopicComplete: z.boolean().describe("True als het onderwerp voldoende is besproken."),
-        summary: z.string().optional().describe("Een beknopte samenvatting (2-3 zinnen) van de input van de gebruiker voor het huidige onderwerp, alleen als isTopicComplete waar is."),
+        summary: z.string().optional().describe("Een beknopte samenvatting (1-2 zinnen) van de input van de gebruiker voor het huidige onderwerp, alleen als isTopicComplete waar is."),
     });
 
     const onboardingTopics: OnboardingTopic[] = [
@@ -30,26 +30,25 @@ export async function runOnboardingFlow(
 
     if (!nextTopic) {
         console.warn("[Onboarding Flow] Onboarding is already complete, but flow was called.");
-        return { response: "Het lijkt erop dat we elkaar al kennen! Waar wil je het vandaag over hebben?", isTopicComplete: true, summary: "Onboarding was al voltooid." };
+        return { response: "Het lijkt erop dat we elkaar al kennen! Waar wil je het vandaag over hebben?", isTopicComplete: true, summary: "Onboarding was al voltooid.", isLastTopic: true, lastTopic: 'additionalHobbies' };
     }
 
     const onboardingBuddyPrompt = ai.definePrompt({
-        name: 'onboardingBuddyPrompt_v3_natural',
-        model: googleAI.model('gemini-2.5-flash'), 
+        name: 'onboardingBuddyPrompt_v4_natural_transitions',
+        model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.any() },
         output: { schema: OnboardingOutputSchema },
         prompt: `
             Je bent een empathische AI-psycholoog voor een jonge atleet genaamd {{{userName}}}.
-            Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker beter te leren kennen.
+            Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker te leren kennen.
             Je antwoord ('response') MOET in het Nederlands zijn.
 
             Het huidige onderwerp is '{{{currentTopic}}}'.
-            - Houd het gesprek luchtig en aan de oppervlakte. Vraag niet door op details, tenzij de gebruiker zelf aangeeft meer te willen delen.
-            - Je primaire doel is een korte introductie. Als de gebruiker een kort antwoord geeft, is dat voldoende.
-            - Wees intelligent: bepaal ZELF wanneer een onderwerp is afgerond. Dit is meestal na 1 of 2 antwoorden van de gebruiker. VRAAG NIET "Ben je klaar voor het volgende?".
+            - Houd het gesprek luchtig en informeel. Stel open vragen. Vraag NIET direct naar de combinatie met sport, tenzij de speler er zelf over begint.
+            - Je primaire doel is een korte kennismaking. Als de gebruiker een kort antwoord geeft, is dat voldoende.
+            - Bepaal ZELF wanneer een onderwerp is afgerond. Dit is meestal na 1 of 2 antwoorden van de gebruiker. 
             - Als je bepaalt dat het onderwerp is afgerond, stel dan 'isTopicComplete' in op true.
-            - Geef in je 'response' een natuurlijke overgang naar het volgende. BIJVOORBEELD: "Oké, duidelijk. Als je er ooit verder over wilt praten, weet je me te vinden. Laten we eens kijken naar iets anders..."
-            - Als 'isTopicComplete' waar is, geef dan een zeer beknopte samenvatting (1-2 zinnen) in het 'summary' veld.
+            - BELANGRIJK: Als 'isTopicComplete' waar is, maak dan een VLOEIENDE overgang door in je 'response' een open vraag te stellen over het VOLGENDE onderwerp. ZEG NIET "Laten we verdergaan met een ander onderwerp". Geef een beknopte samenvatting (1-2 zinnen) in het 'summary' veld.
             - Anders, als je denkt dat een korte vervolgvraag nodig is, stel 'isTopicComplete' in op false en houd het gesprek gaande.
 
             Bericht van de gebruiker: "{{{userMessage}}}"
@@ -64,11 +63,15 @@ export async function runOnboardingFlow(
 
     if (!output) throw new Error("Onboarding prompt returned no output.");
 
-    if (output.isTopicComplete && output.summary) {
+    const isLastTopic = nextTopic === 'additionalHobbies' && output.isTopicComplete;
+
+    // Fire-and-forget save operation, unless it's the last topic.
+    // The main chat action will handle saving the final summary to ensure atomicity.
+    if (output.isTopicComplete && output.summary && !isLastTopic) {
         saveOnboardingSummary(userRef, userProfile, nextTopic, output.summary).catch(err => {
              console.error("[Onboarding Flow] Background summary save failed:", err);
         });
     }
 
-    return output;
+    return { ...output, isLastTopic, lastTopic: nextTopic };
 }

@@ -20,8 +20,14 @@ import { useUser } from "@/context/user-context";
 import { useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
+import { useRouter } from "next/navigation";
 
-export function BuddyProfileCustomizer() {
+
+interface BuddyProfileCustomizerProps {
+  onSave?: () => void;
+}
+
+export function BuddyProfileCustomizer({ onSave }: BuddyProfileCustomizerProps) {
   const { userProfile, user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
@@ -39,7 +45,7 @@ export function BuddyProfileCustomizer() {
   }, [userProfile]);
 
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) {
       toast({ variant: "destructive", title: "Niet ingelogd" });
       return;
@@ -52,14 +58,27 @@ export function BuddyProfileCustomizer() {
       buddyAvatar: selectedAvatar,
     };
 
-    updateUserProfile({ db, userId: user.uid, data: updates });
-    
-    toast({
-      title: "Opgeslagen!",
-      description: "De gegevens van je buddy zijn bijgewerkt.",
-    });
-
-    setIsLoading(false);
+    try {
+        await updateUserProfile({ db, userId: user.uid, data: updates });
+        toast({
+          title: "Opgeslagen!",
+          description: "De gegevens van je buddy zijn bijgewerkt.",
+        });
+        
+        // If an onSave callback is provided (from the sheet), call it.
+        if (onSave) {
+          onSave();
+        }
+    } catch (error) {
+        console.error("Error updating buddy profile:", error);
+        toast({
+            variant: "destructive",
+            title: "Fout",
+            description: "Kon het buddy profiel niet bijwerken."
+        });
+    } finally {
+        setIsLoading(false);
+    }
   };
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +123,7 @@ export function BuddyProfileCustomizer() {
   }
 
   return (
-    <Card className="max-w-2xl mx-auto">
+    <Card className="max-w-2xl mx-auto shadow-none border-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-2xl">
           <Sparkles className="h-6 w-6 text-primary" />

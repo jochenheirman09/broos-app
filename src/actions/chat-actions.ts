@@ -1,11 +1,13 @@
+
 'use server';
 
 import { getFirebaseAdmin } from '@/ai/genkit';
 import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
-import type { UserProfile, WellnessAnalysisInput, ScheduleActivity } from '@/lib/types';
+import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, OnboardingOutput } from '@/lib/types';
 import { GenkitError } from 'genkit';
 import { format, getDay } from 'date-fns';
+import { saveOnboardingSummary } from '@/services/firestore-service';
 
 const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
   0: 'sunday',
@@ -21,17 +23,12 @@ const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
  * Main controller for handling chat interactions.
  * This server action acts as a router, determining whether to invoke the
  * onboarding flow or the regular wellness analysis flow based on the user's profile.
- * It also enriches the input with the player's activity for the day.
- *
- * @param userId The ID of the user initiating the chat.
- * @param input The basic chat input from the client.
- * @returns The output from either the onboarding or wellness analysis flow, or an error object.
+ * It now handles the transition between flows seamlessly.
  */
 export async function chatWithBuddy(
   userId: string,
   input: WellnessAnalysisInput
 ) {
-  // Insurance Policy: Check for API Key
   if (!process.env.GEMINI_API_KEY) {
     console.error("[Chat Action] CRITICAL: GEMINI_API_KEY is not set.");
     return {
@@ -44,18 +41,59 @@ export async function chatWithBuddy(
   
   try {
     const { adminDb } = await getFirebaseAdmin();
-
     const userRef = adminDb.collection('users').doc(userId);
     const userDoc = await userRef.get();
+
     if (!userDoc.exists) {
       throw new GenkitError({ status: 'NOT_FOUND', message: 'User profile not found.' });
     }
-    const userProfile = userDoc.data() as UserProfile;
+    let userProfile = userDoc.data() as UserProfile;
 
+    // --- Onboarding Logic ---
+    if (!userProfile.onboardingCompleted) {
+      console.log('[Chat Action] Routing to onboarding flow.');
+      const onboardingResult = await runOnboardingFlow(userRef, userProfile, input);
+
+      // Check if this was the last onboarding step
+      if (onboardingResult.isTopicComplete && onboardingResult.isLastTopic) {
+        console.log('[Chat Action] Final onboarding step completed. Transitioning to wellness flow...');
+        
+        // Save the final summary
+        if (onboardingResult.summary && onboardingResult.lastTopic) {
+            await saveOnboardingSummary(userRef, userProfile, onboardingResult.lastTopic, onboardingResult.summary);
+        }
+
+        // We need an updated user profile to confirm onboarding is complete
+        const updatedUserDoc = await userRef.get();
+        userProfile = updatedUserDoc.data() as UserProfile;
+
+        // Construct an updated history for the wellness flow
+        const updatedHistory = (input.chatHistory ? input.chatHistory + "\n" : "") + 
+                               `user: ${input.userMessage}\n` +
+                               `assistant: ${onboardingResult.response}`;
+        
+        const wellnessInput: WellnessAnalysisInput = {
+            ...input,
+            userMessage: "Oké, top. Waar zullen we het dan nu over hebben?", // A generic prompt to kick off the wellness part
+            chatHistory: updatedHistory,
+        };
+
+        // Immediately call the wellness flow within the same action
+        return await runWellnessAnalysisFlow(userRef, userProfile, wellnessInput);
+      }
+      
+      // If not the last step, just return the onboarding response
+      return onboardingResult;
+    } 
+    
+    // --- Wellness Analysis Logic (if onboarding is already complete) ---
+    console.log('[Chat Action] Routing to wellness analysis flow.');
+    
     let todayActivity: ScheduleActivity | 'individual' = 'rest';
-    const today = new Date();
-    const todayId = format(today, "yyyy-MM-dd");
-    const dayName = dayMapping[getDay(today)];
+    const now = new Date();
+    const todayId = format(now, "yyyy-MM-dd");
+    const dayName = dayMapping[getDay(now)];
+    const currentTime = format(now, "HH:mm");
 
     const individualTrainingQuery = userRef.collection('trainings').where('date', '==', todayId).limit(1);
     const individualTrainingSnapshot = await individualTrainingQuery.get();
@@ -72,16 +110,11 @@ export async function chatWithBuddy(
         }
       }
     }
+    
+    const enrichedInput = { ...input, todayActivity, currentTime };
 
-    const enrichedInput = { ...input, todayActivity };
+    return await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
 
-    if (!userProfile.onboardingCompleted) {
-      console.log('[Chat Action] Routing to onboarding flow.');
-      return await runOnboardingFlow(userRef, userProfile, enrichedInput);
-    } else {
-      console.log('[Chat Action] Routing to wellness analysis flow.');
-      return await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
-    }
   } catch (error: any) {
     console.error("[Chat Action] Error in chatWithBuddy:", error.message);
     if (error.message && (error.message.includes('503') || error.message.toLowerCase().includes('overloaded'))) {
@@ -90,7 +123,6 @@ export async function chatWithBuddy(
         response: "Mijn excuses, ik heb het even te druk. Probeer het over een momentje opnieuw.",
       };
     }
-    // For other errors, re-throw to let the client handle a generic failure.
     throw error;
   }
 }

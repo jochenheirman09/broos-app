@@ -17,7 +17,7 @@ import { Button } from "../ui/button";
 import { Logo } from "./logo";
 import { ThemeToggle } from "../theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProfileSheet } from "./profile-sheet";
 
 const navItems = [
