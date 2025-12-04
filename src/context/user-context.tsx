@@ -50,24 +50,26 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // The main loading state is now simpler: it's true if auth is loading or if we have a user but are still waiting for their profile.
+  // SIMPLIFIED LOADING LOGIC:
+  // The context is loading if Firebase Auth is checking the user, OR
+  // if we have a user but are still waiting for their Firestore profile to load.
   const loading = isAuthLoading || (!!user && isProfileLoading);
   
   useEffect(() => {
-    if (!loading && !user) {
-      if (
-        !window.location.pathname.startsWith('/login') &&
-        !window.location.pathname.startsWith('/register') &&
-        window.location.pathname !== '/'
-      ) {
-        router.replace("/login");
-      }
-    }
-  }, [user, loading, router]);
+    console.log('[UserProvider] State Change:', {
+      loading,
+      isAuthLoading,
+      isProfileLoading,
+      hasUser: !!user,
+      hasProfile: !!userProfile,
+      isVerified: user?.emailVerified,
+    });
+  }, [user, userProfile, loading, isAuthLoading, isProfileLoading]);
+
 
   useEffect(() => {
     if (profileError) {
-      console.error("Error fetching user profile:", profileError);
+      console.error("[UserProvider] Error fetching user profile:", profileError);
     }
   }, [profileError]);
 
@@ -78,18 +80,25 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoggingOut(false);
   };
 
+  // The global loading screen for the initial app load or logout.
+  // The AppLayout will handle its own loading state for internal navigation.
   if (loading || isLoggingOut) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <Logo size="large" />
-          <Wordmark size="large">Broos 2.0</Wordmark>
-          <Spinner size="medium" className="mt-4" />
-        </div>
-      </div>
-    );
+     if (isAuthLoading) {
+        // This is the very initial, full-screen loader.
+        console.log('[UserProvider] Rendering global loading spinner.');
+        return (
+          <div className="flex h-screen w-full items-center justify-center bg-background">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <Logo size="large" />
+              <Wordmark size="large">Broos 2.0</Wordmark>
+              <Spinner size="medium" className="mt-4" />
+            </div>
+          </div>
+        );
+     }
   }
-
+  
+  console.log('[UserProvider] Loading complete, rendering children.');
   return (
     <UserContext.Provider
       value={{

@@ -13,6 +13,7 @@ import { useUser } from "@/context/user-context";
 
 export default function CompleteProfilePage() {
   const { userProfile } = useUser();
+  console.log('[CompleteProfilePage] Rendering...');
 
   return (
     <div className="flex justify-center items-start pt-8">

@@ -1,4 +1,3 @@
-
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,7 +18,6 @@ import { useFirestore } from "@/firebase";
 import type { Team, Schedule, DayOfWeek } from "@/lib/types";
 import { updateTeam } from "@/lib/firebase/firestore/team";
 import { Checkbox } from "../ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
 const days: DayOfWeek[] = [
   "monday",
@@ -95,15 +93,20 @@ export function EditTeamDialog({
     });
   };
 
-  const handleGameDayChange = (day: DayOfWeek) => {
-    setGameDay(day);
-    // Ensure the same day is not a training day
-    if (trainingDays.has(day)) {
-        setTrainingDays(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(day);
-            return newSet;
-        })
+  const handleGameDayChange = (day: DayOfWeek, checked: boolean) => {
+    if (checked) {
+      setGameDay(day);
+      // Ensure the same day is not a training day
+      if (trainingDays.has(day)) {
+          setTrainingDays(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(day);
+              return newSet;
+          })
+      }
+    } else if (gameDay === day) {
+      // Allow unchecking
+      setGameDay(null);
     }
   }
 
@@ -200,14 +203,19 @@ export function EditTeamDialog({
             </div>
             <div>
               <Label>Wedstrijddag</Label>
-              <RadioGroup value={gameDay || ""} onValueChange={(value) => handleGameDayChange(value as DayOfWeek)} className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
                 {days.map((day) => (
                   <div key={day} className="flex items-center space-x-2">
-                    <RadioGroupItem value={day} id={`edit-game-${day}`} disabled={trainingDays.has(day)} />
+                    <Checkbox
+                      id={`edit-game-${day}`}
+                      checked={gameDay === day}
+                      disabled={trainingDays.has(day)}
+                      onCheckedChange={(checked) => handleGameDayChange(day, !!checked)}
+                    />
                     <Label htmlFor={`edit-game-${day}`}>{dayTranslations[day]}</Label>
                   </div>
                 ))}
-              </RadioGroup>
+              </div>
             </div>
           </div>
         </div>

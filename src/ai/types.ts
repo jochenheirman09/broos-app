@@ -1,4 +1,3 @@
-
 import { z } from 'genkit';
 import type { Schedule } from '@/lib/types';
 

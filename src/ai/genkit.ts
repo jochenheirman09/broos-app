@@ -1,4 +1,3 @@
-
 // src/ai/genkit.ts
 
 // HOUD DEZE LIJN: Dit bestand bevat server-side logica
@@ -25,16 +24,13 @@ export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
     // Haal de API-sleutel op van de environment variables (Secret Manager live)
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // ----- START DEBUGGING LOGS -----
-    console.log(`[DEBUG GENKIT] Raw process.env value: ${process.env.GEMINI_API_KEY}`);
-    console.log("[DEBUG Genkit] Attempting to initialize Genkit...");
-    console.log(`[DEBUG Genkit] API Key Status: ${apiKey ? 'Available (Length: ' + apiKey.length + ')' : 'MISSING'}`);
-    
     if (!apiKey) {
-        console.error("[DEBUG Genkit] CRITICAL: GEMINI_API_KEY is undefined. Cannot initialize Genkit.");
-        throw new Error("Mijn excuses, ik kan momenteel niet functioneren omdat mijn configuratie onvolledig is.");
+        console.error("[Genkit] CRITICAL: GEMINI_API_KEY is undefined. Cannot initialize Genkit.");
+        // Gooi een fout die de server-side operatie stopt.
+        throw new Error("AI service is niet geconfigureerd. De GEMINI_API_KEY ontbreekt.");
     }
-    // ----- EINDE DEBUGGING LOGS -----
+    
+    console.log("[Genkit] Initializing Genkit with a valid API key.");
 
     // DE FIX: Initialiseer HIER pas, wanneer de sleutel geverifieerd is!
     genkitInstance = genkit({

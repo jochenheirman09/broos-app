@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -22,15 +21,91 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldAlert } from "lucide-react";
+import { Trash2, ShieldAlert, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { handleCleanup } from "@/actions/cleanup-actions";
+import { handleCleanup, handleConditionalUserCleanup } from "@/actions/cleanup-actions";
 
-export default function CleanupDbPage() {
+function ConditionalCleanupCard() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const onCleanup = async () => {
+  const onConditionalCleanup = async () => {
+    setIsLoading(true);
+    try {
+      const result = await handleConditionalUserCleanup();
+      if (result.success) {
+        toast({
+          title: "Opruimen Voltooid!",
+          description: result.message,
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Opruimen Mislukt",
+        description: error.message || "Er is een onbekende fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <Users className="h-8 w-8 text-primary" />
+          <div>
+            <CardTitle className="text-2xl">Conditionele Gebruikers-opschoning</CardTitle>
+            <CardDescription>
+              Verwijder testgebruikers op basis van e-maildomein.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-6">
+          Deze actie verwijdert alle gebruikers (en hun data) wiens e-mailadres <strong>niet</strong> eindigt op <code>@gmail.com</code> of <code>@hotmail.com</code>. Dit is handig om testgebruikers met tijdelijke e-mailadressen op te ruimen.
+        </p>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" className="w-full" size="lg">
+              <Trash2 className="mr-2 h-5 w-5" />
+              Start Conditionele Opschoning
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bevestig conditionele opschoning</AlertDialogTitle>
+              <AlertDialogDescription>
+                Weet je zeker dat je alle gebruikers wilt verwijderen behalve die met een Gmail- of Hotmail-adres? Deze actie is onomkeerbaar.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>
+                Annuleren
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={onConditionalCleanup} disabled={isLoading}>
+                {isLoading && <Spinner size="small" className="mr-2" />}
+                Ja, start opschoning
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+function FullCleanupCard() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const onFullCleanup = async () => {
     setIsLoading(true);
     try {
       const result = await handleCleanup();
@@ -54,17 +129,16 @@ export default function CleanupDbPage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <Card className="max-w-xl mx-auto border-destructive">
+      <Card className="border-destructive">
         <CardHeader>
           <div className="flex items-center gap-3">
             <ShieldAlert className="h-8 w-8 text-destructive" />
             <div>
               <CardTitle className="text-2xl text-destructive">
-                Database Opruimactie
+                Volledige Database Reset
               </CardTitle>
               <CardDescription>
-                Deze actie is onomkeerbaar. Gebruik met voorzichtigheid.
+                Deze actie is onomkeerbaar. Gebruik met uiterste voorzichtigheid.
               </CardDescription>
             </div>
           </div>
@@ -82,7 +156,7 @@ export default function CleanupDbPage() {
             <AlertDialogTrigger asChild>
               <Button variant="destructive" className="w-full" size="lg">
                 <Trash2 className="mr-2 h-5 w-5" />
-                Volledige Database Reset
+                Start Volledige Reset
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -97,7 +171,7 @@ export default function CleanupDbPage() {
                 <AlertDialogCancel disabled={isLoading}>
                   Annuleren
                 </AlertDialogCancel>
-                <AlertDialogAction onClick={onCleanup} disabled={isLoading}>
+                <AlertDialogAction onClick={onFullCleanup} disabled={isLoading}>
                   {isLoading && <Spinner size="small" className="mr-2" />}
                   Ja, alles verwijderen
                 </AlertDialogAction>
@@ -106,6 +180,16 @@ export default function CleanupDbPage() {
           </AlertDialog>
         </CardContent>
       </Card>
+  )
+}
+
+export default function CleanupDbPage() {
+  return (
+    <div className="container mx-auto py-8">
+        <div className="space-y-8 max-w-xl mx-auto">
+            <ConditionalCleanupCard />
+            <FullCleanupCard />
+        </div>
     </div>
   );
 }

@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { userProfile, loading } = useUser();
+  console.log('[DashboardPage] Rendering...', { loading, hasProfile: !!userProfile });
 
   if (loading) {
+    console.log('[DashboardPage] Showing spinner because context is loading.');
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner />
@@ -19,11 +21,11 @@ export default function DashboardPage() {
   }
 
   if (!userProfile) {
-    // This can happen briefly during logout or if there's an error.
-    // The layout will handle redirection.
+    console.log('[DashboardPage] No user profile, rendering null. Redirect should be handled by provider.');
     return null;
   }
-
+  
+  console.log('[DashboardPage] Rendering DashboardContent.');
   return (
     <div className="container mx-auto py-8">
       <DashboardContent />

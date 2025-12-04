@@ -1,4 +1,3 @@
-
 'use server';
 
 import { z } from 'zod';
@@ -35,7 +34,7 @@ export async function runOnboardingFlow(
     }
 
     const onboardingBuddyPrompt = ai.definePrompt({
-        name: 'onboardingBuddyPrompt_v2_isolated',
+        name: 'onboardingBuddyPrompt_v3_natural',
         model: googleAI.model('gemini-2.5-flash'), 
         input: { schema: z.any() },
         output: { schema: OnboardingOutputSchema },
@@ -45,14 +44,16 @@ export async function runOnboardingFlow(
             Je antwoord ('response') MOET in het Nederlands zijn.
 
             Het huidige onderwerp is '{{{currentTopic}}}'.
-            - Leid het gesprek op een natuurlijke manier rond dit onderwerp. Stel vervolgvragen als de reactie van de gebruiker kort is.
-            - BELANGRIJK: Wees niet te opdringerig. Als de gebruiker aangeeft niet verder te willen praten over een detail, of als een onderwerp een simpele, alledaagse kwestie lijkt (zoals een ruzie met een broer), respecteer dat dan en rond het onderwerp af.
-            - Als je vindt dat het onderwerp voldoende is besproken, stel dan 'isTopicComplete' in op true.
-            - Als 'isTopicComplete' waar is, geef dan een beknopte samenvatting (2-3 zinnen) van de input in het 'summary' veld, en eindig je 'response' met een vraag zoals "Klaar voor het volgende?"
-            - Anders, stel 'isTopicComplete' in op false en houd het gesprek gaande.
+            - Houd het gesprek luchtig en aan de oppervlakte. Vraag niet door op details, tenzij de gebruiker zelf aangeeft meer te willen delen.
+            - Je primaire doel is een korte introductie. Als de gebruiker een kort antwoord geeft, is dat voldoende.
+            - Wees intelligent: bepaal ZELF wanneer een onderwerp is afgerond. Dit is meestal na 1 of 2 antwoorden van de gebruiker. VRAAG NIET "Ben je klaar voor het volgende?".
+            - Als je bepaalt dat het onderwerp is afgerond, stel dan 'isTopicComplete' in op true.
+            - Geef in je 'response' een natuurlijke overgang naar het volgende. BIJVOORBEELD: "Oké, duidelijk. Als je er ooit verder over wilt praten, weet je me te vinden. Laten we eens kijken naar iets anders..."
+            - Als 'isTopicComplete' waar is, geef dan een zeer beknopte samenvatting (1-2 zinnen) in het 'summary' veld.
+            - Anders, als je denkt dat een korte vervolgvraag nodig is, stel 'isTopicComplete' in op false en houd het gesprek gaande.
 
             Bericht van de gebruiker: "{{{userMessage}}}"
-            Gespreksgeschiedenis over dit onderwerp:
+            Gespreksgeschiedenis over dit onderwerp (kort houden):
             {{{chatHistory}}}
         `,
     });

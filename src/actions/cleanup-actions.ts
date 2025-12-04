@@ -1,6 +1,6 @@
-
 "use server";
 
+import { Auth } from 'firebase-admin/auth';
 import { Firestore } from 'firebase-admin/firestore';
 import { getFirebaseAdmin } from '@/ai/genkit';
 
@@ -30,6 +30,21 @@ async function deleteCollection(
   return deletedCount;
 }
 
+/**
+ * Deletes a single user's data from Firestore, including all subcollections.
+ * @param db Firestore instance.
+ * @param userId The UID of the user to delete.
+ */
+async function deleteUserFirestoreData(db: Firestore, userId: string): Promise<void> {
+    const userRef = db.doc(`users/${userId}`);
+    const subcollections = await userRef.listCollections();
+    for (const subcollection of subcollections) {
+      await deleteCollection(db, subcollection.path);
+    }
+    await userRef.delete();
+}
+
+
 async function cleanupDatabase(): Promise<{
   deletedUsers: number;
   deletedClubs: number;
@@ -52,11 +67,7 @@ async function cleanupDatabase(): Promise<{
   // --- Clean up Users and their subcollections ---
   const usersSnapshot = await db.collection('users').get();
   for (const userDoc of usersSnapshot.docs) {
-    const subcollections = await userDoc.ref.listCollections();
-    for (const subcollection of subcollections) {
-      await deleteCollection(db, subcollection.path);
-    }
-    await userDoc.ref.delete();
+    await deleteUserFirestoreData(db, userDoc.id);
     deletedUsers++;
   }
   
@@ -85,4 +96,68 @@ export async function handleCleanup(): Promise<{ success: boolean; message: stri
       message: error.message || "An internal server error occurred during cleanup.",
     };
   }
+}
+
+
+/**
+ * Deletes users from Firebase Auth and their data from Firestore if their email
+ * does not end with a whitelisted domain.
+ */
+async function conditionalUserCleanup(db: Firestore, auth: Auth): Promise<{ deletedCount: number }> {
+    const allowedDomains = ["@gmail.com", "@hotmail.com"];
+    let nextPageToken;
+    const uidsToDelete: string[] = [];
+  
+    // List all users from Firebase Auth
+    while (true) {
+      const listUsersResult = await auth.listUsers(1000, nextPageToken);
+      listUsersResult.users.forEach(user => {
+        if (user.email) {
+          const isAllowed = allowedDomains.some(domain => user.email!.endsWith(domain));
+          if (!isAllowed) {
+            uidsToDelete.push(user.uid);
+          }
+        }
+      });
+  
+      if (!listUsersResult.pageToken) {
+        break;
+      }
+      nextPageToken = listUsersResult.pageToken;
+    }
+  
+    if (uidsToDelete.length === 0) {
+      return { deletedCount: 0 };
+    }
+  
+    // Delete from Firebase Auth (max 1000 at a time)
+    await auth.deleteUsers(uidsToDelete);
+  
+    // Delete from Firestore
+    for (const uid of uidsToDelete) {
+      await deleteUserFirestoreData(db, uid);
+    }
+  
+    return { deletedCount: uidsToDelete.length };
+}
+  
+export async function handleConditionalUserCleanup(): Promise<{ success: boolean; message: string; }> {
+    if (process.env.NODE_ENV === 'production') {
+        return { success: false, message: "Forbidden: This action is not available in production." };
+    }
+
+    try {
+        const { adminDb, adminAuth } = await getFirebaseAdmin();
+        const { deletedCount } = await conditionalUserCleanup(adminDb, adminAuth);
+        return {
+        success: true,
+        message: `${deletedCount} gebruikers verwijderd die niet eindigen op gmail.com of hotmail.com.`,
+        };
+    } catch (error: any) {
+        console.error("Conditional user cleanup failed:", error);
+        return {
+        success: false,
+        message: error.message || "An internal server error occurred during conditional cleanup.",
+        };
+    }
 }
