@@ -42,12 +42,13 @@ const EMOJIS = ["", "😞", "😟", "😐", "🙂", "😄"];
 // Custom Bar component to have full control over rendering
 const CustomBar = (props: any) => {
   const { x, y, width, height, value, emoji, fill } = props;
-  const ratingText = value ? (value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)) : "N/A";
+  const ratingText = value > 0 ? (value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)) : "N/A";
   const isDarkTheme = document.documentElement.classList.contains('dark');
+  const barFill = value > 0 ? fill : "hsl(var(--muted) / 0.3)";
 
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} fill={fill} rx={8} ry={8} />
+      <rect x={x} y={y} width={width} height={height} fill={barFill} rx={8} ry={8} />
       <text
         x={x + width - 10}
         y={y + height / 2}
@@ -116,27 +117,14 @@ export function WellnessChart() {
       </Alert>
     );
   }
-
-  if (!latestScore) {
-    return (
-      <Alert>
-        <TrendingUp className="h-4 w-4" />
-        <AlertTitle>Nog geen data beschikbaar</AlertTitle>
-        <AlertDescription>
-          Begin een gesprek met je buddy om je eerste welzijnsoverzicht te
-          zien.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
+  
   const chartData = Object.entries(chartConfig)
     .map(([key, config]) => {
-      const scoreValue = latestScore[key as keyof WellnessScore] as
+      const scoreValue = latestScore?.[key as keyof WellnessScore] as
         | number
         | undefined;
       const reasonKey = `${key}Reason` as keyof WellnessScore;
-      const reason = latestScore[reasonKey] as string | undefined;
+      const reason = latestScore?.[reasonKey] as string | undefined;
 
       return {
         metric: config.label,
@@ -145,21 +133,22 @@ export function WellnessChart() {
         emoji: scoreValue ? EMOJIS[Math.round(scoreValue)] : "📊",
         reason: reason || "Nog geen gedetailleerde feedback voor dit onderwerp.",
       };
-    })
-    .filter((item) => item.value > 0);
+    });
 
-  if (chartData.length === 0) {
+
+  if (chartData.filter(d => d.value > 0).length === 0) {
     return (
       <Alert>
         <TrendingUp className="h-4 w-4" />
         <AlertTitle>Nog geen scores ingevuld</AlertTitle>
         <AlertDescription>
           In je laatste gesprek zijn nog geen scores geregistreerd. Praat met
-          Broos om je dashboard te vullen!
+          {user?.displayName ? ` ${user.displayName.split(' ')[0]}` : 'je buddy'} om je dashboard te vullen!
         </AlertDescription>
       </Alert>
     );
   }
+
 
   return (
     <div className="space-y-4">
@@ -187,6 +176,14 @@ export function WellnessChart() {
               content={
                 <ChartTooltipContent
                   formatter={(value, name, item) => {
+                      if (item.payload.value === 0) {
+                         return (
+                            <div className="flex flex-col">
+                                <span className="font-bold">{`${item.payload.metric}: N/A`}</span>
+                                <span className="text-xs text-muted-foreground mt-1">Geen data beschikbaar</span>
+                            </div>
+                         )
+                      }
                       const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)) : value;
                       return (
                       <div className="flex flex-col">
@@ -219,15 +216,15 @@ export function WellnessChart() {
           </SheetHeader>
           <div className="py-4 space-y-6">
             {chartData.map((item) => {
-                const formattedValue = item.value ? (item.value % 1 === 0 ? item.value.toFixed(0) : item.value.toFixed(1)) : 'N/A';
+                const formattedValue = item.value > 0 ? (item.value % 1 === 0 ? item.value.toFixed(0) : item.value.toFixed(1)) : 'N/A';
                 return (
               <div key={item.metric} className="p-4 rounded-xl bg-card/50 shadow-clay-card">
                  <div className="flex items-center justify-between mb-2">
                    <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.emoji}</span>
+                    <span className="text-2xl">{item.value > 0 ? item.emoji : '📊'}</span>
                     <h3 className="font-bold text-lg">{item.metric}</h3>
                    </div>
-                   <div className="font-bold text-lg">{formattedValue}</div>
+                   <div className={cn("font-bold text-lg", item.value === 0 && "text-muted-foreground")}>{formattedValue}</div>
                  </div>
                  <p className="text-muted-foreground text-sm">{item.reason}</p>
               </div>

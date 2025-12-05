@@ -52,6 +52,7 @@ import {
   SheetDescription
 } from "@/components/ui/sheet";
 import { BuddyProfileCustomizer } from "./buddy-profile/page";
+import { ScrollArea } from "../ui/scroll-area";
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -171,8 +172,8 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full max-w-md p-0">
-          <SheetHeader className="p-6">
+        <SheetContent className="w-full max-w-md p-0 flex flex-col">
+          <SheetHeader className="p-6 pb-0">
             <SheetTitle>
                 {showBuddyCustomizer ? "Buddy Aanpassen" : "Jouw Profiel"}
             </SheetTitle>
@@ -183,117 +184,119 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
               }
             </SheetDescription>
           </SheetHeader>
-          <div className="overflow-y-auto h-[calc(100vh-8rem)] pb-6">
-            {showBuddyCustomizer ? (
-              <BuddyProfileCustomizer onSave={() => {
-                setShowBuddyCustomizer(false); 
-                onOpenChange(false);
-              }} />
-            ) : (
-            <div className="px-6 space-y-8">
-              <div className="flex items-center gap-6">
-                <div className="relative">
-                  <Avatar
-                    className="h-24 w-24 cursor-pointer"
-                    onClick={handleAvatarClick}
-                  >
-                    <AvatarImage src={newPhoto || userProfile.photoURL} />
-                    <AvatarFallback className="text-3xl bg-primary/20 text-primary font-bold">
-                      {userProfile.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute bottom-0 right-0 bg-secondary text-secondary-foreground rounded-full p-1.5 border-2 border-background">
-                    <Camera className="h-4 w-4" />
-                  </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept="image/*"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-2xl font-bold truncate">{userProfile.name}</h2>
-                  <p className="text-muted-foreground truncate">{userProfile.email}</p>
-                </div>
-              </div>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Volledige naam</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Jan Janssen" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" disabled={isLoading} className="w-full">
-                    {isLoading && <Spinner className="mr-2 h-4 w-4" />}
-                    Wijzigingen opslaan
-                  </Button>
-                </form>
-              </Form>
-
-              {userProfile.role === 'player' && (
-                <>
-                  <Separator />
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Planning & Instellingen</h3>
-                    <WeekSchedule key={refreshSchedule} />
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setIsAddTrainingOpen(true)}>
-                        <CalendarPlus className="mr-2 h-4 w-4" />
-                        Individuele Training Toevoegen
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowBuddyCustomizer(true)}>
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          Buddy Aanpassen
-                      </Button>
+          <ScrollArea className="flex-1">
+            <div className="px-6 space-y-8 py-6">
+              {showBuddyCustomizer ? (
+                <BuddyProfileCustomizer onSave={() => {
+                  setShowBuddyCustomizer(false); 
+                  onOpenChange(false);
+                }} />
+              ) : (
+              <>
+                <div className="flex items-center gap-6">
+                  <div className="relative">
+                    <Avatar
+                      className="h-24 w-24 cursor-pointer"
+                      onClick={handleAvatarClick}
+                    >
+                      <AvatarImage src={newPhoto || userProfile.photoURL} />
+                      <AvatarFallback className="text-3xl bg-primary/20 text-primary font-bold">
+                        {userProfile.name
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute bottom-0 right-0 bg-secondary text-secondary-foreground rounded-full p-1.5 border-2 border-background">
+                      <Camera className="h-4 w-4" />
                     </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/*"
+                    />
                   </div>
-                </>
-              )}
-
-              <Separator />
-
-              <div className="flex justify-end">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Uitloggen
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-2xl font-bold truncate">{userProfile.name}</h2>
+                    <p className="text-muted-foreground truncate">{userProfile.email}</p>
+                  </div>
+                </div>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Volledige naam</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Jan Janssen" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" disabled={isLoading} className="w-full">
+                      {isLoading && <Spinner className="mr-2 h-4 w-4" />}
+                      Wijzigingen opslaan
                     </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Je wordt uitgelogd en teruggestuurd naar de
-                        startpagina.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => { onOpenChange(false); logout(); }}>
+                  </form>
+                </Form>
+
+                {userProfile.role === 'player' && (
+                  <>
+                    <Separator />
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Planning & Instellingen</h3>
+                      <WeekSchedule key={refreshSchedule} />
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <Button variant="outline" onClick={() => setIsAddTrainingOpen(true)}>
+                          <CalendarPlus className="mr-2 h-4 w-4" />
+                          Individuele Training Toevoegen
+                        </Button>
+                        <Button variant="outline" onClick={() => setShowBuddyCustomizer(true)}>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Buddy Aanpassen
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <Separator />
+
+                <div className="flex justify-end">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive">
+                        <LogOut className="mr-2 h-4 w-4" />
                         Uitloggen
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Je wordt uitgelogd en teruggestuurd naar de
+                          startpagina.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { onOpenChange(false); logout(); }}>
+                          Uitloggen
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </>
+              )}
             </div>
-            )}
-          </div>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
       <AddTrainingDialog

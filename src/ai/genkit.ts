@@ -1,3 +1,4 @@
+
 // src/ai/genkit.ts
 
 // HOUD DEZE LIJN: Dit bestand bevat server-side logica
@@ -11,9 +12,6 @@ import { getAuth, type Auth } from 'firebase-admin/auth';
 import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 
 // --- Genkit AI Configuratie ---
-
-// We maken een Genkit-instantie aan die we hergebruiken.
-// Deze wordt nu pas geïnitialiseerd wanneer getAiInstance() wordt aangeroepen.
 let genkitInstance: ReturnType<typeof genkit> | null = null;
 
 export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
@@ -21,18 +19,15 @@ export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
         return genkitInstance;
     }
 
-    // Haal de API-sleutel op van de environment variables (Secret Manager live)
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
         console.error("[Genkit] CRITICAL: GEMINI_API_KEY is undefined. Cannot initialize Genkit.");
-        // Gooi een fout die de server-side operatie stopt.
         throw new Error("AI service is niet geconfigureerd. De GEMINI_API_KEY ontbreekt.");
     }
     
     console.log("[Genkit] Initializing Genkit with a valid API key.");
 
-    // DE FIX: Initialiseer HIER pas, wanneer de sleutel geverifieerd is!
     genkitInstance = genkit({
         plugins: [googleAI({ apiKey: apiKey })], 
         logLevel: 'debug',
@@ -42,8 +37,7 @@ export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
     return genkitInstance;
 }
 
-
-// --- Firebase Admin SDK --- (Ongewijzigd)
+// --- Firebase Admin SDK ---
 let _firebaseAdminApp: App | null = null;
 let _adminDb: Firestore | null = null;
 let _adminAuth: Auth | null = null;
@@ -52,8 +46,6 @@ let _adminMessaging: Messaging | null = null;
 /**
  * Initializes and returns the Firebase Admin SDK instances.
  * It uses a singleton pattern to ensure it's only initialized once.
- *
- * @returns An object containing the admin app, db, and auth instances.
  */
 export async function getFirebaseAdmin() {
     if (_firebaseAdminApp) {

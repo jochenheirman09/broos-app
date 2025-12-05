@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { sendEmailVerification } from "firebase/auth";
 import { MailCheck } from "lucide-react";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent } from "../ui/card";
 
 export function VerifyEmailNotice() {
@@ -81,7 +81,7 @@ export function VerifyEmailNotice() {
           <div className="mt-6 flex flex-col gap-4">
             <Button onClick={handleResend} disabled={isSending} size="lg">
               {isSending && <Spinner size="small" className="mr-2" />}
-              {isSending ? "Verzenden..." : "Verificatie-e-mail opnieuw verzenden"}
+              {isSending ? "Verzenden..." : "Opnieuw verzenden"}
             </Button>
             <Button variant="outline" onClick={logout} size="lg">
               Uitloggen

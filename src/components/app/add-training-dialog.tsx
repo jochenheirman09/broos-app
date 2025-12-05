@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,6 +44,20 @@ export function AddTrainingDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
 
+  const resetState = () => {
+    setDescription("");
+    setDate(new Date());
+    setIsLoading(false);
+  };
+  
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      resetState();
+    }
+  }
+
+
   const handleSubmit = async () => {
     if (!user) {
         toast({ variant: "destructive", title: "Niet ingelogd"});
@@ -76,7 +90,7 @@ export function AddTrainingDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Voeg Individuele Training Toe</DialogTitle>
@@ -134,7 +148,7 @@ export function AddTrainingDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setIsOpen(false)}
+            onClick={() => handleOpenChange(false)}
             disabled={isLoading}
           >
             Annuleren

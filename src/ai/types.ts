@@ -89,3 +89,4 @@ export const NotificationInputSchema = z.object({
   link: z.string().optional(),
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
+

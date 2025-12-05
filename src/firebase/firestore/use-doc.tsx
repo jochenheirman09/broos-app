@@ -53,6 +53,9 @@ export function useDoc<T = any>(
     const path = memoizedDocRef ? memoizedDocRef.path : 'unknown path';
     console.log(`[useDoc] Subscribing to: ${path}`);
     
+    // Set loading to true at the start of the effect when there is a valid ref
+    setIsLoading(true);
+
     if (!memoizedDocRef) {
       console.log(`[useDoc] Subscription skipped (null ref) for: ${path}`);
       setData(null);
@@ -61,7 +64,6 @@ export function useDoc<T = any>(
       return;
     }
 
-    setIsLoading(true);
     setError(null);
     
     const unsubscribe = onSnapshot(
@@ -104,3 +106,4 @@ export function useDoc<T = any>(
 
   return { data, isLoading, error };
 }
+

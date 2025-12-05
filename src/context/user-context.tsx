@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser } from "firebase/auth";
-import { doc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import {
   useUser as useFirebaseUser,
@@ -72,6 +72,17 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("[UserProvider] Error fetching user profile:", profileError);
     }
   }, [profileError]);
+
+  // DATA SYNC FIX: Ensure emailVerified status in Firestore matches Auth state.
+  useEffect(() => {
+    if (user && user.emailVerified && userProfile && !userProfile.emailVerified) {
+      console.log(`[UserProvider] Syncing emailVerified status for user ${user.uid}...`);
+      const userRef = doc(firestore, "users", user.uid);
+      updateDoc(userRef, { emailVerified: true })
+        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${user.uid}.`))
+        .catch(err => console.error(`[UserProvider] Failed to sync emailVerified status:`, err));
+    }
+  }, [user, userProfile, firestore]);
 
   const logout = async () => {
     setIsLoggingOut(true);

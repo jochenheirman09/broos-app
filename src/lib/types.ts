@@ -24,6 +24,8 @@ export interface UserProfile {
   additionalHobbies?: string;
   acceptedTerms?: boolean;
   schedule?: Schedule;
+  siblings?: { name: string; age?: number }[];
+  pets?: { name: string; type: string }[];
 }
 
 export interface FcmToken {
@@ -101,12 +103,14 @@ export interface ChatMessage {
 export type WithId<T> = T & { id: string };
 
 export interface Alert {
-  id?: string;
+  id: string;
   userId: string;
+  clubId: string; // Denormalized for security rules
   date: string; // YYYY-MM-DD
   alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
   triggeringMessage: string;
   status: 'new' | 'acknowledged' | 'resolved';
+  shareWithStaff?: boolean; 
   createdAt: any; // Firestore ServerTimestamp
 }
 
@@ -190,7 +194,9 @@ export interface FullWellnessAnalysisOutput {
   alert?: {
     alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
     triggeringMessage: string;
+    shareWithStaff?: boolean; // Added for consent
   };
+  askForConsent?: boolean; // New field
 }
 
 
@@ -204,4 +210,13 @@ export interface OnboardingOutput {
   summary?: string;
   isLastTopic?: boolean;
   lastTopic?: OnboardingTopic;
+  siblings?: { name: string; age?: number }[];
+  pets?: { name: string; type: string }[];
+}
+
+export interface NotificationInput {
+  userId: string;
+  title: string;
+  body: string;
+  link?: string;
 }

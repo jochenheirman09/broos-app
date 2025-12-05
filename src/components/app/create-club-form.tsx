@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -12,11 +11,13 @@ import { createClub } from "@/lib/firebase/firestore/club";
 import { useFirestore } from "@/firebase";
 import Link from "next/link";
 import { Separator } from "../ui/separator";
+import { useRouter } from "next/navigation";
 
 export function CreateClubForm() {
   const { user } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
+  const router = useRouter();
   const [clubName, setClubName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,8 +46,13 @@ export function CreateClubForm() {
       await createClub(firestore, user.uid, clubName);
       toast({
         title: "Succes!",
-        description: "Je club is aangemaakt.",
+        description: "Je club is aangemaakt. Je wordt doorgestuurd.",
       });
+      // The UserProvider will detect the change in userProfile.clubId
+      // and the AppLayout's useEffect will handle the redirect.
+      // We push to dashboard as a fallback/faster navigation.
+      router.push('/dashboard');
+
     } catch (error: any) {
       console.error("Fout bij het maken van de club:", error);
       toast({

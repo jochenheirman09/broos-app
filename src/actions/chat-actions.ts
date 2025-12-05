@@ -4,10 +4,12 @@
 import { getFirebaseAdmin } from '@/ai/genkit';
 import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
-import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, OnboardingOutput } from '@/lib/types';
+import { generatePlayerUpdate } from '@/ai/flows/player-update-flow';
+import { analyzeTeamData } from '@/ai/flows/team-analysis-flow';
+import type { UserProfile, WellnessAnalysisInput, OnboardingOutput, PlayerUpdateInput, PlayerUpdate, TeamAnalysisInput } from '@/lib/types';
 import { GenkitError } from 'genkit';
 import { format, getDay } from 'date-fns';
-import { saveOnboardingSummary } from '@/services/firestore-service';
+import { AITeamSummary } from '@/ai/types';
 
 const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
   0: 'sunday',
@@ -23,12 +25,17 @@ const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
  * Main controller for handling chat interactions.
  * This server action acts as a router, determining whether to invoke the
  * onboarding flow or the regular wellness analysis flow based on the user's profile.
- * It now handles the transition between flows seamlessly.
+ * It also enriches the input with the player's activity for the day.
+ *
+ * @param userId The ID of the user initiating the chat.
+ * @param input The basic chat input from the client.
+ * @returns The output from either the onboarding or wellness analysis flow, or an error object.
  */
 export async function chatWithBuddy(
   userId: string,
   input: WellnessAnalysisInput
 ) {
+  // Insurance Policy: Check for API Key
   if (!process.env.GEMINI_API_KEY) {
     console.error("[Chat Action] CRITICAL: GEMINI_API_KEY is not set.");
     return {
@@ -41,79 +48,60 @@ export async function chatWithBuddy(
   
   try {
     const { adminDb } = await getFirebaseAdmin();
+
     const userRef = adminDb.collection('users').doc(userId);
     const userDoc = await userRef.get();
-
     if (!userDoc.exists) {
       throw new GenkitError({ status: 'NOT_FOUND', message: 'User profile not found.' });
     }
-    let userProfile = userDoc.data() as UserProfile;
+    const userProfile = userDoc.data() as UserProfile;
 
     // --- Onboarding Logic ---
     if (!userProfile.onboardingCompleted) {
       console.log('[Chat Action] Routing to onboarding flow.');
-      const onboardingResult = await runOnboardingFlow(userRef, userProfile, input);
-
-      // Check if this was the last onboarding step
-      if (onboardingResult.isTopicComplete && onboardingResult.isLastTopic) {
-        console.log('[Chat Action] Final onboarding step completed. Transitioning to wellness flow...');
-        
-        // Save the final summary
-        if (onboardingResult.summary && onboardingResult.lastTopic) {
-            await saveOnboardingSummary(userRef, userProfile, onboardingResult.lastTopic, onboardingResult.summary);
-        }
-
-        // We need an updated user profile to confirm onboarding is complete
-        const updatedUserDoc = await userRef.get();
-        userProfile = updatedUserDoc.data() as UserProfile;
-
-        // Construct an updated history for the wellness flow
-        const updatedHistory = (input.chatHistory ? input.chatHistory + "\n" : "") + 
-                               `user: ${input.userMessage}\n` +
-                               `assistant: ${onboardingResult.response}`;
-        
-        const wellnessInput: WellnessAnalysisInput = {
-            ...input,
-            userMessage: "Oké, top. Waar zullen we het dan nu over hebben?", // A generic prompt to kick off the wellness part
-            chatHistory: updatedHistory,
-        };
-
-        // Immediately call the wellness flow within the same action
-        return await runWellnessAnalysisFlow(userRef, userProfile, wellnessInput);
-      }
-      
-      // If not the last step, just return the onboarding response
-      return onboardingResult;
+      return await runOnboardingFlow(userRef, userProfile, input);
     } 
     
     // --- Wellness Analysis Logic (if onboarding is already complete) ---
     console.log('[Chat Action] Routing to wellness analysis flow.');
     
-    let todayActivity: ScheduleActivity | 'individual' = 'rest';
     const now = new Date();
-    const todayId = format(now, "yyyy-MM-dd");
-    const dayName = dayMapping[getDay(now)];
     const currentTime = format(now, "HH:mm");
+    
+    const enrichedInput = { ...input, currentTime };
 
-    const individualTrainingQuery = userRef.collection('trainings').where('date', '==', todayId).limit(1);
-    const individualTrainingSnapshot = await individualTrainingQuery.get();
-
-    if (!individualTrainingSnapshot.empty) {
-      todayActivity = 'individual';
-    } else if (userProfile.teamId && userProfile.clubId) {
-      const teamDocRef = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').doc(userProfile.teamId);
-      const teamDoc = await teamDocRef.get();
-      if (teamDoc.exists) {
-        const teamData = teamDoc.data();
-        if (teamData?.schedule && teamData.schedule[dayName]) {
-          todayActivity = teamData.schedule[dayName];
-        }
+    const wellnessResult = await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
+    
+    // NEW: Trigger player update ("weetje") generation immediately after wellness scores are saved.
+    if (wellnessResult.wellnessScores && userProfile.teamId) {
+      // To generate a "weetje", we need the team's average scores.
+      // We'll fetch them here. This might add a slight delay, but makes the feedback immediate.
+      const summaryRef = adminDb.collection('clubs').doc(userProfile.clubId!).collection('teams').doc(userProfile.teamId).collection('summaries').orderBy('date', 'desc').limit(1);
+      const summarySnap = await summaryRef.get();
+      
+      if (!summarySnap.empty) {
+        const teamAverageScores = summarySnap.docs[0].data() as AITeamSummary;
+        const playerUpdateInput: PlayerUpdateInput = {
+          playerName: userProfile.name,
+          playerScores: { ...wellnessResult.wellnessScores, id: '', date: '' }, // Construct a valid WellnessScore object
+          teamAverageScores: teamAverageScores,
+        };
+        // Generate and save the update (fire-and-forget in the background)
+        generatePlayerUpdate(playerUpdateInput).then(async (playerUpdateResult) => {
+          if (playerUpdateResult) {
+            const updateRef = userRef.collection('updates').doc();
+            const updateData: PlayerUpdate = { ...playerUpdateResult, id: updateRef.id, date: format(new Date(), 'yyyy-MM-dd') };
+            await updateRef.set(updateData);
+            console.log(`[Chat Action] Real-time 'weetje' generated and saved for user ${userId}.`);
+          }
+        }).catch(err => {
+          console.error(`[Chat Action] Failed to generate real-time 'weetje' for user ${userId}:`, err);
+        });
       }
     }
-    
-    const enrichedInput = { ...input, todayActivity, currentTime };
 
-    return await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
+
+    return wellnessResult;
 
   } catch (error: any) {
     console.error("[Chat Action] Error in chatWithBuddy:", error.message);
@@ -123,6 +111,7 @@ export async function chatWithBuddy(
         response: "Mijn excuses, ik heb het even te druk. Probeer het over een momentje opnieuw.",
       };
     }
+    // For other errors, re-throw to let the client handle a generic failure.
     throw error;
   }
 }

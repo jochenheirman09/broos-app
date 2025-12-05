@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { type WellnessAnalysisInput, type WellnessAnalysisOutput, type OnboardingOutput, type FullWellnessAnalysisOutput } from '@/lib/types';
+import { type WellnessAnalysisInput, type OnboardingOutput, type FullWellnessAnalysisOutput } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
@@ -20,7 +20,6 @@ import {
   serverTimestamp,
   query,
   orderBy,
-  limit,
 } from "firebase/firestore";
 import { format } from "date-fns";
 import { BuddyAvatar } from "./buddy-avatar";
@@ -61,18 +60,17 @@ export function ChatInterface() {
     if (!user) return null;
     return query(
       collection(db, "users", user.uid, "chats", today, "messages"),
-      orderBy("timestamp", "asc"),
-      limit(50)
+      orderBy("timestamp", "asc")
     );
   }, [user, db, today]);
 
-  const { data: messages, isLoading: messagesLoading } =
+  const { data: messages, isLoading: messagesLoading, forceRefetch } =
     useCollection<ChatMessageType>(messagesQuery);
 
   const addMessageToDb = useCallback(
     async (role: 'assistant' | 'user', content: string) => {
       if (!user || !db) return;
-      addDoc(
+      await addDoc(
         collection(db, "users", user.uid, "chats", today, "messages"),
         { role, content, timestamp: serverTimestamp() }
       );
@@ -86,7 +84,6 @@ export function ChatInterface() {
     setLastFailedMessage(null);
     setRetryMessage(null);
 
-    // Don't add user message to DB again on retry
     if (!isRetry && buddyInput.userMessage !== `Start het gesprek voor vandaag.`) {
       await addMessageToDb("user", buddyInput.userMessage);
     }
@@ -97,17 +94,24 @@ export function ChatInterface() {
       if (result.error) {
         setLastFailedMessage(buddyInput);
         setRetryMessage(result.response);
-        return; // Stop execution, let the UI show the retry button
+        return;
       }
 
       const responseContent = result.response;
       if (!responseContent) throw new Error('AI returned an empty response.');
 
       await addMessageToDb("assistant", responseContent);
+      
+      // If this was the last onboarding step, force a refetch to re-evaluate the user profile
+      // and then trigger a new initial wellness message.
+      if ('isLastTopic' in result && result.isLastTopic) {
+         console.log("[Chat Interface] Last onboarding topic detected. Forcing refetch and re-initialization.");
+         forceRefetch(); // This will trigger the useEffect below to run again
+      }
 
     } catch (error: any) {
       console.error("[CLIENT] Error in executeChat:", error);
-      setLastFailedMessage(buddyInput); // Also set failed state on general error
+      setLastFailedMessage(buddyInput);
       setRetryMessage("Er is een onverwachte fout opgetreden. Probeer het opnieuw.");
       toast({
         variant: "destructive",
@@ -117,7 +121,7 @@ export function ChatInterface() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, addMessageToDb, toast]);
+  }, [user, addMessageToDb, toast, forceRefetch]);
 
 
   const handleInitialMessage = useCallback(async () => {
@@ -127,15 +131,16 @@ export function ChatInterface() {
       userName: firstName,
       userMessage: `Start het gesprek voor vandaag.`,
       chatHistory: '',
+      currentTime: format(new Date(), "HH:mm"),
     };
     executeChat(buddyInput);
   }, [firstName, buddyName, executeChat, userProfile]);
 
   useEffect(() => {
-    if (!messagesLoading && messages?.length === 0 && firstName) {
+    if (!messagesLoading && messages?.length === 0 && firstName && userProfile) {
       handleInitialMessage();
     }
-  }, [messagesLoading, messages, firstName, handleInitialMessage]);
+  }, [messagesLoading, messages, firstName, userProfile, handleInitialMessage]);
 
   useEffect(() => {
     if (viewportRef.current) {
@@ -153,12 +158,16 @@ export function ChatInterface() {
     const userMessageContent = input;
     setInput("");
     
-    const chatHistory = (messages || []).map((m) => `${m.role}: ${m.content}`).join("\n");
+    let chatHistory = (messages || []).map((m) => `${m.role}: ${m.content}`).join("\n");
+    // Append the new user message to the history being sent to the AI
+    chatHistory += `\nuser: ${userMessageContent}`;
+
     const buddyInput: WellnessAnalysisInput = {
       buddyName: buddyName,
       userName: firstName,
       userMessage: userMessageContent,
       chatHistory: chatHistory,
+      currentTime: format(new Date(), "HH:mm"),
     };
     
     executeChat(buddyInput);

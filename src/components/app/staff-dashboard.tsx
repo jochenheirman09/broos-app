@@ -51,7 +51,7 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
           <StaffUpdates clubId={clubId} teamId={teamId} />
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -69,3 +69,6 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
     </div>
   );
 }
+
+
+    
