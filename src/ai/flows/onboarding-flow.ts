@@ -43,7 +43,7 @@ export async function runOnboardingFlow(
         output: { schema: OnboardingOutputSchema },
         prompt: `
             Je bent een empathische AI-psycholoog voor een jonge atleet genaamd {{{userName}}}.
-            Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker te leren kennen.
+            Je doel is om een natuurlijke, ondersteunende conversatie te hebben om de gebruiker beter te leren kennen.
             Je antwoord ('response') MOET in het Nederlands zijn.
 
             HUIDIG ONDERWERP: '{{{currentTopic}}}'.
@@ -57,7 +57,7 @@ export async function runOnboardingFlow(
                 -   Geef een beknopte samenvatting (1-2 zinnen) in het 'summary' veld.
             5.  **Houd het Gaande:** Als 'isTopicComplete' false is, stel dan een korte, relevante vervolgvraag over het huidige onderwerp.
 
-            Bericht van de gebruiker: "{{{userMessage}}}"
+            Bericht gebruiker: "{{{userMessage}}}"
             Gespreksgeschiedenis (voor context):
             {{{chatHistory}}}
         `,
@@ -71,20 +71,16 @@ export async function runOnboardingFlow(
 
     const isLastTopic = nextTopic === 'additionalHobbies' && output.isTopicComplete;
 
-    // Fire-and-forget save operation, unless it's the last topic.
-    if (output.isTopicComplete && (output.summary || output.siblings || output.pets)) {
+    if (output.isTopicComplete) {
         const dataToSave = {
             summary: output.summary,
             siblings: output.siblings,
             pets: output.pets
         };
-        // Don't await this unless it's the last topic to avoid blocking the response to the user.
-        const savePromise = saveOnboardingSummary(userRef, userProfile, nextTopic, dataToSave);
-        if (isLastTopic) {
-            await savePromise;
-        } else {
-            savePromise.catch(err => console.error("[Onboarding Flow] Background summary save failed:", err));
-        }
+        // Fire-and-forget the save operation.
+        saveOnboardingSummary(userRef, nextTopic, dataToSave, isLastTopic).catch(err => {
+            console.error(`[Onboarding Flow] Background save failed for user ${userRef.id}:`, err);
+        });
     }
 
     return { ...output, isLastTopic, lastTopic: nextTopic };

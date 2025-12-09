@@ -1,3 +1,4 @@
+
 "use server";
 
 import { Auth } from 'firebase-admin/auth';
@@ -158,6 +159,56 @@ export async function handleConditionalUserCleanup(): Promise<{ success: boolean
         return {
         success: false,
         message: error.message || "An internal server error occurred during conditional cleanup.",
+        };
+    }
+}
+
+/**
+ * Finds users who are stuck in onboarding and marks them as complete.
+ */
+async function fixStuckOnboarding(): Promise<{ fixedCount: number }> {
+    const { adminDb: db } = await getFirebaseAdmin();
+    let fixedCount = 0;
+
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('onboardingCompleted', '==', false).get();
+
+    if (snapshot.empty) {
+        return { fixedCount: 0 };
+    }
+
+    for (const doc of snapshot.docs) {
+        const user = doc.data();
+        // We only fix users who have already started chatting, indicating they are stuck.
+        const chatsRef = doc.ref.collection('chats');
+        const chatSnapshot = await chatsRef.limit(1).get();
+        
+        if (!chatSnapshot.empty) {
+            console.log(`Fixing user ${user.uid} (${user.name})...`);
+            await doc.ref.update({ onboardingCompleted: true });
+            fixedCount++;
+        }
+    }
+
+    return { fixedCount };
+}
+
+export async function handleFixStuckOnboarding(): Promise<{ success: boolean; message: string; }> {
+    if (process.env.NODE_ENV === 'production') {
+        return { success: false, message: "Forbidden: This action is not available in production." };
+    }
+
+    try {
+        const { fixedCount } = await fixStuckOnboarding();
+        return {
+        success: true,
+        message: `${fixedCount} gebruikers die vastzaten in onboarding zijn gerepareerd.`,
+        };
+    } catch (error: any) {
+        console.error("Fixing stuck onboarding failed:", error);
+        return {
+        success: false,
+        message: error.message || "An internal server error occurred during the fix.",
         };
     }
 }

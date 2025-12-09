@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -14,53 +15,34 @@ service cloud.firestore {
     function isCreatingOwnData(userId) {
         return isOwner(userId) && request.resource.data.uid == userId;
     }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
 
     function isResponsible() {
-        // This function requires that a 'get' on the user's own document is allowed.
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'responsible';
+        return getUserData().role == 'responsible';
     }
     
-    function isMemberOfClub(clubId) {
-        // This function requires that a 'get' on the user's own document is allowed.
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
-    }
-
     function isStaff() {
-       // This function requires that a 'get' on the user's own document is allowed.
-       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff';
+       return getUserData().role == 'staff';
     }
-    
-    function getMyTeamId() {
-       // This function requires that a 'get' on the user's own document is allowed.
-       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId;
-    }
-
-    // Collection group query for alerts
-    match /{path=**}/alerts/{alertId} {
-      // Allow staff or responsible to read alerts if they are querying by userIds.
-      // This is secure because the client first fetches player UIDs based on their role (team/club)
-      // and then uses those IDs to query the alerts. The rules for /users/{userId} list operations
-      // ensure they can only get IDs for players they are allowed to see.
-      allow read: if (isStaff() || isResponsible()) && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'userId';
-    }
-
 
     match /users/{userId} {
-      // CRITICAL: Allow any signed-in user to GET any user document. 
-      // This is required for helper functions like isResponsible() and isStaff() to work in other rules.
-      // The client UI is responsible for only showing relevant data.
       allow get: if isSignedIn();
       allow create: if isCreatingOwnData(userId);
       allow update, delete: if isOwner(userId);
 
-      // Listing users is allowed if filtered by clubId (for responsible), teamId (for staff),
-      // or a specific uid (for fetching profiles for alerts).
-      allow list: if (isResponsible() && request.query.where[0][0] == 'clubId') ||
-                   (isStaff() && request.query.where[0][0] == 'teamId') ||
-                   (isSignedIn() && request.query.where[0][0] == 'uid');
+      // LIST rule: Allows staff/responsible to list users but ONLY if filtered by teamId/clubId
+      // This is secure because the user can only know their own team/club ID to query.
+      allow list: if isSignedIn() && (
+                    (request.query.where.size() > 0 && request.query.where[0][0] == 'clubId' && request.query.where[0][2] == getUserData().clubId && isResponsible()) ||
+                    (request.query.where.size() > 0 && request.query.where[0][0] == 'teamId' && request.query.where[0][2] == getUserData().teamId && isStaff()) ||
+                    (request.query.where.size() > 0 && request.query.where[0][0] == 'uid')
+                  );
 
       match /wellnessScores/{scoreId} {
-        allow read, write: if isSignedIn();
+        allow read, write: if isOwner(userId);
       }
       
       match /fcmTokens/{tokenId} {
@@ -69,24 +51,15 @@ service cloud.firestore {
       }
 
       match /trainings/{trainingId} {
-        allow read, write: if isSignedIn();
+        allow read, write: if isOwner(userId);
       }
       
       match /chats/{chatId} {
-        allow read, write: if isSignedIn();
+        allow read, write: if isOwner(userId);
         
         match /messages/{messageId} {
-          allow read, write: if isSignedIn();
+          allow read, write: if isOwner(userId);
         }
-      }
-
-      match /alerts/{alertId} {
-        allow create: if isOwner(userId);
-        
-        // Staff can read/update alerts for players in their team.
-        // Responsibles can read/update any alert in their club.
-        allow read, update, delete: if (isStaff() && get(/databases/$(database)/documents/users/$(userId)).data.teamId == getMyTeamId()) ||
-                                      (isResponsible() && get(/databases/$(database)/documents/users/$(userId)).data.clubId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId);
       }
 
       match /updates/{updateId} {
@@ -94,36 +67,51 @@ service cloud.firestore {
         allow write: if false; 
       }
     }
+    
+    match /clubs/{clubId}/teams/{teamId}/alerts/{alertId} {
+      allow create: if isOwner(request.resource.data.userId); // Player can create
+      allow read, update, delete: if (isStaff() && getUserData().teamId == teamId) ||
+                                     (isResponsible() && getUserData().clubId == clubId);
+    }
+    
+    // Collection Group for Alerts
+    match /{path=**}/alerts/{alertId} {
+        // A user can list alerts if they are a staff or responsible, AND
+        // the query is filtered on the 'clubId' field.
+        // This is secure because the client will filter on *their own* clubId.
+        allow list: if (isStaff() || isResponsible()) && 
+                    'clubId' in request.query.where;
+    }
+
 
     match /clubs/{clubId} {
-      // Any signed-in user can read club details or list clubs
       allow get, list: if isSignedIn(); 
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /clubUpdates/{updateId} {
-        allow read: if isSignedIn(); 
+        allow read: if isResponsible() && getUserData().clubId == clubId;
         allow write: if false;
       }
 
       match /teams/{teamId} {
-        allow read: if isSignedIn();
-        allow list, create, update, delete: if isResponsible() && isMemberOfClub(clubId);
+        allow read: if isSignedIn() && getUserData().clubId == clubId;
+        allow list, create, update, delete: if isResponsible() && getUserData().clubId == clubId;
 
         match /summaries/{summaryId} {
-            allow read: if isSignedIn();
+            allow read: if (isStaff() && getUserData().teamId == teamId) || (isResponsible() && getUserData().clubId == clubId);
             allow write: if false;
         }
 
         match /staffUpdates/{updateId} {
-            allow read: if isSignedIn();
+            allow read: if (isStaff() && getUserData().teamId == teamId) || (isResponsible() && getUserData().clubId == clubId);
             allow write: if false;
         }
       }
     }
 
     match /knowledge_base/{docId} {
-      allow get, list: if isResponsible();
+      allow read, list: if isResponsible();
       allow write: if false; 
     }
   }

@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { type WellnessAnalysisInput, type OnboardingOutput, type FullWellnessAnalysisOutput } from '@/lib/types';
+import type { WellnessAnalysisInput, OnboardingOutput, FullWellnessAnalysisOutput } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
@@ -16,12 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import {
   collection,
-  addDoc,
-  serverTimestamp,
   query,
   orderBy,
 } from "firebase/firestore";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { BuddyAvatar } from "./buddy-avatar";
 import { chatWithBuddy } from "@/actions/chat-actions";
 import {
@@ -33,11 +30,10 @@ import {
 } from "@/components/ui/card";
 import { MessageSquare } from "lucide-react";
 
-// Extend the output type to include potential error states
 type BuddyResponse = (OnboardingOutput | FullWellnessAnalysisOutput) & {
     error?: 'service_unavailable' | 'configuration_error';
+    response: string;
 };
-
 
 export function ChatInterface() {
   const { userProfile, user } = useUser();
@@ -47,82 +43,57 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastFailedMessage, setLastFailedMessage] = useState<WellnessAnalysisInput | null>(null);
-  const [retryMessage, setRetryMessage] = useState<string | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const buddyName = userProfile?.buddyName || "Broos";
   const firstName = userProfile?.name?.split(" ")[0] || "";
 
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = formatInTimeZone(new Date(), 'Europe/Brussels', "yyyy-MM-dd");
 
   const messagesQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
       collection(db, "users", user.uid, "chats", today, "messages"),
-      orderBy("timestamp", "asc")
+      orderBy("sortOrder", "asc")
     );
   }, [user, db, today]);
 
-  const { data: messages, isLoading: messagesLoading, forceRefetch } =
+  const { data: messages, isLoading: messagesLoading } =
     useCollection<ChatMessageType>(messagesQuery);
-
-  const addMessageToDb = useCallback(
-    async (role: 'assistant' | 'user', content: string) => {
-      if (!user || !db) return;
-      await addDoc(
-        collection(db, "users", user.uid, "chats", today, "messages"),
-        { role, content, timestamp: serverTimestamp() }
-      );
-    }, [user, db, today]
-  );
-  
-  const executeChat = useCallback(async (buddyInput: WellnessAnalysisInput, isRetry = false) => {
-    if (!user) return;
+    
+  const executeChat = useCallback(async (buddyInput: WellnessAnalysisInput): Promise<boolean> => {
+    if (!user) return false;
     
     setIsLoading(true);
     setLastFailedMessage(null);
-    setRetryMessage(null);
-
-    if (!isRetry && buddyInput.userMessage !== `Start het gesprek voor vandaag.`) {
-      await addMessageToDb("user", buddyInput.userMessage);
-    }
     
     try {
       const result: BuddyResponse = await chatWithBuddy(user.uid, buddyInput);
 
       if (result.error) {
         setLastFailedMessage(buddyInput);
-        setRetryMessage(result.response);
-        return;
+        toast({ title: "Fout", description: result.response, variant: "destructive" });
+        return false;
       }
 
-      const responseContent = result.response;
-      if (!responseContent) throw new Error('AI returned an empty response.');
+      if (!result.response) throw new Error('AI returned an empty response.');
 
-      await addMessageToDb("assistant", responseContent);
-      
-      // If this was the last onboarding step, force a refetch to re-evaluate the user profile
-      // and then trigger a new initial wellness message.
-      if ('isLastTopic' in result && result.isLastTopic) {
-         console.log("[Chat Interface] Last onboarding topic detected. Forcing refetch and re-initialization.");
-         forceRefetch(); // This will trigger the useEffect below to run again
-      }
+      return true;
 
     } catch (error: any) {
-      console.error("[CLIENT] Error in executeChat:", error);
-      setLastFailedMessage(buddyInput);
-      setRetryMessage("Er is een onverwachte fout opgetreden. Probeer het opnieuw.");
+      console.error("[CLIENT] Error calling chatWithBuddy action:", error);
+      setLastFailedMessage(buddyInput); 
       toast({
         variant: "destructive",
-        title: "Oh nee!",
-        description: error.message || "Kon het gesprek niet voortzetten.",
+        title: "Communicatiefout",
+        description: error.message || "Kon geen verbinding maken met de server.",
       });
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [user, addMessageToDb, toast, forceRefetch]);
-
+  }, [user, toast]);
 
   const handleInitialMessage = useCallback(async () => {
     if (!userProfile || !firstName) return;
@@ -130,17 +101,16 @@ export function ChatInterface() {
       buddyName: buddyName,
       userName: firstName,
       userMessage: `Start het gesprek voor vandaag.`,
-      chatHistory: '',
-      currentTime: format(new Date(), "HH:mm"),
     };
-    executeChat(buddyInput);
+    await executeChat(buddyInput);
   }, [firstName, buddyName, executeChat, userProfile]);
 
   useEffect(() => {
-    if (!messagesLoading && messages?.length === 0 && firstName && userProfile) {
+    if (!messagesLoading && (!messages || messages.length === 0) && firstName && userProfile) {
       handleInitialMessage();
     }
   }, [messagesLoading, messages, firstName, userProfile, handleInitialMessage]);
+
 
   useEffect(() => {
     if (viewportRef.current) {
@@ -149,37 +119,31 @@ export function ChatInterface() {
         behavior: "smooth",
       });
     }
-  }, [messages, isLoading, retryMessage]);
+  }, [messages, isLoading]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !userProfile || !firstName) return;
 
     const userMessageContent = input;
-    setInput("");
+    setInput(""); 
     
-    let chatHistory = (messages || []).map((m) => `${m.role}: ${m.content}`).join("\n");
-    // Append the new user message to the history being sent to the AI
-    chatHistory += `\nuser: ${userMessageContent}`;
-
     const buddyInput: WellnessAnalysisInput = {
       buddyName: buddyName,
       userName: firstName,
       userMessage: userMessageContent,
-      chatHistory: chatHistory,
-      currentTime: format(new Date(), "HH:mm"),
     };
     
-    executeChat(buddyInput);
+    await executeChat(buddyInput);
   };
   
   const handleRetry = () => {
     if (lastFailedMessage) {
-        executeChat(lastFailedMessage, true);
+        executeChat(lastFailedMessage);
     }
   }
 
-  if (messagesLoading) {
+  if (messagesLoading && !messages) {
     return <div className="flex-grow flex items-center justify-center"><Spinner /></div>;
   }
 
@@ -210,11 +174,11 @@ export function ChatInterface() {
                         </div>
                       </div>
                     )}
-                    {retryMessage && !isLoading && (
+                    {lastFailedMessage && !isLoading && (
                       <div className="flex items-start gap-3 my-4 justify-start">
                         <BuddyAvatar className="h-10 w-10 border-2 border-destructive" />
                         <div className="bg-destructive/10 rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex flex-col items-start gap-2">
-                            <p className="text-destructive/90">{retryMessage}</p>
+                            <p className="text-destructive/90">Kon het laatste bericht niet verwerken.</p>
                             <Button variant="destructive" size="sm" onClick={handleRetry}>
                                 <RotateCw className="h-4 w-4 mr-2" />
                                 Opnieuw proberen
@@ -232,12 +196,12 @@ export function ChatInterface() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Typ je bericht..."
                     autoComplete="off"
-                    disabled={isLoading || (!messages || messages.length === 0)}
+                    disabled={isLoading || (!messages)}
                   />
                   <Button
                     type="submit"
                     size="icon"
-                    disabled={isLoading || !input.trim() || (!messages || messages.length === 0)}
+                    disabled={isLoading || !input.trim() || (!messages)}
                   >
                     <SendHorizonal className="h-5 w-5" />
                   </Button>

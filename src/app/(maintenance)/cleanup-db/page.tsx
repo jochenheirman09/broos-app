@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -21,9 +22,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldAlert, Users } from "lucide-react";
+import { Trash2, ShieldAlert, Users, Wrench } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { handleCleanup, handleConditionalUserCleanup } from "@/actions/cleanup-actions";
+import { handleCleanup, handleConditionalUserCleanup, handleFixStuckOnboarding } from "@/actions/cleanup-actions";
 
 function ConditionalCleanupCard() {
   const { toast } = useToast();
@@ -91,6 +92,81 @@ function ConditionalCleanupCard() {
               <AlertDialogAction onClick={onConditionalCleanup} disabled={isLoading}>
                 {isLoading && <Spinner size="small" className="mr-2" />}
                 Ja, start opschoning
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+function OnboardingFixCard() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const onFixOnboarding = async () => {
+    setIsLoading(true);
+    try {
+      const result = await handleFixStuckOnboarding();
+      if (result.success) {
+        toast({
+          title: "Reparatie Voltooid!",
+          description: result.message,
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Reparatie Mislukt",
+        description: error.message || "Er is een onbekende fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <Wrench className="h-8 w-8 text-primary" />
+          <div>
+            <CardTitle className="text-2xl">Repareer Vastgelopen Onboarding</CardTitle>
+            <CardDescription>
+              Zet de onboarding-status van vastgelopen gebruikers op voltooid.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-6">
+          Deze actie zoekt naar gebruikers die gesprekken zijn gestart maar wiens <code>onboardingCompleted</code> status nog op <code>false</code> staat. Voor deze gebruikers wordt de status op <code>true</code> gezet, zodat ze de normale wellness-analyse kunnen starten.
+        </p>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="default" className="w-full" size="lg">
+              {isLoading ? <Spinner className="mr-2 h-5 w-5" /> : <Wrench className="mr-2 h-5 w-5" />}
+              Start Reparatie
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bevestig Reparatie</AlertDialogTitle>
+              <AlertDialogDescription>
+                Weet je zeker dat je de onboarding-status wilt repareren voor alle vastgelopen gebruikers?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>
+                Annuleren
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={onFixOnboarding} disabled={isLoading}>
+                {isLoading && <Spinner size="small" className="mr-2" />}
+                Ja, start reparatie
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -187,6 +263,7 @@ export default function CleanupDbPage() {
   return (
     <div className="container mx-auto py-8">
         <div className="space-y-8 max-w-xl mx-auto">
+            <OnboardingFixCard />
             <ConditionalCleanupCard />
             <FullCleanupCard />
         </div>

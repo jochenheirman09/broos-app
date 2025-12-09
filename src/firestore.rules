@@ -43,6 +43,18 @@ service cloud.firestore {
         return getUserData(null).clubId;
     }
 
+    // --- NEW: Rules for Peer-to-Peer Chat ---
+    match /p2p_chats/{chatId} {
+        // A user can only access a chat document if their UID is in the `participants` array.
+        allow read, write: if isSignedIn() && request.auth.uid in resource.data.participants;
+
+        match /messages/{messageId} {
+             // Messages can only be read or written by participants of the parent chat.
+            allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants;
+        }
+    }
+
+
     match /users/{userId} {
       allow get: if isSignedIn();
       allow create: if isCreatingOwnData(userId);
@@ -90,7 +102,6 @@ service cloud.firestore {
     match /{path=**}/alerts/{alertId} {
         // A user can list alerts if they are a staff or responsible, AND
         // the query is filtered on the 'clubId' field.
-        // This is secure because the client will filter on *their own* clubId.
         allow list: if (isStaff() && 'clubId' in request.query.where && request.query.where.clubId == getMyClubId()) || 
                     (isResponsible() && 'clubId' in request.query.where && request.query.where.clubId == getMyClubId());
     }
@@ -128,3 +139,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

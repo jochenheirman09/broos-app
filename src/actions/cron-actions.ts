@@ -8,7 +8,7 @@ import { analyzeClubData } from '@/ai/flows/club-analysis-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
 import type { TeamAnalysisInput, TeamAnalysisOutput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary } from '@/ai/types';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, PlayerUpdate, ClubUpdate } from '@/lib/types';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { getFirebaseAdmin } from '@/ai/genkit';
 
 /**
@@ -93,7 +93,7 @@ export async function runAnalysisJob() {
 
         if (teamAnalysisResult?.insight) {
           const insightRef = teamDoc.ref.collection('staffUpdates').doc();
-          const insightData: StaffUpdate = { ...teamAnalysisResult.insight, id: insightRef.id, date: format(new Date(), 'yyyy-MM-dd') };
+          const insightData: StaffUpdate = { ...teamAnalysisResult.insight, id: insightRef.id, date: formatInTimeZone(new Date(), 'Europe/Brussels', 'yyyy-MM-dd') };
           await insightRef.set(insightData);
           teamAnalysisCount++;
           
@@ -116,7 +116,7 @@ export async function runAnalysisJob() {
                 const playerUpdateResult = await generatePlayerUpdate(playerUpdateInput);
                 if (playerUpdateResult) {
                     const updateRef = db.collection('users').doc(playerProfile.uid).collection('updates').doc();
-                    const updateData: PlayerUpdate = { ...playerUpdateResult, id: updateRef.id, date: format(new Date(), 'yyyy-MM-dd') };
+                    const updateData: PlayerUpdate = { ...playerUpdateResult, id: updateRef.id, date: formatInTimeZone(new Date(), 'Europe/Brussels', 'yyyy-MM-dd') };
                     await updateRef.set(updateData);
                     playerUpdateCount++;
                     await sendNotification({ userId: playerProfile.uid, title: 'Nieuw Weetje!', body: updateData.title, link: '/dashboard' });
@@ -133,7 +133,7 @@ export async function runAnalysisJob() {
 
         if (clubInsightResult) {
             const insightRef = clubDoc.ref.collection('clubUpdates').doc();
-            const insightData: ClubUpdate = { ...clubInsightResult, id: insightRef.id, date: format(new Date(), 'yyyy-MM-dd') };
+            const insightData: ClubUpdate = { ...clubInsightResult, id: insightRef.id, date: formatInTimeZone(new Date(), 'Europe/Brussels', 'yyyy-MM-dd') };
             await insightRef.set(insightData);
             clubAnalysisCount++;
 

@@ -1,4 +1,3 @@
-
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -22,6 +21,7 @@ export interface UserProfile {
   matchPreparation?: string;
   recoveryHabits?: string;
   additionalHobbies?: string;
+  personalDetails?: string; 
   acceptedTerms?: boolean;
   schedule?: Schedule;
   siblings?: { name: string; age?: number }[];
@@ -63,8 +63,6 @@ export interface WellnessScore {
   moodReason?: string;
   stress?: number;
   stressReason?: string;
-  sleep?: number;
-  sleepReason?: string;
   motivation?: number;
   motivationReason?: string;
   rest?: number;
@@ -83,6 +81,21 @@ export interface WellnessScore {
   shareWithStaff?: boolean;
   summary?: string; // AI generated summary for the day
   updatedAt?: any; // Firestore ServerTimestamp
+  // DEPRECATED:
+  sleep?: number;
+  sleepReason?: string;
+}
+
+export interface Game {
+    id: string; // YYYY-MM-DD
+    userId: string;
+    date: string;
+    opponent?: string;
+    score?: string;
+    playerSummary?: string;
+    playerRating?: number; // 1-10
+    createdAt: any; // Firestore ServerTimestamp
+    updatedAt: any; // Firestore ServerTimestamp
 }
 
 export interface Chat {
@@ -98,6 +111,21 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: any; // Firestore ServerTimestamp on write, Timestamp object on read
+  sortOrder?: number; // Client-side timestamp for reliable ordering
+}
+
+export interface P2PChat {
+    id: string; // e.g., uid1_uid2
+    participants: string[];
+    lastMessage?: string;
+    lastMessageTimestamp?: any; // Firestore ServerTimestamp
+}
+
+export interface P2PChatMessage {
+    id?: string;
+    senderId: string;
+    content: string;
+    timestamp: any; // Firestore ServerTimestamp
 }
 
 export type WithId<T> = T & { id: string };
@@ -185,6 +213,17 @@ export interface WellnessAnalysisInput {
     retrievedDocs?: any;
     todayActivity?: string;
     currentTime?: string;
+    // Add all structured memory fields for context
+    familySituation?: string;
+    schoolSituation?: string;
+    personalGoals?: string;
+    matchPreparation?: string;
+    recoveryHabits?: string;
+    additionalHobbies?: string;
+    personalDetails?: string;
+    // Game day context
+    isGameDay?: boolean;
+    game?: Partial<Game>;
 }
 
 export interface FullWellnessAnalysisOutput {
@@ -194,9 +233,11 @@ export interface FullWellnessAnalysisOutput {
   alert?: {
     alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
     triggeringMessage: string;
-    shareWithStaff?: boolean; // Added for consent
+    shareWithStaff?: boolean; 
   };
-  askForConsent?: boolean; // New field
+  askForConsent?: boolean;
+  updatedFields?: Partial<Pick<UserProfile, 'familySituation' | 'schoolSituation' | 'personalGoals' | 'matchPreparation' | 'recoveryHabits' | 'additionalHobbies' | 'personalDetails'>>;
+  gameUpdate?: Partial<Omit<Game, 'id' | 'userId' | 'date' | 'createdAt' | 'updatedAt'>>;
 }
 
 

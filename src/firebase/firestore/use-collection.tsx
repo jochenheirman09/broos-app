@@ -9,6 +9,7 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
+  SnapshotListenOptions,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -38,6 +39,11 @@ export interface InternalQuery extends Query<DocumentData> {
     }
   }
 }
+
+const listenOptions: SnapshotListenOptions = {
+  includeMetadataChanges: true,
+};
+
 
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
@@ -100,6 +106,7 @@ export function useCollection<T = any>(
 
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
+      listenOptions, // INCLUDE METADATA CHANGES
       (snapshot: QuerySnapshot<DocumentData>) => {
         console.log(`[useCollection] Data received for: ${path}`);
         const results: ResultItemType[] = [];
