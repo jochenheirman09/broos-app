@@ -1,5 +1,5 @@
 
-"use client";
+'use client';
 
 import {
   LayoutGrid,
@@ -7,6 +7,7 @@ import {
   Archive,
   User,
   Info,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,13 +18,14 @@ import { Button } from "../ui/button";
 import { Logo } from "./logo";
 import { ThemeToggle } from "../theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ProfileSheet } from "./profile-sheet";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { href: "/chat", icon: MessageSquare, label: "Chat" },
   { href: "/archive", icon: Archive, label: "Archief" },
+  { href: "/p2p-chat", icon: Users, label: "Team" },
 ];
 
 export function PlayerLayout({ children }: { children: React.ReactNode }) {
@@ -83,9 +85,9 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 pb-24">{children}</main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto grid h-20 max-w-lg grid-cols-3 items-center justify-items-center text-sm">
+          <div className="container mx-auto grid h-20 max-w-lg grid-cols-4 items-center justify-items-center text-sm">
             {navItems.map(({ href, icon: Icon, label }) => {
-              const isActive = pathname === href;
+              const isActive = pathname.startsWith(href);
               return (
                 <Link
                   key={href}

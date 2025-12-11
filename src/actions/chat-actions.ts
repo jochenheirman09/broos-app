@@ -6,24 +6,11 @@ import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
 import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, Game, FullWellnessAnalysisOutput } from '@/lib/types';
 import { GenkitError } from 'genkit';
-import { format, getDay } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
-import { saveAssistantResponse } from '@/services/firestore-service';
-import { FieldValue } from 'firebase-admin/firestore';
-
-
-const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
-  0: 'sunday',
-  1: 'monday',
-  2: 'tuesday',
-  3: 'wednesday',
-  4: 'thursday',
-  5: 'friday',
-  6: 'saturday',
-};
+import { getDay } from 'date-fns';
+import { saveAssistantResponse, saveUserMessage } from '@/services/firestore-service';
 
 /**
- * Main controller for handling chat interactions.
+ * Main controller for handling chat interactions with the AI Buddy.
  * This server action acts as a router, determining whether to invoke the
  * onboarding flow or the regular wellness analysis flow based on the user's profile.
  * It enriches the input, calls the appropriate AI flow, and then saves all resulting data.
@@ -46,27 +33,32 @@ export async function chatWithBuddy(
 
   console.log('[Chat Action] chatWithBuddy invoked for user:', userId);
   
+  const dayMapping: { [key: number]: keyof UserProfile['schedule'] } = {
+    0: 'sunday',
+    1: 'monday',
+    2: 'tuesday',
+    3: 'wednesday',
+    4: 'thursday',
+    5: 'friday',
+    6: 'saturday',
+  };
+  
   try {
     const { adminDb } = await getFirebaseAdmin();
     const userRef = adminDb.collection('users').doc(userId);
     const now = new Date();
-    const today = formatInTimeZone(now, "Europe/Brussels", "yyyy-MM-dd");
+    // Use server-safe ISO string date formatting
+    const today = now.toISOString().split('T')[0];
 
-    // --- FIX: Step 1 - Immediately save the user's message if it's not the system start message ---
+    // Immediately save user message to provide quick UI feedback.
     const isSystemStartMessage = input.userMessage === 'Start het gesprek voor vandaag.';
     if (!isSystemStartMessage) {
-        console.log("[Chat Action] Step 1: Saving user message first.");
-        const messagesColRef = userRef.collection('chats').doc(today).collection('messages');
-        await messagesColRef.add({
-            role: 'user',
-            content: input.userMessage,
-            timestamp: FieldValue.serverTimestamp(),
-            sortOrder: Date.now(),
-        });
-        console.log("[Chat Action] Step 1 Complete: User message saved.");
+        console.log("[Chat Action] Saving user message first.");
+        await saveUserMessage(userId, today, input.userMessage);
+        console.log("[Chat Action] User message saved.");
     }
-
-    // --- Step 2: Fetch user profile and build the full, up-to-date context ---
+    
+    console.log("[Chat Action] Fetching user profile and building context.");
     const userDoc = await userRef.get();
     if (!userDoc.exists) {
       throw new GenkitError({ status: 'NOT_FOUND', message: 'User profile not found.' });
@@ -78,6 +70,8 @@ export async function chatWithBuddy(
     let todayActivity: ScheduleActivity | 'individual' = 'rest';
     let isGameDay = false;
     let game: Partial<Game> = {};
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
 
     const individualTrainingQuery = userRef.collection('trainings').where('date', '==', today).limit(1);
     const individualTrainingSnapshot = await individualTrainingQuery.get();
@@ -105,16 +99,14 @@ export async function chatWithBuddy(
         }
     }
     
-    // Step 3: Fetch the now-complete chat history
-    console.log("[Chat Action] Step 3: Fetching complete chat history.");
     const messagesSnapshot = await userRef.collection('chats').doc(today).collection('messages').orderBy('sortOrder', 'asc').get();
     const chatHistory = messagesSnapshot.docs.map(doc => `${doc.data().role}: ${doc.data().content}`).join('\n');
-    console.log("[Chat Action] Step 3 Complete: History fetched.");
+    console.log("[Chat Action] History fetched for AI context.");
 
     const enrichedInput: WellnessAnalysisInput = { 
         ...input, 
-        currentTime: formatInTimeZone(now, "Europe/Brussels", "HH:mm"), 
-        chatHistory, // This now includes the message we just saved
+        currentTime,
+        chatHistory,
         todayActivity,
         isGameDay,
         game,
@@ -126,18 +118,17 @@ export async function chatWithBuddy(
         additionalHobbies: userProfile.additionalHobbies || "",
     };
 
-    // --- Step 4: Routing & AI Execution ---
     let result;
     if (!userProfile.onboardingCompleted) {
-      console.log('[Chat Action] Step 4: Routing to onboarding flow.');
+      console.log('[Chat Action] Routing to onboarding flow.');
       result = await runOnboardingFlow(userRef, userProfile, enrichedInput);
     } else {
-      console.log('[Chat Action] Step 4: Routing to wellness analysis flow.');
+      console.log('[Chat Action] Routing to wellness analysis flow.');
       result = await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
     }
     
-    // --- Step 5: Save the AI's response and all other extracted data ---
-    console.log("[Chat Action] Step 5: Saving assistant response and other data.");
+    // After getting the AI response, save all the data in one go.
+    console.log("[Chat Action] Saving assistant response and extracted data.");
     const fullResult = result as FullWellnessAnalysisOutput; 
     const saveDataPayload = {
       userId: userId,
@@ -150,8 +141,9 @@ export async function chatWithBuddy(
     };
     
     await saveAssistantResponse(saveDataPayload); 
-    console.log("[Chat Action] Step 5 Complete: Assistant response saved.");
+    console.log("[Chat Action] Assistant response and data saved.");
 
+    // Return the result to the client for UI updates.
     return result;
 
   } catch (error: any) {

@@ -40,11 +40,6 @@ export interface InternalQuery extends Query<DocumentData> {
   }
 }
 
-const listenOptions: SnapshotListenOptions = {
-  includeMetadataChanges: true,
-};
-
-
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
  * Handles nullable references/queries.
@@ -106,7 +101,6 @@ export function useCollection<T = any>(
 
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
-      listenOptions, // INCLUDE METADATA CHANGES
       (snapshot: QuerySnapshot<DocumentData>) => {
         console.log(`[useCollection] Data received for: ${path}`);
         const results: ResultItemType[] = [];

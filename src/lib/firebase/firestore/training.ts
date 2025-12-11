@@ -5,7 +5,6 @@ import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
-import { formatInTimeZone } from 'date-fns-tz';
 
 interface AddPlayerTrainingParams {
   db: ReturnType<typeof useFirestore>;
@@ -33,7 +32,7 @@ export async function addPlayerTraining({
   const trainingData = {
     id: newTrainingRef.id,
     userId,
-    date: formatInTimeZone(date, 'UTC', 'yyyy-MM-dd'), // Store as YYYY-MM-DD in UTC
+    date: date.toISOString().split("T")[0], // Store as YYYY-MM-DD
     description,
     createdAt: serverTimestamp(),
   };

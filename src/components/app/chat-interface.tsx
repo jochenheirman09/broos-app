@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -69,6 +70,7 @@ export function ChatInterface() {
     setLastFailedMessage(null);
     
     try {
+      // The server action now handles all database writes atomically.
       const result: BuddyResponse = await chatWithBuddy(user.uid, buddyInput);
 
       if (result.error) {
@@ -76,9 +78,9 @@ export function ChatInterface() {
         toast({ title: "Fout", description: result.response, variant: "destructive" });
         return false;
       }
-
-      if (!result.response) throw new Error('AI returned an empty response.');
-
+      
+      // If the action was successful, we don't need to do anything else here.
+      // The useCollection hook will automatically pick up the new user and assistant messages.
       return true;
 
     } catch (error: any) {
@@ -134,7 +136,10 @@ export function ChatInterface() {
       userMessage: userMessageContent,
     };
     
-    await executeChat(buddyInput);
+    const success = await executeChat(buddyInput);
+    if (success) {
+      setInput("");
+    }
   };
   
   const handleRetry = () => {
@@ -248,3 +253,5 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
     </div>
   );
 }
+
+    

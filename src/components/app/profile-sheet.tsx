@@ -1,4 +1,3 @@
-
 "use client";
 import { useUser } from "@/context/user-context";
 import {
@@ -24,11 +23,10 @@ import {
 } from "@/components/ui/form";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, useFirestore } from "@/firebase";
-import { updateUserProfile } from "@/lib/firebase/firestore/user";
+import { useAuth } from "@/firebase";
 import { updateProfile as updateAuthProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
-import { Camera, LogOut, Sparkles, CalendarPlus } from "lucide-react";
+import { Camera, LogOut, Sparkles, CalendarPlus, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +38,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { WeekSchedule } from "@/components/app/week-schedule";
 import { AddTrainingDialog } from "@/components/app/add-training-dialog";
@@ -49,24 +46,89 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription
+  SheetDescription,
+  SheetFooter
 } from "@/components/ui/sheet";
 import { BuddyProfileCustomizer } from "./buddy-profile/page";
 import { ScrollArea } from "../ui/scroll-area";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
+import { updateUserTeam } from "@/actions/user-actions";
+
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
     message: "Naam moet minimaal 2 karakters lang zijn.",
   }),
 });
-
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
+
+const changeTeamFormSchema = z.object({
+  teamCode: z.string().min(1, { message: "Teamcode is vereist." }),
+});
+type ChangeTeamFormValues = z.infer<typeof changeTeamFormSchema>;
+
+// Sub-component for changing teams
+function ChangeTeamForm() {
+  const { user } = useUser();
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<ChangeTeamFormValues>({
+    resolver: zodResolver(changeTeamFormSchema),
+    defaultValues: { teamCode: "" },
+  });
+
+  async function onSubmit(values: ChangeTeamFormValues) {
+    if (!user) return;
+    setIsLoading(true);
+
+    const result = await updateUserTeam(user.uid, values.teamCode);
+
+    if (result.success) {
+      toast({
+        title: "Team Gewijzigd!",
+        description: "Je bent succesvol van team gewisseld.",
+      });
+      form.reset();
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Fout",
+        description: result.message,
+      });
+    }
+    setIsLoading(false);
+  }
+
+  return (
+     <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="teamCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nieuwe Team Uitnodigingscode</FormLabel>
+              <FormControl>
+                <Input placeholder="ABCDEF" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={isLoading} className="w-full">
+          {isLoading && <Spinner size="small" className="mr-2" />}
+          {isLoading ? "Verwerken..." : "Verander van Team"}
+        </Button>
+      </form>
+    </Form>
+  )
+}
 
 export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
   const { user, userProfile, logout } = useUser();
   const { toast } = useToast();
   const auth = useAuth();
-  const firestore = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,6 +142,13 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
       name: userProfile?.name || "",
     },
   });
+
+  useEffect(() => {
+    if (userProfile) {
+        form.reset({ name: userProfile.name });
+    }
+  }, [userProfile, form]);
+  
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -122,7 +191,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
       }
 
       if (Object.keys(updates).length > 0) {
-        await updateUserProfile({ db: firestore, userId: user.uid, data: updates });
+        await updateUserProfile({ userId: user.uid, data: updates });
 
         if (Object.keys(authUpdates).length > 0) {
           await updateAuthProfile(auth.currentUser, authUpdates);
@@ -173,7 +242,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="w-full max-w-md p-0 flex flex-col">
-          <SheetHeader className="p-6 pb-0">
+          <SheetHeader className="p-6 pb-4">
             <SheetTitle>
                 {showBuddyCustomizer ? "Buddy Aanpassen" : "Jouw Profiel"}
             </SheetTitle>
@@ -184,119 +253,125 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
               }
             </SheetDescription>
           </SheetHeader>
-          <ScrollArea className="flex-1">
-            <div className="px-6 space-y-8 py-6">
-              {showBuddyCustomizer ? (
-                <BuddyProfileCustomizer onSave={() => {
-                  setShowBuddyCustomizer(false); 
-                  onOpenChange(false);
-                }} />
-              ) : (
-              <>
-                <div className="flex items-center gap-6">
-                  <div className="relative">
-                    <Avatar
-                      className="h-24 w-24 cursor-pointer"
-                      onClick={handleAvatarClick}
-                    >
-                      <AvatarImage src={newPhoto || userProfile.photoURL} />
-                      <AvatarFallback className="text-3xl bg-primary/20 text-primary font-bold">
-                        {userProfile.name
-                          ?.split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute bottom-0 right-0 bg-secondary text-secondary-foreground rounded-full p-1.5 border-2 border-background">
-                      <Camera className="h-4 w-4" />
-                    </div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      className="hidden"
-                      accept="image/*"
-                    />
+          
+          <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
+            {showBuddyCustomizer ? (
+              <BuddyProfileCustomizer onSave={() => {
+                setShowBuddyCustomizer(false); 
+                onOpenChange(false);
+              }} />
+            ) : (
+            <>
+              <div className="flex items-center gap-6 pt-2">
+                <div className="relative">
+                  <Avatar
+                    className="h-24 w-24 cursor-pointer"
+                    onClick={handleAvatarClick}
+                  >
+                    <AvatarImage src={newPhoto || userProfile.photoURL} />
+                    <AvatarFallback className="text-3xl bg-primary/20 text-primary font-bold">
+                      {userProfile.name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute bottom-0 right-0 bg-secondary text-secondary-foreground rounded-full p-1.5 border-2 border-background">
+                    <Camera className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-2xl font-bold truncate">{userProfile.name}</h2>
-                    <p className="text-muted-foreground truncate">{userProfile.email}</p>
-                  </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="image/*"
+                  />
                 </div>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Volledige naam</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Jan Janssen" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" disabled={isLoading} className="w-full">
-                      {isLoading && <Spinner className="mr-2 h-4 w-4" />}
-                      Wijzigingen opslaan
-                    </Button>
-                  </form>
-                </Form>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-2xl font-bold truncate">{userProfile.name}</h2>
+                  <p className="text-muted-foreground truncate">{userProfile.email}</p>
+                </div>
+              </div>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Volledige naam</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Jan Janssen" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" disabled={isLoading} className="w-full">
+                    {isLoading && <Spinner className="mr-2 h-4 w-4" />}
+                    Wijzigingen opslaan
+                  </Button>
+                </form>
+              </Form>
 
-                {userProfile.role === 'player' && (
-                  <>
-                    <Separator />
-                    <div className="space-y-4">
+              {userProfile.role === 'player' && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
                       <h3 className="text-lg font-medium">Planning & Instellingen</h3>
                       <WeekSchedule key={refreshSchedule} />
                       <div className="flex flex-wrap gap-2 mt-4">
-                        <Button variant="outline" onClick={() => setIsAddTrainingOpen(true)}>
-                          <CalendarPlus className="mr-2 h-4 w-4" />
-                          Individuele Training Toevoegen
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowBuddyCustomizer(true)}>
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            Buddy Aanpassen
-                        </Button>
+                          <Button variant="outline" onClick={() => setIsAddTrainingOpen(true)}>
+                              <CalendarPlus className="mr-2 h-4 w-4" />
+                              Individuele Training Toevoegen
+                          </Button>
+                          <Button variant="outline" onClick={() => setShowBuddyCustomizer(true)}>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Buddy Aanpassen
+                          </Button>
                       </div>
-                    </div>
-                  </>
-                )}
+                  </div>
+                  <Separator />
+                  <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Verander van Team</h3>
+                      <p className="text-sm text-muted-foreground">Voer de uitnodigingscode van je nieuwe team in om te wisselen.</p>
+                      <ChangeTeamForm />
+                  </div>
+                </>
+              )}
+            </>
+            )}
+          </div>
 
-                <Separator />
-
-                <div className="flex justify-end">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive">
+          {!showBuddyCustomizer && (
+            <SheetFooter className="p-6 pt-4 border-t">
+                <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="w-full sm:w-auto ml-auto">
                         <LogOut className="mr-2 h-4 w-4" />
                         Uitloggen
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Je wordt uitgelogd en teruggestuurd naar de
-                          startpagina.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => { onOpenChange(false); logout(); }}>
-                          Uitloggen
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </>
-              )}
-            </div>
-          </ScrollArea>
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Je wordt uitgelogd en teruggestuurd naar de
+                        startpagina.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { onOpenChange(false); logout(); }}>
+                        Uitloggen
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+                </AlertDialog>
+            </SheetFooter>
+          )}
+
         </SheetContent>
       </Sheet>
       <AddTrainingDialog

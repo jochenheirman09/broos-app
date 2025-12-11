@@ -7,7 +7,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { doc, updateDoc } from 'firebase/firestore';
 
 interface UpdateUserProfileParams {
-  db: ReturnType<typeof useFirestore>;
   userId: string;
   data: { [key: string]: any };
 }
@@ -18,7 +17,9 @@ interface UpdateUserProfileParams {
  * @param {UpdateUserProfileParams} params - The parameters for the update.
  * @returns A promise that resolves when the update is complete.
  */
-export async function updateUserProfile({ db, userId, data }: UpdateUserProfileParams): Promise<void> {
+export async function updateUserProfile({ userId, data }: UpdateUserProfileParams): Promise<void> {
+  // Get db instance inside the function to avoid client/server context issues
+  const db = useFirestore();
   if (!db || !userId) {
     throw new Error('Firestore instance and User ID are required for update.');
   }

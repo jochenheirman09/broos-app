@@ -20,8 +20,6 @@ import { useUser } from "@/context/user-context";
 import { useFirestore } from "@/firebase";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { Spinner } from "@/components/ui/spinner";
-import { useRouter } from "next/navigation";
-
 
 interface BuddyProfileCustomizerProps {
   onSave?: () => void;

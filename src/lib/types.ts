@@ -81,7 +81,7 @@ export interface WellnessScore {
   shareWithStaff?: boolean;
   summary?: string; // AI generated summary for the day
   updatedAt?: any; // Firestore ServerTimestamp
-  // DEPRECATED:
+  // DEPRECATED: These fields are kept for backwards compatibility with old data, but are no longer actively set.
   sleep?: number;
   sleepReason?: string;
 }
@@ -114,9 +114,12 @@ export interface ChatMessage {
   sortOrder?: number; // Client-side timestamp for reliable ordering
 }
 
-export interface P2PChat {
-    id: string; // e.g., uid1_uid2
+// Renamed from P2PChat to be more generic for group chats
+export interface Conversation {
+    id: string; // For 1-on-1: uid1_uid2, for groups: unique ID
     participants: string[];
+    isGroupChat?: boolean;
+    name?: string; // Optional name for group chats
     lastMessage?: string;
     lastMessageTimestamp?: any; // Firestore ServerTimestamp
 }
@@ -134,6 +137,7 @@ export interface Alert {
   id: string;
   userId: string;
   clubId: string; // Denormalized for security rules
+  teamId: string; // Denormalized for security rules
   date: string; // YYYY-MM-DD
   alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
   triggeringMessage: string;
@@ -229,7 +233,7 @@ export interface WellnessAnalysisInput {
 export interface FullWellnessAnalysisOutput {
   response: string;
   summary?: string;
-  wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt">>;
+  wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt" | "sleep" | "sleepReason">>;
   alert?: {
     alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
     triggeringMessage: string;

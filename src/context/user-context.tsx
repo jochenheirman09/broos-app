@@ -3,15 +3,15 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   useUser as useFirebaseUser,
-  useFirestore,
   useAuth,
   useDoc,
-  useMemoFirebase,
+  useFirestore,
+  useMemoFirebase
 } from "@/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
@@ -19,109 +19,89 @@ import { Wordmark } from "@/components/app/wordmark";
 
 interface UserContextType {
   user: FirebaseUser | null;
-  userProfile: UserProfile | null;
-  loading: boolean;
+  isUserLoading: boolean; // Renamed for clarity, represents auth state loading.
   logout: () => void;
+  // userProfile is removed from here. It will be fetched by components that need it.
 }
 
 const UserContext = createContext<UserContextType>({
   user: null,
-  userProfile: null,
-  loading: true,
+  isUserLoading: true,
   logout: async () => {},
 });
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user, isUserLoading: isAuthLoading } = useFirebaseUser();
-  const firestore = useFirestore();
+  const { user, isUserLoading, userError } = useFirebaseUser();
   const auth = useAuth();
   const router = useRouter();
-
-  const userDocRef = useMemoFirebase(
-    () => (user ? doc(firestore, "users", user.uid) : null),
-    [user, firestore]
-  );
-
-  const {
-    data: userProfile,
-    isLoading: isProfileLoading,
-    error: profileError,
-  } = useDoc<UserProfile>(userDocRef);
-
+  
+  // This state is now simplified to only handle logout.
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // SIMPLIFIED LOADING LOGIC:
-  // The context is loading if Firebase Auth is checking the user, OR
-  // if we have a user but are still waiting for their Firestore profile to load.
-  const loading = isAuthLoading || (!!user && isProfileLoading);
-  
+  // Effect to log auth errors if they occur during the initial check.
   useEffect(() => {
-    console.log('[UserProvider] State Change:', {
-      loading,
-      isAuthLoading,
-      isProfileLoading,
-      hasUser: !!user,
-      hasProfile: !!userProfile,
-      isVerified: user?.emailVerified,
-    });
-  }, [user, userProfile, loading, isAuthLoading, isProfileLoading]);
-
-
-  useEffect(() => {
-    if (profileError) {
-      console.error("[UserProvider] Error fetching user profile:", profileError);
+    if (userError) {
+      console.error("[UserProvider] Auth state error:", userError);
     }
-  }, [profileError]);
+  }, [userError]);
 
-  // DATA SYNC FIX: Ensure emailVerified status in Firestore matches Auth state.
-  useEffect(() => {
-    if (user && user.emailVerified && userProfile && !userProfile.emailVerified) {
-      console.log(`[UserProvider] Syncing emailVerified status for user ${user.uid}...`);
-      const userRef = doc(firestore, "users", user.uid);
-      updateDoc(userRef, { emailVerified: true })
-        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${user.uid}.`))
-        .catch(err => console.error(`[UserProvider] Failed to sync emailVerified status:`, err));
-    }
-  }, [user, userProfile, firestore]);
 
   const logout = async () => {
     setIsLoggingOut(true);
-    await auth.signOut();
-    router.push("/");
-    setIsLoggingOut(false);
+    try {
+      await auth.signOut();
+      // After sign-out, the `onAuthStateChanged` listener will update the `user` state to null.
+      // We can then forcefully redirect to ensure the user lands on the login page.
+      router.push("/login"); 
+    } catch (error) {
+       console.error("Logout failed:", error);
+    } finally {
+       setIsLoggingOut(false);
+    }
   };
 
-  // The global loading screen for the initial app load or logout.
-  // The AppLayout will handle its own loading state for internal navigation.
-  if (loading || isLoggingOut) {
-     if (isAuthLoading) {
-        // This is the very initial, full-screen loader.
-        console.log('[UserProvider] Rendering global loading spinner.');
-        return (
-          <div className="flex h-screen w-full items-center justify-center bg-background">
-            <div className="flex flex-col items-center justify-center gap-4">
-              <Logo size="large" />
-              <Wordmark size="large">Broos 2.0</Wordmark>
-              <Spinner size="medium" className="mt-4" />
-            </div>
-          </div>
-        );
-     }
+  // The main loading screen now only depends on the auth check and logout process.
+  // It does NOT wait for the Firestore profile anymore.
+  if (isUserLoading || isLoggingOut) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <Logo size="large" />
+          <Wordmark size="large">Broos 2.0</Wordmark>
+          <Spinner size="medium" className="mt-4" />
+        </div>
+      </div>
+    );
   }
-  
-  console.log('[UserProvider] Loading complete, rendering children.');
+
+  // The context now provides only the user object and its loading state.
   return (
     <UserContext.Provider
-      value={{
-        user,
-        userProfile: userProfile as UserProfile | null,
-        loading,
-        logout,
-      }}
+      value={{ user, isUserLoading, logout }}
     >
       {children}
     </UserContext.Provider>
   );
 };
 
-export const useUser = () => useContext(UserContext);
+// This hook now returns a simpler object, without `userProfile`.
+export const useUser = () => {
+    const context = useContext(UserContext);
+    if (context === undefined) {
+        throw new Error("useUser must be used within a UserProvider");
+    }
+    // We can now also fetch the userProfile directly within the hook for convenience in components,
+    // but the layout will handle the primary loading and redirection logic.
+    const firestore = useFirestore();
+    const userDocRef = useMemoFirebase(() => (context.user ? doc(firestore, 'users', context.user.uid) : null), [context.user, firestore]);
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+
+    return {
+        user: context.user,
+        isUserLoading: context.isUserLoading,
+        userProfile,
+        isProfileLoading,
+        loading: context.isUserLoading || (!!context.user && isProfileLoading), // Corrected loading logic
+        logout: context.logout,
+    }
+};

@@ -2,9 +2,8 @@
 'use server';
 
 import { getFirebaseAdmin } from '@/ai/genkit';
-import { type DocumentReference, FieldValue } from 'firebase-admin/firestore';
-import type { OnboardingTopic, UserProfile, Game } from '@/lib/types';
-import { formatInTimeZone } from 'date-fns-tz';
+import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
+import type { OnboardingTopic, UserProfile, Game, FullWellnessAnalysisOutput } from '@/lib/types';
 
 export async function saveOnboardingSummary(
     userRef: DocumentReference,
@@ -38,29 +37,29 @@ export async function saveOnboardingSummary(
     }
 }
 
+export async function saveUserMessage(userId: string, today: string, userMessage: string) {
+    console.log(`[Firestore Service] Saving user message for ${userId}.`);
+    const { adminDb } = await getFirebaseAdmin();
+    const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
+    const clientTimestampMs = Date.now();
+    await messagesColRef.add({
+        role: 'user',
+        content: userMessage,
+        timestamp: FieldValue.serverTimestamp(),
+        sortOrder: clientTimestampMs,
+    });
+}
+
 
 // This interface is now for the *second* part of the save operation
 export interface SaveAssistantPayload {
     userId: string;
     assistantResponse: string;
     summary?: string;
-    wellnessScores?: {
-        mood?: number;
-        moodReason?: string;
-        stress?: number;
-        stressReason?: string;
-        sleep?: number;
-        sleepReason?: string;
-        motivation?: number;
-        motivationReason?: string;
-    };
-    alert?: {
-        alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
-        triggeringMessage: string;
-        shareWithStaff?: boolean;
-    };
+    wellnessScores?: FullWellnessAnalysisOutput['wellnessScores'];
+    alert?: FullWellnessAnalysisOutput['alert'];
     askForConsent?: boolean;
-    gameUpdate?: Partial<Omit<Game, 'id' | 'userId' | 'date' | 'createdAt' | 'updatedAt'>>;
+    gameUpdate?: FullWellnessAnalysisOutput['gameUpdate'];
 }
 
 /**
@@ -70,9 +69,9 @@ export interface SaveAssistantPayload {
 export async function saveAssistantResponse(payload: SaveAssistantPayload) {
   const { userId, assistantResponse, summary, wellnessScores, alert, askForConsent, gameUpdate } = payload;
   
-  console.log(`[Wellness Service] Saving assistant response & data for user ${userId}.`);
+  console.log(`[Firestore Service] Saving assistant response & data for user ${userId}.`);
   const { adminDb } = await getFirebaseAdmin();
-  const today = formatInTimeZone(new Date(), 'Europe/Brussels', "yyyy-MM-dd");
+  const today = new Date().toISOString().split('T')[0];
 
   const batch = adminDb.batch();
   
@@ -81,18 +80,19 @@ export async function saveAssistantResponse(payload: SaveAssistantPayload) {
   const messagesColRef = chatDocRef.collection('messages');
   
   // 1. Save assistant's response
-  console.log("[Wellness Service] Queuing assistant response save.");
-  const clientTimestampMs = Date.now();
-  batch.set(messagesColRef.doc(), {
+  console.log("[Firestore Service] Queuing assistant response save.");
+  const clientTimestampMs = Date.now() + 1; // Ensure it's after user message
+  const assistantMessageRef = messagesColRef.doc(); // Generate a new doc ref
+  batch.set(assistantMessageRef, {
       role: 'assistant',
       content: assistantResponse,
       timestamp: FieldValue.serverTimestamp(),
-      sortOrder: clientTimestampMs + 1, // Ensure it's after the user message
+      sortOrder: clientTimestampMs,
   });
 
   // 2. Save Chat Summary if present
   if (summary) {
-    console.log("[Wellness Service] Queuing chat summary save.");
+    console.log("[Firestore Service] Queuing chat summary save.");
     batch.set(chatDocRef, {
         id: today,
         userId,
@@ -104,7 +104,7 @@ export async function saveAssistantResponse(payload: SaveAssistantPayload) {
 
   // 3. Save Wellness Scores if present
   if (wellnessScores && Object.keys(wellnessScores).length > 0) {
-    console.log("[Wellness Service] Queuing wellness scores save. Payload:", wellnessScores);
+    console.log("[Firestore Service] Queuing wellness scores save. Payload:", wellnessScores);
     const scoresDocRef = userDocRef.collection('wellnessScores').doc(today);
     const scoreData = {
       ...(wellnessScores || {}),
@@ -117,7 +117,7 @@ export async function saveAssistantResponse(payload: SaveAssistantPayload) {
   
   // 4. Save Game Data if present
   if (gameUpdate && Object.keys(gameUpdate).length > 0) {
-    console.log("[Wellness Service] Queuing game data update. Payload:", gameUpdate);
+    console.log("[Firestore Service] Queuing game data update. Payload:", gameUpdate);
     const gameDocRef = userDocRef.collection('games').doc(today);
     const gameData = {
         ...gameUpdate,
@@ -126,16 +126,7 @@ export async function saveAssistantResponse(payload: SaveAssistantPayload) {
     batch.set(gameDocRef, gameData, { merge: true });
   }
 
-  // Commit the first batch for AI data
-  try {
-    await batch.commit();
-    console.log(`[Wellness Service] Assistant response batch write successful for user ${userId}.`);
-  } catch (e: any) {
-     console.error(`[Wellness Service] CRITICAL: Assistant response batch commit failed for user ${userId}:`, e);
-     throw new Error(`Database write failed for assistant response: ${e.message}`);
-  }
-
-  // 5. Handle Alert separately after other data is saved
+  // 5. Handle Alert if present
   if (alert) {
       const userDoc = await userDocRef.get();
       const userData = userDoc.data() as UserProfile | undefined;
@@ -143,23 +134,32 @@ export async function saveAssistantResponse(payload: SaveAssistantPayload) {
       const teamId = userData?.teamId;
 
       if (!clubId || !teamId) {
-          console.error(`[Wellness Service] Cannot save alert for user ${userId}: missing clubId or teamId.`);
-          return; 
+          console.error(`[Firestore Service] Cannot save alert for user ${userId}: missing clubId or teamId.`);
+      } else {
+          const alertDocRef = adminDb.collection('clubs').doc(clubId).collection('teams').doc(teamId).collection('alerts').doc();
+          const alertData = {
+              alertType: alert.alertType,
+              triggeringMessage: alert.triggeringMessage,
+              id: alertDocRef.id,
+              userId,
+              clubId,
+              teamId, // Denormalize for staff queries
+              date: today,
+              status: 'new',
+              shareWithStaff: alert.shareWithStaff === true,
+              createdAt: FieldValue.serverTimestamp(),
+          };
+          batch.set(alertDocRef, alertData);
+          console.log(`[Firestore Service] Queued alert of type '${alert.alertType}' for user ${userId}.`);
       }
-      
-      const alertDocRef = adminDb.collection('clubs').doc(clubId).collection('teams').doc(teamId).collection('alerts').doc();
-      const alertData = {
-          alertType: alert.alertType,
-          triggeringMessage: alert.triggeringMessage,
-          id: alertDocRef.id,
-          userId,
-          clubId,
-          date: today,
-          status: 'new',
-          shareWithStaff: alert.shareWithStaff === true,
-          createdAt: FieldValue.serverTimestamp(),
-      };
-      await alertDocRef.set(alertData);
-      console.log(`[Wellness Service] Alert of type '${alert.alertType}' saved for user ${userId}.`);
+  }
+  
+  // Commit the batch
+  try {
+    await batch.commit();
+    console.log(`[Firestore Service] Batch write successful for user ${userId}.`);
+  } catch (e: any) {
+     console.error(`[Firestore Service] CRITICAL: Batch commit failed for user ${userId}:`, e);
+     throw new Error(`Database write failed: ${e.message}`);
   }
 }

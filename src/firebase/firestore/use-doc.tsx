@@ -14,7 +14,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { useMemoFirebase } from '../provider';
 
 /** Utility type to add an 'id' field to a given type T. */
-type WithId<T> = T & { id: string };
+export type WithId<T> = T & { id: string };
 
 /**
  * Interface for the return value of the useDoc hook.
@@ -46,31 +46,26 @@ export function useDoc<T = any>(
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Start as true
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
     const path = memoizedDocRef ? memoizedDocRef.path : 'unknown path';
-    console.log(`[useDoc] Subscribing to: ${path}`);
     
-    // Set loading to true at the start of the effect when there is a valid ref
-    setIsLoading(true);
-
     if (!memoizedDocRef) {
-      console.log(`[useDoc] Subscription skipped (null ref) for: ${path}`);
       setData(null);
-      setIsLoading(false);
+      setIsLoading(false); 
       setError(null);
       return;
     }
-
+    
+    setIsLoading(true);
     setError(null);
     
     const unsubscribe = onSnapshot(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
-          console.log(`[useDoc] Data received for: ${path}`);
           setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
           console.warn(`[useDoc] Document does not exist at: ${path}`);
@@ -95,10 +90,9 @@ export function useDoc<T = any>(
     );
 
     return () => {
-      console.log(`[useDoc] Unsubscribing from: ${path}`);
       unsubscribe();
     }
-  }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+  }, [memoizedDocRef]);
 
   if (memoizedDocRef && !memoizedDocRef.__memo) {
     throw new Error('useDoc reference was not properly memoized using useMemoFirebase');
@@ -106,4 +100,5 @@ export function useDoc<T = any>(
 
   return { data, isLoading, error };
 }
+
 

@@ -49,13 +49,13 @@ export async function runOnboardingFlow(
             HUIDIG ONDERWERP: '{{{currentTopic}}}'.
 
             TAAK:
-            1.  **Houd het gesprek luchtig en informeel.** Stel open vragen.
-            2.  **Verzamel Details:** Als het onderwerp 'familySituation' is en de gebruiker noemt broers, zussen of huisdieren, vraag dan op een natuurlijke manier naar hun naam, leeftijd (voor broers/zussen) en type (voor huisdieren). EXTRAHEER deze data naar de 'siblings' en 'pets' velden.
-            3.  **Rond Zelf Af:** Bepaal zelf wanneer een onderwerp is afgerond (meestal na 1-3 antwoorden). Stel 'isTopicComplete' in op true.
+            1.  **Houd het gesprek luchtig en informeel.** Stel open vragen. Een kort antwoord van de gebruiker is prima; je hoeft niet door te vragen.
+            2.  **Verzamel Details (Optioneel):** Als het onderwerp 'familySituation' is en de gebruiker noemt broers, zussen of huisdieren, vraag dan op een natuurlijke manier naar hun naam, leeftijd (voor broers/zussen) en type (voor huisdieren). EXTRAHEER deze data naar de 'siblings' en 'pets' velden.
+            3.  **Rond Zelf Af:** Bepaal zelf wanneer een onderwerp is afgerond (meestal na 1 of 2 antwoorden). Stel dan 'isTopicComplete' in op true.
             4.  **Vloeiende Overgang:** Als 'isTopicComplete' waar is:
-                -   Maak een vloeiende overgang in je 'response' door een open vraag te stellen over het VOLGENDE onderwerp. ZEG NIET "Laten we verdergaan".
-                -   Geef een beknopte samenvatting (1-2 zinnen) in het 'summary' veld.
-            5.  **Houd het Gaande:** Als 'isTopicComplete' false is, stel dan een korte, relevante vervolgvraag over het huidige onderwerp.
+                -   Genereer een beknopte samenvatting (1-2 zinnen) in het 'summary' veld.
+                -   Maak in je 'response' een natuurlijke overgang naar het volgende onderwerp zonder expliciet te zeggen "volgende onderwerp". Bijvoorbeeld: "Oké, interessant. En hoe zit het met school en je vrienden?"
+            5.  **Houd het Gaande:** Als je denkt dat één korte vervolgvraag nuttig is, stel 'isTopicComplete' dan in op 'false' en houd het gesprek gaande.
 
             Bericht gebruiker: "{{{userMessage}}}"
             Gespreksgeschiedenis (voor context):

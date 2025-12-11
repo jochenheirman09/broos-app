@@ -1,9 +1,9 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // --- HELPER FUNCTIONS ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -15,129 +15,159 @@ service cloud.firestore {
     function isCreatingOwnData(userId) {
         return isOwner(userId) && request.resource.data.uid == userId;
     }
+
+    function getMyProfile() {
+      // Haalt het volledige document van de ingelogde gebruiker op.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
     
-    function getUserData(userId) {
-      let targetUserId = userId != null ? userId : request.auth.uid;
-      return get(/databases/$(database)/documents/users/$(targetUserId)).data;
+    // Defensieve check om te zien of de aanvrager en de doelgebruiker
+    // in hetzelfde team zitten.
+    function isSameTeam() {
+      let requesterDoc = getMyProfile();
+      
+      // 1. Controleer of het profiel van de aanvrager bestaat en of het een staflid is.
+      if (!requesterDoc.exists || requesterDoc.data.get('role', 'none') != 'staff') { 
+        return false; 
+      }
+      
+      // 2. Haal teamId's veilig op met .get() en een default waarde (null).
+      let requesterTeamId = requesterDoc.data.get('teamId', null);
+      // resource.data is hier het /users/{userId} document dat wordt opgevraagd.
+      let targetTeamId = resource.data.get('teamId', null);
+      
+      // 3. Verleen alleen toegang als beide teamId's bestaan en gelijk zijn.
+      return requesterTeamId != null && targetTeamId != null && requesterTeamId == targetTeamId;
     }
 
     function isResponsible(clubId) {
-        let userData = getUserData(null);
-        return userData.role == 'responsible' && userData.clubId == clubId;
+        let profile = getMyProfile();
+        return profile.exists && profile.data.role == 'responsible' && profile.data.clubId == clubId;
     }
     
     function isStaff() {
-       return getUserData(null).role == 'staff';
-    }
-
-    function isStaffOfTeam(clubId, teamId) {
-        let userData = getUserData(null);
-        return userData.role == 'staff' && userData.clubId == clubId && userData.teamId == teamId;
+       let profile = getMyProfile();
+       return profile.exists && profile.data.role == 'staff';
     }
     
-    function getMyTeamId() {
-       return getUserData(null).teamId;
+    function isMemberOfClub(clubId) {
+        let profile = getMyProfile();
+        return profile.exists && profile.data.clubId == clubId;
+    }
+
+    function isInChatWith(userId) {
+      let sortedIds = [request.auth.uid, userId].sort();
+      let chatId = sortedIds.join('_');
+      let chatRef = /databases/$(database)/documents/p2p_chats/$(chatId);
+      return exists(chatRef);
     }
     
-    function getMyClubId() {
-        return getUserData(null).clubId;
-    }
-
-    // --- NEW: Rules for Peer-to-Peer Chat ---
-    match /p2p_chats/{chatId} {
-        // A user can only access a chat document if their UID is in the `participants` array.
-        allow read, write: if isSignedIn() && request.auth.uid in resource.data.participants;
-
-        match /messages/{messageId} {
-             // Messages can only be read or written by participants of the parent chat.
-            allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants;
+    // --- COLLECTION GROUP RULES ---
+    match /{path=**}/alerts/{alertId} {
+        // Haalt de rol, teamId en clubId van de aanvrager defensief op.
+        function getRequesterData() {
+            let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+            // Retourneer een veilige object met defaults als het profiel niet bestaat.
+            if (!profile.exists) return { role: 'none', teamId: null, clubId: null };
+            return { 
+                role: profile.data.get('role', 'none'), 
+                teamId: profile.data.get('teamId', null), 
+                clubId: profile.data.get('clubId', null) 
+            };
         }
+        
+        let req = getRequesterData();
+        
+        // READ (GET & LIST) is toegestaan als:
+        allow read: if isSignedIn() && (
+            req.role == 'responsible' // 1. Responsible mag alle alerts lezen
+            
+            // 2. Staff mag alleen alerts lezen die bij ZIJN Team en Club horen.
+            || (req.role == 'staff' 
+                // Belangrijk: De query moet gefilterd zijn op deze waarden!
+                && resource.data.get('clubId', null) == req.clubId
+                && resource.data.get('teamId', null) == req.teamId
+            )
+        );
     }
 
+
+    // --- COLLECTION RULES ---
 
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow create: if isCreatingOwnData(userId);
-      allow update, delete: if isOwner(userId);
-
+      // GET is toegestaan als:
+      allow get: if isSignedIn() && (
+          isOwner(userId)         // 1. Eigen profiel
+          || isTeamMate()         // 2. Speler in hetzelfde team (voor staff)
+          || isInChatWith(userId) // 3. Voor P2P chats
+          || isResponsible(get(/databases/$(database)/documents/users/$(userId)).data.clubId) // 4. Responsible van dezelfde club
+      );
+      
+      // LIST/Query is toegestaan als de query gescopeerd is.
       allow list: if isSignedIn() && (
-                    (isResponsible(request.query.where[0][2]) && request.query.where[0][0] == 'clubId') ||
-                    (isStaff() && request.query.where[0][0] == 'teamId' && request.query.where[0][2] == getMyTeamId()) ||
-                    (isSignedIn() && request.query.where.size() > 0 && request.query.where[0][0] == 'uid')
-                  );
-
-      match /wellnessScores/{scoreId} {
-        allow read, write: if isSignedIn();
-      }
+          // Responsible: Mag query's uitvoeren zolang ze binnen de club filteren.
+          (isResponsible(request.query.resource.data.clubId) && request.query.resource.data.clubId == getMyProfile().data.clubId)
+          
+          // Staff: Mag query's uitvoeren zolang ze binnen het team filteren.
+          || (isStaff() && request.query.resource.data.teamId == getMyProfile().data.teamId)
+      );
       
-      match /fcmTokens/{tokenId} {
-        allow read, list: if false; 
-        allow write: if isOwner(userId);
-      }
+      allow create: if isCreatingOwnData(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
 
-      match /trainings/{trainingId} {
-        allow read, write: if isSignedIn();
-      }
-      
-      match /chats/{chatId} {
-        allow read, write: if isSignedIn();
-        
-        match /messages/{messageId} {
-          allow read, write: if isSignedIn();
-        }
-      }
-
-      match /updates/{updateId} {
-        allow read: if isOwner(userId);
-        allow write: if false; 
-      }
+      // Subcollections for a user
+      match /chats/{chatId} { allow read, write: if isOwner(userId); match /messages/{messageId} { allow read, write: if isOwner(userId); } }
+      match /wellnessScores/{scoreId} { allow read, write: if isOwner(userId); }
+      match /trainings/{trainingId} { allow read, write: if isOwner(userId); }
+      match /fcmTokens/{tokenId} { allow write: if isOwner(userId); }
+      match /updates/{updateId} { allow read: if isOwner(userId); allow write: if false; }
     }
     
-    match /clubs/{clubId}/teams/{teamId}/alerts/{alertId} {
-      allow create: if isOwner(request.resource.data.userId); // Player can create
-      allow read, update, delete: if (isStaffOfTeam(clubId, teamId)) || (isResponsible(clubId));
+    match /p2p_chats/{chatId} {
+      allow read, update: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
+      
+      match /messages/{messageId} {
+        allow read, list, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants;
+      }
     }
-    
-    // Collection Group for Alerts
-    match /{path=**}/alerts/{alertId} {
-        // A user can list alerts if they are a staff or responsible, AND
-        // the query is filtered on the 'clubId' field.
-        allow list: if (isStaff() && 'clubId' in request.query.where && request.query.where.clubId == getMyClubId()) || 
-                    (isResponsible() && 'clubId' in request.query.where && request.query.where.clubId == getMyClubId());
-    }
-
 
     match /clubs/{clubId} {
-      allow get, list: if isSignedIn(); 
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-
-      match /clubUpdates/{updateId} {
-        allow read: if isResponsible(clubId);
-        allow write: if false;
-      }
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // Allow listing clubs for team code validation
+      allow create: if isResponsible() && !exists(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId;
+      allow update, delete: if isResponsible() && isMemberOfClub(clubId);
 
       match /teams/{teamId} {
-        allow read: if isSignedIn() && clubId == getUserData(null).clubId;
+        allow read: if isResponsible(clubId) || (isStaff() && getMyProfile().data.teamId == teamId);
         allow list, create, update, delete: if isResponsible(clubId);
 
         match /summaries/{summaryId} {
-            allow read: if isStaffOfTeam(clubId, teamId) || isResponsible(clubId);
+            allow read: if isResponsible(clubId) || (isStaff() && getMyProfile().data.teamId == teamId);
             allow write: if false;
         }
 
         match /staffUpdates/{updateId} {
-            allow read: if isStaffOfTeam(clubId, teamId) || isResponsible(clubId);
+            allow read: if isResponsible(clubId) || (isStaff() && getMyProfile().data.teamId == teamId);
             allow write: if false;
         }
+
+        match /alerts/{alertId} {
+          allow read: if isResponsible(clubId) || (isStaff() && teamId == getMyTeamId());
+          allow write: if isOwner(request.resource.data.userId) || isResponsible(clubId) || (isStaff() && teamId == getMyTeamId());
+        }
+      }
+      
+      match /clubUpdates/{updateId} {
+        allow read: if isResponsible(clubId);
+        allow write: if false;
       }
     }
-
+    
     match /knowledge_base/{docId} {
-      allow read, list: if isResponsible(getUserData(null).clubId);
-      allow write: if false; 
+        allow read, list: if isResponsible();
+        allow create, update, delete: if false; // Managed via server-side actions
     }
   }
 }
-
-    

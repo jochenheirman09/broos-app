@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
@@ -28,13 +29,14 @@ import { cn } from "@/lib/utils"
 const chartConfig = {
   mood: { label: "Stemming", color: "hsl(var(--chart-1))" },
   stress: { label: "Stress", color: "hsl(var(--chart-2))" },
-  motivation: { label: "Motivatie", color: "hsl(var(--chart-4))" },
   rest: { label: "Rust", color: "hsl(var(--chart-5))" },
+  motivation: { label: "Motivatie", color: "hsl(var(--chart-4))" },
   familyLife: { label: "Thuis", color: "hsl(var(--chart-1))" },
   school: { label: "School", color: "hsl(var(--chart-2))" },
   hobbys: { label: "Hobby's", color: "hsl(var(--chart-3))" },
   food: { label: "Voeding", color: "hsl(var(--chart-4))" },
 } satisfies ChartConfig;
+
 
 const EMOJIS = ["", "😞", "😟", "😐", "🙂", "😄"];
 
@@ -121,12 +123,18 @@ export function WellnessChart() {
   
   const chartData = Object.entries(chartConfig)
     .map(([key, config]) => {
-      const scoreValue = latestScore?.[key as keyof WellnessScore] as
-        | number
-        | undefined;
-      const reasonKey = `${key}Reason` as keyof WellnessScore;
-      const reason = latestScore?.[reasonKey] as string | undefined;
-      
+      let scoreValue = latestScore?.[key as keyof WellnessScore] as number | undefined;
+      let reasonKey = `${key}Reason` as keyof WellnessScore;
+      let reason = latestScore?.[reasonKey] as string | undefined;
+
+      // --- DATA MERGE LOGIC ---
+      // If the key is 'rest' and there is no 'rest' score, but there is an old 'sleep' score, use the sleep score.
+      if (key === 'rest' && !scoreValue && latestScore?.sleep) {
+        scoreValue = latestScore.sleep;
+        reason = latestScore.sleepReason;
+      }
+      // --- END MERGE LOGIC ---
+
       const isPlaceholder = !scoreValue || scoreValue === 0;
       const displayValue = isPlaceholder ? 3 : scoreValue;
 
@@ -224,7 +232,7 @@ export function WellnessChart() {
             {chartData.map((item) => {
                 const isPlaceholder = item.isPlaceholder;
                 const displayValue = item.value;
-                const displayReason = isPlaceholder ? "Nog geen data beschikbaar." : item.reason;
+                const displayReason = item.reason;
                 const formattedValue = displayValue % 1 === 0 ? displayValue.toFixed(0) : displayValue.toFixed(1);
 
                 return (
