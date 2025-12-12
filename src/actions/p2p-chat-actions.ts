@@ -3,13 +3,18 @@
 
 import { getAdminDb } from '@/lib/server/admin-db-singleton';
 import { FieldValue } from 'firebase-admin/firestore';
-import { useUser } from '@/context/user-context';
+import type { UserProfile, Conversation } from '@/lib/types';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 /**
- * Creates or retrieves a chat session, for both 1-on-1 and group chats.
- * @param participantIds An array of all participant UIDs.
- * @param groupName The name for the group chat (null for 1-on-1).
- * @returns An object with the chatId or an error message.
+ * Creëert of haalt een chat-sessie op en denormaliseert de metadata.
+ * Deze functie is nu robuuster en zorgt ervoor dat denormalisatie ook plaatsvindt
+ * voor chats die al bestonden voordat de denormalisatiestrategie werd ingevoerd.
+ *
+ * @param participantIds Een array van alle deelnemende UID's.
+ * @param groupName De naam voor een groepschat (null voor 1-op-1).
+ * @returns Een object met de chatId of een foutmelding.
  */
 export async function createOrGetChat(
   participantIds: string[],
@@ -28,59 +33,136 @@ export async function createOrGetChat(
 
   const db = getAdminDb();
   let chatId: string;
+  const p2pChatsRef = db.collection('p2p_chats');
   let chatRef;
 
   if (isGroupChat) {
-    // For a group chat, we always create a new document with a unique ID.
-    chatRef = db.collection('p2p_chats').doc();
+    chatRef = p2pChatsRef.doc();
     chatId = chatRef.id;
-    console.log(`[CHAT ACTION] Nieuwe groepschat aanmaken met ID: ${chatId}`);
   } else {
-    // For a 1-on-1 chat, we generate a consistent ID to reuse existing chats.
     chatId = participantIds.sort().join('_');
-    chatRef = db.collection('p2p_chats').doc(chatId);
-    console.log(`[CHAT ACTION] 1-op-1 chat ID berekend: ${chatId}`);
+    chatRef = p2pChatsRef.doc(chatId);
   }
   
   try {
     const doc = await chatRef.get();
+    
+    // Altijd de profielen ophalen om de meest recente data te garanderen.
+    // Deze query vereist dat de security rules een 'list' op 'users' toestaan met een 'uid' in 'in' filter.
+    const userDocs = await db.collection('users').where('uid', 'in', participantIds).get();
+    const participantProfiles: { [key: string]: { name: string; photoURL?: string } } = {};
+    
+    userDocs.forEach(doc => {
+        const user = doc.data() as UserProfile;
+        participantProfiles[doc.id] = {
+            name: user.name,
+            photoURL: user.photoURL || '',
+        };
+    });
 
     if (!doc.exists) {
-      console.log(`[CHAT ACTION] Chatdocument bestaat nog niet, wordt aangemaakt...`);
-      
-      // Get the name of the user creating the chat
-      const creatorId = participantIds.find(id => id !== groupName); // Assuming creator is in the list
-      let creatorName = 'Iemand';
-      if (creatorId) {
-        const creatorDoc = await db.collection('users').doc(creatorId).get();
-        if (creatorDoc.exists) {
-           creatorName = creatorDoc.data()?.name || 'Iemand';
-        }
-      }
+      console.log(`[P2P Chat Action] Creating new chat: ${chatId}`);
+      const batch = db.batch();
 
-      const initialMessage = isGroupChat
-        ? `Groepschat "${groupName}" aangemaakt.`
-        : "Gesprek is gestart.";
-
-      await chatRef.set({
+      const chatData: Conversation = {
+        id: chatId,
         participants: participantIds,
         isGroupChat,
-        name: groupName,
-        id: chatId, // Store the ID within the document
-        lastMessage: initialMessage,
+        name: groupName || undefined,
+        participantProfiles, 
+        lastMessage: isGroupChat ? `Groepschat "${groupName}" aangemaakt.` : "Gesprek is gestart.",
         lastMessageTimestamp: FieldValue.serverTimestamp(),
+      };
+      
+      batch.set(chatRef, chatData);
+      
+      participantIds.forEach(userId => {
+        const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
+        batch.set(myChatRef, chatData);
       });
-      console.log(`[CHAT ACTION] Aanmaken gelukt: ${chatId}`);
+
+      await batch.commit();
+      console.log(`[P2P Chat Action] Successfully created and denormalized chat: ${chatId}`);
+
     } else {
-      console.log(`[CHAT ACTION] Document bestaat al: ${chatId}`);
+      console.log(`[P2P Chat Action] Chat already exists: ${chatId}. Verifying denormalization...`);
+      const existingChatData = doc.data() as Conversation;
+      const batch = db.batch();
+      
+      // Update de hoofd-chat met de nieuwste profielinformatie.
+      batch.set(chatRef, { participantProfiles }, { merge: true });
+
+      for (const userId of existingChatData.participants) {
+        const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
+        // Gebruik `set` met `merge:true` om te creëren als het niet bestaat, of bij te werken als het wel bestaat.
+        batch.set(myChatRef, { ...existingChatData, participantProfiles }, { merge: true });
+      }
+      
+      await batch.commit();
+      console.log(`[P2P Chat Action] Denormalization verified and profiles refreshed.`);
     }
 
     return { chatId, error: null };
 
   } catch (e: any) {
+    console.error(`[P2P Chat Action] ERROR creating/getting chat for ${chatId}:`, e);
+
+    if (e.code === 'permission-denied') {
+        // Maak en propageer een contextuele fout
+        const permissionError = new FirestorePermissionError({
+            path: 'users',
+            operation: 'list',
+            requestResourceData: { where: `uid in [${participantIds.join(', ')}]` }
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        // Geef een generieke fout terug naar de client, de gedetailleerde fout is voor de ontwikkelaar.
+        return { chatId: null, error: 'Permissiefout bij het ophalen van deelnemers.' };
+    }
+
     const errorMessage = e instanceof Error ? e.message : "Onbekende serverfout";
-    console.error(`SERVER ACTION ERROR DETAILS (createOrGetChat voor ${chatId}):`, e);
-    return { chatId: null, error: `Chatfout: ${errorMessage}` };
+    return { chatId: null, error: `Fout bij het starten van de chat: ${errorMessage}` };
   }
 }
 
+/**
+ * Verstuurt een P2P-bericht. Deze actie is atomisch.
+ * 1. Voegt het bericht toe aan de centrale `/p2p_chats/{chatId}/messages` collectie.
+ * 2. Werkt `lastMessage` bij in het centrale `/p2p_chats/{chatId}` document.
+ * 3. Werkt `lastMessage` bij in de gedenormaliseerde `/users/{userId}/myChats/{chatId}` documenten voor ALLE deelnemers.
+ */
+export async function sendP2PMessage(chatId: string, senderId: string, content: string) {
+    if (!chatId || !senderId || !content) {
+        throw new Error("Chat ID, sender ID, and content are required.");
+    }
+    const db = getAdminDb();
+    const batch = db.batch();
+
+    const messagesRef = db.collection('p2p_chats').doc(chatId).collection('messages');
+    const newMessageRef = messagesRef.doc();
+    batch.set(newMessageRef, {
+        senderId,
+        content,
+        timestamp: FieldValue.serverTimestamp(),
+    });
+
+    const updateData = {
+        lastMessage: content,
+        lastMessageTimestamp: FieldValue.serverTimestamp(),
+    };
+
+    const chatRef = db.collection('p2p_chats').doc(chatId);
+    batch.update(chatRef, updateData);
+
+    const chatSnapshot = await chatRef.get();
+    const participants = chatSnapshot.data()?.participants;
+
+    if (participants && Array.isArray(participants)) {
+        for (const userId of participants) {
+            const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
+            // Gebruik set met merge:true om te creëren als het niet bestaat, of bij te werken als het wel bestaat.
+            batch.set(myChatRef, updateData, { merge: true });
+        }
+    }
+
+    await batch.commit();
+}
