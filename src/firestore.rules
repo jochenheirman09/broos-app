@@ -4,6 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // --- HELPER FUNCTIONS ---
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -16,56 +17,56 @@ service cloud.firestore {
         return isOwner(userId) && request.resource.data.uid == userId;
     }
     
+    // Internal helper, not to be used directly in most rules
+    function getMyProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
     function isResponsibleForClub(clubId) { 
-        let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        let profile = getMyProfile();
         return profile.exists 
                && profile.data.get('role', 'none') == 'responsible' 
                && profile.data.get('clubId', null) == clubId;
     }
     
     function isStaff() {
-       let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+       let profile = getMyProfile();
        return profile.exists && profile.data.get('role', 'none') == 'staff';
     }
     
     function getMyTeamId() {
-       let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+       let profile = getMyProfile();
        return profile.exists ? profile.data.get('teamId', null) : null;
     }
     
     function getMyClubId() {
-        let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        let profile = getMyProfile();
         return profile.exists ? profile.data.get('clubId', null) : null;
     }
 
     // --- COLLECTION GROUP RULES ---
     
     match /{path=**}/alerts/{alertId} {
-        function canReadAlerts() {
-            let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
-            if (!profile.exists) { return false; } 
-
-            let alertClubId = resource.data.get('clubId', null);
-            let alertTeamId = resource.data.get('teamId', null);
-
-            let isResp = profile.data.get('role', 'none') == 'responsible' && profile.data.get('clubId', null) == alertClubId;
-            let isSt = profile.data.get('role', 'none') == 'staff' && profile.data.get('teamId', null) == alertTeamId;
-
-            return isResp || isSt;
-        }
-
-        allow read: if isSignedIn() && canReadAlerts();
+      // Simplified: Access if the user is a Responsible for the club, 
+      // or Staff for the team mentioned in the document.
+      allow read: if isSignedIn() && (
+          isResponsibleForClub(resource.data.get('clubId', null)) || 
+          (isStaff() && getMyTeamId() == resource.data.get('teamId', null))
+      );
     }
-    
+
     // --- COLLECTION RULES ---
 
     match /users/{userId} {
         allow get: if isSignedIn() && request.auth.uid == userId;
-      
+
         allow list: if isSignedIn() && (
+            // Responsible: Can list users of their own club AND the query must enforce this.
             (isResponsibleForClub(getMyClubId()) && request.query.where[0][0] == 'clubId' && request.query.where[0][2] == getMyClubId())
+            // Staff: Can list users of their own team AND the query must enforce this.
             || (isStaff() && request.query.where[0][0] == 'teamId' && request.query.where[0][2] == getMyTeamId())
-            || (isSignedIn() && request.query.where[0][0] == 'uid')
+            // Allow a user to look up their own profile via their UID in a query.
+            || (request.query.where[0][0] == 'uid' && request.query.where[0][2] == request.auth.uid)
         );
 
       allow create: if isCreatingOwnData(userId);
@@ -89,47 +90,53 @@ service cloud.firestore {
     }
 
     match /clubs/{clubId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update, delete: if isResponsibleForClub(clubId); 
 
-        match /teams/{teamId} {
-            // TIJDELIJKE DEBUGGING REGEL: Sta elke ingelogde gebruiker toe om teamdocumenten te lezen.
-            allow read: if isSignedIn(); 
-            
-            allow list, create, update, delete: if isResponsibleForClub(clubId); 
-
-            match /summaries/{summaryId} {
-                allow read: if isSignedIn();
-                allow write: if false;
-            }
-            
-            match /staffUpdates/{updateId} {
-                allow read: if isSignedIn();
-                allow write: if false;
-            }
-
-            match /alerts/{alertId} {
-                allow read: if isSignedIn();
-                allow write: if isOwner(request.resource.data.userId) 
-                             || isResponsibleForClub(clubId)
-                             || (isStaff() && teamId == getMyTeamId());
-            }
-        }
-      
       match /clubUpdates/{updateId} {
         allow read: if isResponsibleForClub(clubId);
         allow write: if false;
       }
+
+      match /teams/{teamId} {
+        allow read: if isSignedIn();
+        allow list, create, update, delete: if isResponsibleForClub(clubId);
+
+        match /summaries/{summaryId} {
+            allow read: if isResponsibleForClub(clubId) || teamId == getMyTeamId(); 
+            allow write: if false;
+        }
+    
+        match /staffUpdates/{updateId} {
+            allow read: if isResponsibleForClub(clubId) || teamId == getMyTeamId();
+            allow write: if false;
+        }
+    
+        match /alerts/{alertId} {
+            allow read: if isResponsibleForClub(clubId) || teamId == getMyTeamId();
+            allow write: if isOwner(request.resource.data.userId)
+                         || isResponsibleForClub(clubId)
+                         || (isStaff() && teamId == getMyTeamId()); 
+        }
+      }
     }
     
     match /knowledge_base/{docId} {
-        allow read, list: if isResponsible(); 
-        allow create, update, delete: if false;
+      function isResponsibleGlobal() {
+        let profile = getMyProfile();
+        return profile.exists && profile.data.get('role', 'none') == 'responsible';
+      }
+      allow read, list: if isResponsibleGlobal();
+      allow create, update, delete: if false;
     }
+
     match /knowledge_stats/{statId} {
-      allow read: if isResponsible();
+      function isResponsibleGlobal() {
+        let profile = getMyProfile();
+        return profile.exists && profile.data.get('role', 'none') == 'responsible';
+      }
+      allow read: if isResponsibleGlobal();
       allow write: if false;
     }
   }

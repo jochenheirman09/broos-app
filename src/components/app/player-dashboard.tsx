@@ -15,7 +15,7 @@ import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, limit, query, doc } from "firebase/firestore";
+import { collection, limit, query, where, doc } from "firebase/firestore";
 import { Chat, Team, Club } from "@/lib/types";
 import { RequestNotificationPermission } from "./request-notification-permission";
 import { Spinner } from "../ui/spinner";
@@ -29,18 +29,15 @@ export function PlayerDashboard() {
   const firstName = userProfile?.name?.split(" ")[0];
   const buddyName = userProfile?.buddyName || "Broos";
 
-  // Fetch team and club data
-  const teamRef = useMemoFirebase(() => {
+  const { data: teamData, isLoading: teamLoading } = useDoc<Team>(useMemoFirebase(() => {
     if (!userProfile?.clubId || !userProfile?.teamId) return null;
     return doc(db, "clubs", userProfile.clubId, "teams", userProfile.teamId);
-  }, [db, userProfile?.clubId, userProfile?.teamId]);
-  const { data: teamData, isLoading: teamLoading } = useDoc<Team>(teamRef);
+  }, [db, userProfile?.clubId, userProfile?.teamId]));
 
-  const clubRef = useMemoFirebase(() => {
+  const { data: clubData, isLoading: clubLoading } = useDoc<Club>(useMemoFirebase(() => {
     if (!userProfile?.clubId) return null;
     return doc(db, "clubs", userProfile.clubId);
-  }, [db, userProfile?.clubId]);
-  const { data: clubData, isLoading: clubLoading } = useDoc<Club>(clubRef);
+  }, [db, userProfile?.clubId]));
 
 
   // Check if there's any chat history to adjust the button text
