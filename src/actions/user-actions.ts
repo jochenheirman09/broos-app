@@ -4,35 +4,41 @@
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+// CORRECTIE: Gebruik de types van de admin SDK, niet de client SDK functies
+import type { Firestore } from 'firebase-admin/firestore';
 
 /**
  * Validates a team invitation code across all clubs and returns the team and club IDs.
+ * This is an internal helper function and should be called by an authorized server action.
+ * @param db The Firestore admin instance.
  * @param teamCode The invitation code to validate.
  * @returns An object with teamId and clubId, or null if not found.
  */
-async function validateTeamCode(teamCode: string): Promise<{ teamId: string; clubId: string } | null> {
-  const { adminDb: db } = await getFirebaseAdmin();
-  console.log(`[User Action] Validating team code: ${teamCode}`);
+async function validateTeamCode(db: Firestore, teamCode: string): Promise<{ teamId: string; clubId: string } | null> {
+  console.log(`[User Action] CORRECTLY entering validateTeamCode with code: ${teamCode}`);
+  
+  if (!db) {
+      console.error("[User Action][validateTeamCode] CRITICAL: db instance is null or undefined.");
+      throw new Error("Database service is niet beschikbaar.");
+  }
 
-  const clubsQuery = query(collection(db, "clubs"));
-  const clubsSnapshot = await getDocs(clubsQuery);
+  // CORRECTIE: Gebruik admin SDK syntax
+  const clubsSnapshot = await db.collection("clubs").get();
 
   if (clubsSnapshot.empty) {
     console.log("[User Action] No clubs found in the system.");
     return null;
   }
+  console.log(`[User Action] Found ${clubsSnapshot.docs.length} clubs to search through.`);
 
   for (const clubDoc of clubsSnapshot.docs) {
     const club = { id: clubDoc.id, ...clubDoc.data() } as Club;
-    const teamsRef = collection(db, "clubs", club.id, "teams");
-    const teamQuery = query(
-      teamsRef,
-      where("invitationCode", "==", teamCode),
-      limit(1)
-    );
+    // CORRECTIE: Gebruik admin SDK syntax voor subcollectie query
+    const teamQuery = db.collection("clubs").doc(club.id).collection("teams")
+      .where("invitationCode", "==", teamCode)
+      .limit(1);
 
-    const teamSnapshot = await getDocs(teamQuery);
+    const teamSnapshot = await teamQuery.get();
 
     if (!teamSnapshot.empty) {
       const teamDoc = teamSnapshot.docs[0];
@@ -62,17 +68,19 @@ export async function updateUserTeam(userId: string, teamCode: string, updates: 
     return { success: false, message: "Gebruikers-ID en teamcode zijn vereist." };
   }
 
+  console.log(`[User Action] Starting updateUserTeam for user ${userId}`);
   const { adminDb: db } = await getFirebaseAdmin();
   const userRef = db.collection('users').doc(userId);
+  console.log("[User Action] Admin DB and user reference obtained successfully.");
 
   try {
-    const teamInfo = await validateTeamCode(teamCode);
+    const teamInfo = await validateTeamCode(db, teamCode);
 
     if (!teamInfo) {
       return { success: false, message: "Team niet gevonden. Controleer de code en probeer opnieuw." };
     }
 
-    const finalUpdates: Partial<UserProfile> = {
+    const finalUpdates: { [key: string]: any } = {
       ...updates,
       teamId: teamInfo.teamId,
       clubId: teamInfo.clubId,
@@ -93,10 +101,6 @@ export async function updateUserTeam(userId: string, teamCode: string, updates: 
 /**
  * Server Action to securely fetch a list of potential chat partners
  * based on the current user's role and affiliation.
- * This bypasses client-side list query limitations by performing the
- * filtering on the server with admin privileges.
- * @param userId The UID of the user requesting the list.
- * @returns An array of UserProfile objects for chat partners.
  */
 export async function getChatPartners(userId: string): Promise<WithId<UserProfile>[]> {
   if (!userId) {
@@ -126,7 +130,6 @@ export async function getChatPartners(userId: string): Promise<WithId<UserProfil
     chatPartnersQuery = adminDb.collection('users')
         .where('clubId', '==', userProfile.clubId);
   } else {
-    // Players and Staff can only chat within their team.
     console.log(`[User Action] User is staff/player, querying for users in teamId: ${userProfile.teamId}`);
     chatPartnersQuery = adminDb.collection('users')
         .where('teamId', '==', userProfile.teamId);

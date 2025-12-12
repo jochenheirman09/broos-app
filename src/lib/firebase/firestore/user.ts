@@ -1,25 +1,22 @@
-
 "use client";
 
-import { useFirestore } from '@/firebase';
+import { type Firestore, doc, updateDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { doc, updateDoc } from 'firebase/firestore';
 
 interface UpdateUserProfileParams {
+  db: Firestore;
   userId: string;
   data: { [key: string]: any };
 }
 
 /**
  * Updates a user's profile document in Firestore.
- * This is now a blocking async function that returns a promise.
+ * This is a blocking async function that returns a promise.
  * @param {UpdateUserProfileParams} params - The parameters for the update.
  * @returns A promise that resolves when the update is complete.
  */
-export async function updateUserProfile({ userId, data }: UpdateUserProfileParams): Promise<void> {
-  // Get db instance inside the function to avoid client/server context issues
-  const db = useFirestore();
+export async function updateUserProfile({ db, userId, data }: UpdateUserProfileParams): Promise<void> {
   if (!db || !userId) {
     throw new Error('Firestore instance and User ID are required for update.');
   }

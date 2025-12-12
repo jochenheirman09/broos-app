@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/form";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { updateProfile as updateAuthProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
 import { Camera, LogOut, Sparkles, CalendarPlus, Users } from "lucide-react";
@@ -129,6 +129,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
   const { user, userProfile, logout } = useUser();
   const { toast } = useToast();
   const auth = useAuth();
+  const db = useFirestore();
   const [isLoading, setIsLoading] = useState(false);
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,7 +192,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
       }
 
       if (Object.keys(updates).length > 0) {
-        await updateUserProfile({ userId: user.uid, data: updates });
+        await updateUserProfile({ db, userId: user.uid, data: updates });
 
         if (Object.keys(authUpdates).length > 0) {
           await updateAuthProfile(auth.currentUser, authUpdates);
@@ -208,12 +209,12 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
           description: "Er waren geen wijzigingen om op te slaan.",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating profile: ", error);
       toast({
         variant: "destructive",
         title: "Fout",
-        description: "Er is een fout opgetreden bij het bijwerken van je profiel.",
+        description: "Er is een fout opgetreden bij het bijwerken van je profiel: " + error.message,
       });
     } finally {
       setIsLoading(false);

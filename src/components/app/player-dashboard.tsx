@@ -29,15 +29,17 @@ export function PlayerDashboard() {
   const firstName = userProfile?.name?.split(" ")[0];
   const buddyName = userProfile?.buddyName || "Broos";
 
-  const { data: teamData, isLoading: teamLoading } = useDoc<Team>(useMemoFirebase(() => {
+  const teamRef = useMemoFirebase(() => {
     if (!userProfile?.clubId || !userProfile?.teamId) return null;
     return doc(db, "clubs", userProfile.clubId, "teams", userProfile.teamId);
-  }, [db, userProfile?.clubId, userProfile?.teamId]));
+  }, [db, userProfile?.clubId, userProfile?.teamId]);
+  const { data: teamData, isLoading: teamLoading } = useDoc<Team>(teamRef);
 
-  const { data: clubData, isLoading: clubLoading } = useDoc<Club>(useMemoFirebase(() => {
+  const clubRef = useMemoFirebase(() => {
     if (!userProfile?.clubId) return null;
     return doc(db, "clubs", userProfile.clubId);
-  }, [db, userProfile?.clubId]));
+  }, [db, userProfile?.clubId]);
+  const { data: clubData, isLoading: clubLoading } = useDoc<Club>(clubRef);
 
 
   // Check if there's any chat history to adjust the button text

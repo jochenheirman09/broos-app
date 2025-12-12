@@ -67,12 +67,12 @@ export function BuddyProfileCustomizer({ onSave }: BuddyProfileCustomizerProps) 
         if (onSave) {
           onSave();
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error updating buddy profile:", error);
         toast({
             variant: "destructive",
             title: "Fout",
-            description: "Kon het buddy profiel niet bijwerken."
+            description: "Kon het buddy profiel niet bijwerken: " + error.message,
         });
     } finally {
         setIsLoading(false);

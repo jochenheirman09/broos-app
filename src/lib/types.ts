@@ -223,6 +223,7 @@ export interface WellnessAnalysisInput {
     retrievedDocs?: any;
     todayActivity?: string;
     currentTime?: string;
+    // Game day context
     isGameDay?: boolean;
     game?: Partial<Game>;
 }
