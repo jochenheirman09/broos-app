@@ -1,9 +1,11 @@
 
 'use server';
 
-import { getFirebaseAdmin } from '@/ai/genkit';
+import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
-import type { OnboardingTopic, UserProfile, Game, FullWellnessAnalysisOutput } from '@/lib/types';
+import type { OnboardingTopic, UserProfile, Game, WellnessScore, FullWellnessAnalysisOutput } from '@/lib/types';
+import { googleAI } from '@genkit-ai/google-genai';
+import { z } from 'zod';
 
 export async function saveOnboardingSummary(
     userRef: DocumentReference,
@@ -50,116 +52,123 @@ export async function saveUserMessage(userId: string, today: string, userMessage
     });
 }
 
-
-// This interface is now for the *second* part of the save operation
-export interface SaveAssistantPayload {
-    userId: string;
-    assistantResponse: string;
-    summary?: string;
-    wellnessScores?: FullWellnessAnalysisOutput['wellnessScores'];
-    alert?: FullWellnessAnalysisOutput['alert'];
-    askForConsent?: boolean;
-    gameUpdate?: FullWellnessAnalysisOutput['gameUpdate'];
-}
-
-/**
- * Saves the assistant's response and all AI-extracted data.
- * The user's message is now saved separately and before this function is called.
- */
-export async function saveAssistantResponse(payload: SaveAssistantPayload) {
-  const { userId, assistantResponse, summary, wellnessScores, alert, askForConsent, gameUpdate } = payload;
-  
-  console.log(`[Firestore Service] Saving assistant response & data for user ${userId}.`);
+export async function saveAssistantResponse(userId: string, today: string, assistantResponse: string) {
+  console.log(`[Firestore Service] Saving assistant response for ${userId}.`);
   const { adminDb } = await getFirebaseAdmin();
-  const today = new Date().toISOString().split('T')[0];
-
-  const batch = adminDb.batch();
-  
-  const userDocRef = adminDb.collection('users').doc(userId);
-  const chatDocRef = userDocRef.collection('chats').doc(today);
-  const messagesColRef = chatDocRef.collection('messages');
-  
-  // 1. Save assistant's response
-  console.log("[Firestore Service] Queuing assistant response save.");
+  const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
   const clientTimestampMs = Date.now() + 1; // Ensure it's after user message
-  const assistantMessageRef = messagesColRef.doc(); // Generate a new doc ref
-  batch.set(assistantMessageRef, {
+  await messagesColRef.add({
       role: 'assistant',
       content: assistantResponse,
       timestamp: FieldValue.serverTimestamp(),
       sortOrder: clientTimestampMs,
   });
+}
 
-  // 2. Save Chat Summary if present
-  if (summary) {
-    console.log("[Firestore Service] Queuing chat summary save.");
-    batch.set(chatDocRef, {
-        id: today,
-        userId,
-        date: today,
-        summary: summary,
-        updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-  }
 
-  // 3. Save Wellness Scores if present
-  if (wellnessScores && Object.keys(wellnessScores).length > 0) {
-    console.log("[Firestore Service] Queuing wellness scores save. Payload:", wellnessScores);
-    const scoresDocRef = userDocRef.collection('wellnessScores').doc(today);
-    const scoreData = {
-      ...(wellnessScores || {}),
-      id: today,
-      date: today,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-    batch.set(scoresDocRef, scoreData, { merge: true });
-  }
-  
-  // 4. Save Game Data if present
-  if (gameUpdate && Object.keys(gameUpdate).length > 0) {
-    console.log("[Firestore Service] Queuing game data update. Payload:", gameUpdate);
-    const gameDocRef = userDocRef.collection('games').doc(today);
-    const gameData = {
-        ...gameUpdate,
-        updatedAt: FieldValue.serverTimestamp(),
-    };
-    batch.set(gameDocRef, gameData, { merge: true });
-  }
+/**
+ * A dedicated server action that takes the full chat history of the day and
+ * performs a comprehensive analysis to extract all structured data (scores, alerts, etc.).
+ * It then saves all extracted data to Firestore in a single batch.
+ * This is a 'fire-and-forget' function from the client's perspective.
+ */
+export async function analyzeAndSaveChatData(userId: string, fullChatHistory: string) {
+    console.log(`[Analysis Service] Starting full analysis for user ${userId}.`);
+    const ai = await getAiInstance();
 
-  // 5. Handle Alert if present
-  if (alert) {
-      const userDoc = await userDocRef.get();
-      const userData = userDoc.data() as UserProfile | undefined;
-      const clubId = userData?.clubId;
-      const teamId = userData?.teamId;
+    // Define the Zod schema for the expected output of the analysis prompt.
+    const AnalysisOutputSchema = z.object({
+      summary: z.string().optional().describe("Een beknopte, algehele samenvatting van het gesprek."),
+      wellnessScores: z.object({
+          mood: z.number().min(1).max(5).optional(),
+          moodReason: z.string().optional(),
+          stress: z.number().min(1).max(5).optional().describe("HOGE score = WEINIG stress."),
+          stressReason: z.string().optional(),
+          rest: z.number().min(1).max(5).optional(),
+          restReason: z.string().optional(),
+          motivation: z.number().min(1).max(5).optional(),
+          motivationReason: z.string().optional(),
+          familyLife: z.number().min(1).max(5).optional(),
+          familyLifeReason: z.string().optional(),
+          school: z.number().min(1).max(5).optional(),
+          schoolReason: z.string().optional(),
+          hobbys: z.number().min(1).max(5).optional(),
+          hobbysReason: z.string().optional(),
+          food: z.number().min(1).max(5).optional(),
+          foodReason: z.string().optional(),
+      }).optional(),
+      alert: z.object({
+          alertType: z.enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity']),
+          triggeringMessage: z.string(),
+      }).optional(),
+      askForConsent: z.boolean().optional(),
+      gameUpdate: z.object({
+          opponent: z.string().optional(),
+          score: z.string().optional(),
+          playerSummary: z.string().optional(),
+          playerRating: z.number().min(1).max(10).optional(),
+      }).optional(),
+    });
 
-      if (!clubId || !teamId) {
-          console.error(`[Firestore Service] Cannot save alert for user ${userId}: missing clubId or teamId.`);
-      } else {
-          const alertDocRef = adminDb.collection('clubs').doc(clubId).collection('teams').doc(teamId).collection('alerts').doc();
-          const alertData = {
-              alertType: alert.alertType,
-              triggeringMessage: alert.triggeringMessage,
-              id: alertDocRef.id,
-              userId,
-              clubId,
-              teamId, // Denormalize for staff queries
-              date: today,
-              status: 'new',
-              shareWithStaff: alert.shareWithStaff === true,
-              createdAt: FieldValue.serverTimestamp(),
-          };
-          batch.set(alertDocRef, alertData);
-          console.log(`[Firestore Service] Queued alert of type '${alert.alertType}' for user ${userId}.`);
-      }
-  }
-  
-  // Commit the batch
-  try {
-    await batch.commit();
-    console.log(`[Firestore Service] Batch write successful for user ${userId}.`);
-  } catch (e: any) {
-     console.error(`[Firestore Service] CRITICAL: Batch commit failed for user ${userId}:`, e);
-     throw new Error(`Database write failed: ${e.message}`);
-  }
+    const analysisPrompt = ai.definePrompt({
+        name: 'chatDataExtractorPrompt',
+        model: googleAI.model('gemini-2.5-flash'),
+        input: { schema: z.object({ chatHistory: z.string() }) },
+        output: { schema: AnalysisOutputSchema },
+        prompt: `
+            Je bent een data-analist. Analyseer het volgende gesprek en extraheer de data.
+            - **Samenvatting:** Geef een korte samenvatting van het hele gesprek.
+            - **Welzijnsscores:** Leid scores (1-5) en redenen af voor de 8 welzijnsthema's. VRAAG NOOIT OM EEN SCORE. Een hoog stress-cijfer betekent WEINIG stress.
+            - **Alerts:** Als er zorgwekkende signalen zijn, vul het 'alert' object.
+            - **Wedstrijd:** Als er over een wedstrijd is gesproken, vul het 'gameUpdate' object.
+
+            Gespreksgeschiedenis:
+            {{{chatHistory}}}
+        `,
+    });
+
+    try {
+        const { output } = await analysisPrompt({ chatHistory: fullChatHistory });
+
+        if (!output) {
+            console.warn(`[Analysis Service] AI data extraction returned null for user ${userId}.`);
+            return;
+        }
+
+        const { adminDb } = await getFirebaseAdmin();
+        const today = new Date().toISOString().split('T')[0];
+        const batch = adminDb.batch();
+        const userDocRef = adminDb.collection('users').doc(userId);
+        
+        // Queue all database writes
+        if (output.summary) {
+            batch.set(userDocRef.collection('chats').doc(today), { summary: output.summary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        }
+        if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
+            batch.set(userDocRef.collection('wellnessScores').doc(today), { ...output.wellnessScores, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        }
+        if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
+            batch.set(userDocRef.collection('games').doc(today), { ...output.gameUpdate, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        }
+        if (output.alert) {
+            const userDoc = await userDocRef.get();
+            const userData = userDoc.data() as UserProfile | undefined;
+            if (userData?.clubId && userData?.teamId) {
+                const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc();
+                batch.set(alertDocRef, {
+                    ...output.alert,
+                    id: alertDocRef.id,
+                    userId, clubId: userData.clubId, teamId: userData.teamId,
+                    date: today, status: 'new', createdAt: FieldValue.serverTimestamp(),
+                });
+            }
+        }
+        
+        await batch.commit();
+        console.log(`[Analysis Service] Successfully analyzed and saved data for user ${userId}.`);
+
+    } catch (error) {
+        console.error(`[Analysis Service] CRITICAL: Failed to analyze and save data for user ${userId}:`, error);
+        // We don't re-throw here because it's a background process.
+    }
 }

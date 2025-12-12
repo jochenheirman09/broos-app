@@ -1,3 +1,4 @@
+
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -217,33 +218,9 @@ export interface WellnessAnalysisInput {
     retrievedDocs?: any;
     todayActivity?: string;
     currentTime?: string;
-    // Add all structured memory fields for context
-    familySituation?: string;
-    schoolSituation?: string;
-    personalGoals?: string;
-    matchPreparation?: string;
-    recoveryHabits?: string;
-    additionalHobbies?: string;
-    personalDetails?: string;
-    // Game day context
     isGameDay?: boolean;
     game?: Partial<Game>;
 }
-
-export interface FullWellnessAnalysisOutput {
-  response: string;
-  summary?: string;
-  wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt" | "sleep" | "sleepReason">>;
-  alert?: {
-    alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
-    triggeringMessage: string;
-    shareWithStaff?: boolean; 
-  };
-  askForConsent?: boolean;
-  updatedFields?: Partial<Pick<UserProfile, 'familySituation' | 'schoolSituation' | 'personalGoals' | 'matchPreparation' | 'recoveryHabits' | 'additionalHobbies' | 'personalDetails'>>;
-  gameUpdate?: Partial<Omit<Game, 'id' | 'userId' | 'date' | 'createdAt' | 'updatedAt'>>;
-}
-
 
 export interface OnboardingInput extends WellnessAnalysisInput {
     currentTopic: OnboardingTopic;
@@ -255,8 +232,6 @@ export interface OnboardingOutput {
   summary?: string;
   isLastTopic?: boolean;
   lastTopic?: OnboardingTopic;
-  siblings?: { name: string; age?: number }[];
-  pets?: { name: string; type: string }[];
 }
 
 export interface NotificationInput {

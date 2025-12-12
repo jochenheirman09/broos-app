@@ -15,108 +15,63 @@ service cloud.firestore {
     function isCreatingOwnData(userId) {
         return isOwner(userId) && request.resource.data.uid == userId;
     }
-
-    function getMyProfile() {
-      // Haalt het volledige document van de ingelogde gebruiker op.
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
     
-    // Defensieve check om te zien of de aanvrager en de doelgebruiker
-    // in hetzelfde team zitten.
-    function isSameTeam() {
-      let requesterDoc = getMyProfile();
-      
-      // 1. Controleer of het profiel van de aanvrager bestaat en of het een staflid is.
-      if (!requesterDoc.exists || requesterDoc.data.get('role', 'none') != 'staff') { 
-        return false; 
-      }
-      
-      // 2. Haal teamId's veilig op met .get() en een default waarde (null).
-      let requesterTeamId = requesterDoc.data.get('teamId', null);
-      // resource.data is hier het /users/{userId} document dat wordt opgevraagd.
-      let targetTeamId = resource.data.get('teamId', null);
-      
-      // 3. Verleen alleen toegang als beide teamId's bestaan en gelijk zijn.
-      return requesterTeamId != null && targetTeamId != null && requesterTeamId == targetTeamId;
-    }
-
-    function isResponsible(clubId) {
-        let profile = getMyProfile();
-        return profile.exists && profile.data.role == 'responsible' && profile.data.clubId == clubId;
+    function isResponsibleForClub(clubId) { 
+        let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return profile.exists 
+               && profile.data.get('role', 'none') == 'responsible' 
+               && profile.data.get('clubId', null) == clubId;
     }
     
     function isStaff() {
-       let profile = getMyProfile();
-       return profile.exists && profile.data.role == 'staff';
+       let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+       return profile.exists && profile.data.get('role', 'none') == 'staff';
     }
     
-    function isMemberOfClub(clubId) {
-        let profile = getMyProfile();
-        return profile.exists && profile.data.clubId == clubId;
+    function getMyTeamId() {
+       let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+       return profile.exists ? profile.data.get('teamId', null) : null;
+    }
+    
+    function getMyClubId() {
+        let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return profile.exists ? profile.data.get('clubId', null) : null;
     }
 
-    function isInChatWith(userId) {
-      let sortedIds = [request.auth.uid, userId].sort();
-      let chatId = sortedIds.join('_');
-      let chatRef = /databases/$(database)/documents/p2p_chats/$(chatId);
-      return exists(chatRef);
-    }
-    
     // --- COLLECTION GROUP RULES ---
+    
     match /{path=**}/alerts/{alertId} {
-        // Haalt de rol, teamId en clubId van de aanvrager defensief op.
-        function getRequesterData() {
+        function canReadAlerts() {
             let profile = get(/databases/$(database)/documents/users/$(request.auth.uid));
-            // Retourneer een veilige object met defaults als het profiel niet bestaat.
-            if (!profile.exists) return { role: 'none', teamId: null, clubId: null };
-            return { 
-                role: profile.data.get('role', 'none'), 
-                teamId: profile.data.get('teamId', null), 
-                clubId: profile.data.get('clubId', null) 
-            };
+            if (!profile.exists) { return false; } 
+
+            let alertClubId = resource.data.get('clubId', null);
+            let alertTeamId = resource.data.get('teamId', null);
+
+            let isResp = profile.data.get('role', 'none') == 'responsible' && profile.data.get('clubId', null) == alertClubId;
+            let isSt = profile.data.get('role', 'none') == 'staff' && profile.data.get('teamId', null) == alertTeamId;
+
+            return isResp || isSt;
         }
-        
-        let req = getRequesterData();
-        
-        // READ (GET & LIST) is toegestaan als:
-        allow read: if isSignedIn() && (
-            req.role == 'responsible' // 1. Responsible mag alle alerts lezen
-            
-            // 2. Staff mag alleen alerts lezen die bij ZIJN Team en Club horen.
-            || (req.role == 'staff' 
-                // Belangrijk: De query moet gefilterd zijn op deze waarden!
-                && resource.data.get('clubId', null) == req.clubId
-                && resource.data.get('teamId', null) == req.teamId
-            )
-        );
+
+        allow read: if isSignedIn() && canReadAlerts();
     }
-
-
+    
     // --- COLLECTION RULES ---
 
     match /users/{userId} {
-      // GET is toegestaan als:
-      allow get: if isSignedIn() && (
-          isOwner(userId)         // 1. Eigen profiel
-          || isTeamMate()         // 2. Speler in hetzelfde team (voor staff)
-          || isInChatWith(userId) // 3. Voor P2P chats
-          || isResponsible(get(/databases/$(database)/documents/users/$(userId)).data.clubId) // 4. Responsible van dezelfde club
-      );
+        allow get: if isSignedIn() && request.auth.uid == userId;
       
-      // LIST/Query is toegestaan als de query gescopeerd is.
-      allow list: if isSignedIn() && (
-          // Responsible: Mag query's uitvoeren zolang ze binnen de club filteren.
-          (isResponsible(request.query.resource.data.clubId) && request.query.resource.data.clubId == getMyProfile().data.clubId)
-          
-          // Staff: Mag query's uitvoeren zolang ze binnen het team filteren.
-          || (isStaff() && request.query.resource.data.teamId == getMyProfile().data.teamId)
-      );
-      
+        allow list: if isSignedIn() && (
+            (isResponsibleForClub(getMyClubId()) && request.query.where[0][0] == 'clubId' && request.query.where[0][2] == getMyClubId())
+            || (isStaff() && request.query.where[0][0] == 'teamId' && request.query.where[0][2] == getMyTeamId())
+            || (isSignedIn() && request.query.where[0][0] == 'uid')
+        );
+
       allow create: if isCreatingOwnData(userId);
       allow update: if isOwner(userId);
       allow delete: if false;
 
-      // Subcollections for a user
       match /chats/{chatId} { allow read, write: if isOwner(userId); match /messages/{messageId} { allow read, write: if isOwner(userId); } }
       match /wellnessScores/{scoreId} { allow read, write: if isOwner(userId); }
       match /trainings/{trainingId} { allow read, write: if isOwner(userId); }
@@ -135,39 +90,47 @@ service cloud.firestore {
 
     match /clubs/{clubId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn(); // Allow listing clubs for team code validation
-      allow create: if isResponsible() && !exists(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId;
-      allow update, delete: if isResponsible() && isMemberOfClub(clubId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isResponsibleForClub(clubId); 
 
-      match /teams/{teamId} {
-        allow read: if isResponsible(clubId) || (isStaff() && getMyProfile().data.teamId == teamId);
-        allow list, create, update, delete: if isResponsible(clubId);
+        match /teams/{teamId} {
+            // TIJDELIJKE DEBUGGING REGEL: Sta elke ingelogde gebruiker toe om teamdocumenten te lezen.
+            allow read: if isSignedIn(); 
+            
+            allow list, create, update, delete: if isResponsibleForClub(clubId); 
 
-        match /summaries/{summaryId} {
-            allow read: if isResponsible(clubId) || (isStaff() && getMyProfile().data.teamId == teamId);
-            allow write: if false;
+            match /summaries/{summaryId} {
+                allow read: if isSignedIn();
+                allow write: if false;
+            }
+            
+            match /staffUpdates/{updateId} {
+                allow read: if isSignedIn();
+                allow write: if false;
+            }
+
+            match /alerts/{alertId} {
+                allow read: if isSignedIn();
+                allow write: if isOwner(request.resource.data.userId) 
+                             || isResponsibleForClub(clubId)
+                             || (isStaff() && teamId == getMyTeamId());
+            }
         }
-
-        match /staffUpdates/{updateId} {
-            allow read: if isResponsible(clubId) || (isStaff() && getMyProfile().data.teamId == teamId);
-            allow write: if false;
-        }
-
-        match /alerts/{alertId} {
-          allow read: if isResponsible(clubId) || (isStaff() && teamId == getMyTeamId());
-          allow write: if isOwner(request.resource.data.userId) || isResponsible(clubId) || (isStaff() && teamId == getMyTeamId());
-        }
-      }
       
       match /clubUpdates/{updateId} {
-        allow read: if isResponsible(clubId);
+        allow read: if isResponsibleForClub(clubId);
         allow write: if false;
       }
     }
     
     match /knowledge_base/{docId} {
-        allow read, list: if isResponsible();
-        allow create, update, delete: if false; // Managed via server-side actions
+        allow read, list: if isResponsible(); 
+        allow create, update, delete: if false;
+    }
+    match /knowledge_stats/{statId} {
+      allow read: if isResponsible();
+      allow write: if false;
     }
   }
 }

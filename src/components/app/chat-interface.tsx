@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import type { WellnessAnalysisInput, OnboardingOutput, FullWellnessAnalysisOutput } from '@/lib/types';
+import type { WellnessAnalysisInput } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
@@ -31,9 +31,10 @@ import {
 } from "@/components/ui/card";
 import { MessageSquare } from "lucide-react";
 
-type BuddyResponse = (OnboardingOutput | FullWellnessAnalysisOutput) & {
+// The server action now only returns a simple response object or an error.
+type BuddyResponse = {
     error?: 'service_unavailable' | 'configuration_error';
-    response: string;
+    response?: string;
 };
 
 export function ChatInterface() {
@@ -44,6 +45,7 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [lastFailedMessage, setLastFailedMessage] = useState<WellnessAnalysisInput | null>(null);
+  const [retryErrorMessage, setRetryErrorMessage] = useState<string | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -67,25 +69,27 @@ export function ChatInterface() {
     if (!user) return false;
     
     setIsLoading(true);
-    setLastFailedMessage(null);
+    setLastFailedMessage(null); // Clear previous failure state
+    setRetryErrorMessage(null);
     
     try {
-      // The server action now handles all database writes atomically.
+      // The server action is now much simpler.
       const result: BuddyResponse = await chatWithBuddy(user.uid, buddyInput);
 
-      if (result.error) {
+      if (result.error && result.response) {
         setLastFailedMessage(buddyInput);
-        toast({ title: "Fout", description: result.response, variant: "destructive" });
+        setRetryErrorMessage(result.response);
         return false;
       }
       
-      // If the action was successful, we don't need to do anything else here.
-      // The useCollection hook will automatically pick up the new user and assistant messages.
+      // The user and assistant messages are now saved by the server action.
+      // The useCollection hook will update the UI automatically.
       return true;
 
     } catch (error: any) {
       console.error("[CLIENT] Error calling chatWithBuddy action:", error);
       setLastFailedMessage(buddyInput); 
+      setRetryErrorMessage("Kon geen verbinding maken met de server. Probeer het opnieuw.");
       toast({
         variant: "destructive",
         title: "Communicatiefout",
@@ -183,7 +187,7 @@ export function ChatInterface() {
                       <div className="flex items-start gap-3 my-4 justify-start">
                         <BuddyAvatar className="h-10 w-10 border-2 border-destructive" />
                         <div className="bg-destructive/10 rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex flex-col items-start gap-2">
-                            <p className="text-destructive/90">Kon het laatste bericht niet verwerken.</p>
+                            <p className="text-destructive/90">{retryErrorMessage || "Kon het laatste bericht niet verwerken."}</p>
                             <Button variant="destructive" size="sm" onClick={handleRetry}>
                                 <RotateCw className="h-4 w-4 mr-2" />
                                 Opnieuw proberen
@@ -253,5 +257,3 @@ function ChatMessage({ message }: { message: WithId<ChatMessageType> }) {
     </div>
   );
 }
-
-    

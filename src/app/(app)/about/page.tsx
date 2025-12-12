@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -15,12 +16,19 @@ import {
   Sparkles,
   Users,
   AlertTriangle,
+  ArrowLeft,
 } from "lucide-react";
 import { useUser } from "@/context/user-context";
+import packageJson from "../../../../package.json"; // Import package.json
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function AboutPage() {
   const { userProfile } = useUser();
   const buddyName = userProfile?.buddyName || "Broos";
+  const appVersion = packageJson.version;
+  // Lees de commit hash uit de environment variables
+  const commitHash = process.env.NEXT_PUBLIC_GIT_COMMIT_SHA;
 
   const features = [
     {
@@ -58,10 +66,21 @@ export default function AboutPage() {
   return (
     <div className="container mx-auto py-8">
       <Card>
-        <CardHeader className="text-center">
-          <Info className="mx-auto h-12 w-12 text-primary mb-4" />
-          <CardTitle className="text-3xl">Over {buddyName}</CardTitle>
-          <CardDescription className="text-lg">
+        <CardHeader>
+           <div className="relative flex w-full justify-center items-center">
+             <div className="absolute left-0">
+               <Link href="/dashboard" passHref>
+                  <Button variant="ghost" size="icon">
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                </Link>
+             </div>
+             <div className="text-center">
+                <Info className="mx-auto h-12 w-12 text-primary mb-4" />
+                <CardTitle className="text-3xl">Over {buddyName}</CardTitle>
+             </div>
+           </div>
+          <CardDescription className="text-lg text-center pt-2">
             Jouw partner in mentaal welzijn voor jonge sporters.
           </CardDescription>
         </CardHeader>
@@ -80,6 +99,11 @@ export default function AboutPage() {
             </Card>
           ))}
         </CardContent>
+        <CardFooter>
+            <p className="w-full text-center text-sm text-muted-foreground">
+                Versie: {appVersion} (commit: {commitHash ? commitHash.substring(0, 7) : 'lokaal'})
+            </p>
+        </CardFooter>
       </Card>
     </div>
   );

@@ -8,7 +8,9 @@
 runConfig:
   # Increase this value to automatically spin up more instances
   # in response to increased traffic.
-  maxInstances: 1
+  maxInstances: 10
+  # Set the timeout for server-side rendering and API calls to 3 minutes.
+  timeoutSeconds: 180
   
 env:
   - variable: GEMINI_API_KEY

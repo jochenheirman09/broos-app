@@ -1,4 +1,3 @@
-
 // src/ai/genkit.ts
 
 // HOUD DEZE LIJN: Dit bestand bevat server-side logica

@@ -3,11 +3,13 @@
 
 import type { KnowledgeDocument } from "@/lib/types";
 import { getFirebaseAdmin } from "@/ai/genkit";
+import { FieldValue } from "firebase-admin/firestore";
 
 /**
  * A simple keyword-based retriever for the knowledge base.
  * In a real-world RAG implementation, this would be replaced by a
  * vector search against an embedding index.
+ * It now also logs the usage of the retrieved documents.
  *
  * @param userMessage The user's message to search for.
  * @param clubId The club to which the knowledge belongs (for future multi-tenancy).
@@ -38,9 +40,6 @@ export async function retrieveSimilarDocuments(
 
   try {
     const knowledgeBaseRef = adminDb.collection("knowledge_base");
-    
-    // NOTE: This performs a full collection scan, which is inefficient for large datasets.
-    // This is a placeholder for a real vector search.
     const snapshot = await knowledgeBaseRef.where('status', '==', 'completed').get();
 
     if (snapshot.empty) {
@@ -52,7 +51,6 @@ export async function retrieveSimilarDocuments(
     
     const relevantDocs: KnowledgeDocument[] = [];
     
-    // Simple scoring: count how many keywords appear in the document content.
     for (const doc of allDocs) {
         let score = 0;
         const content = doc.content.toLowerCase();
@@ -66,7 +64,6 @@ export async function retrieveSimilarDocuments(
         }
     }
     
-    // Sort by relevance (most keyword matches) and take the top 2.
     const sortedDocs = relevantDocs.sort((a, b) => {
         const scoreA = keywords.filter(k => a.content.toLowerCase().includes(k)).length;
         const scoreB = keywords.filter(k => b.content.toLowerCase().includes(k)).length;
@@ -74,6 +71,23 @@ export async function retrieveSimilarDocuments(
     });
 
     const topDocs = sortedDocs.slice(0, 2);
+
+    // --- Log Usage Statistics (Fire-and-forget) ---
+    if (topDocs.length > 0) {
+      console.log(`[Retriever] Logging usage for ${topDocs.length} documents.`);
+      const batch = adminDb.batch();
+      topDocs.forEach(doc => {
+        const statRef = adminDb.collection('knowledge_stats').doc(doc.id);
+        batch.set(statRef, {
+          id: doc.id,
+          queryCount: FieldValue.increment(1),
+          lastQueried: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      });
+      batch.commit().catch(err => {
+        console.error('[Retriever] Failed to log knowledge base usage stats:', err);
+      });
+    }
 
     console.log(`[Retriever] Found ${topDocs.length} relevant documents.`);
     return topDocs;
