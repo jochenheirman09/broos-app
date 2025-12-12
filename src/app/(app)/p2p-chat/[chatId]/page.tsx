@@ -12,14 +12,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { User, ShieldX } from 'lucide-react';
 import React from 'react';
 
-// The complex `usePartnerProfiles` hook is no longer needed because
-// the profile information is now directly available in the `chatData` object.
+// De complexe `usePartnerProfiles` hook is niet langer nodig omdat
+// de profielinformatie nu direct beschikbaar is in het `chatData` object.
 
 function P2PChatLoader({ chatId }: { chatId: string }) {
   const { user, isUserLoading: userLoading } = useUser();
   const db = useFirestore();
 
-  // We still fetch the central chat document, which now contains denormalized profiles.
+  // We halen nog steeds het centrale chat-document op, want daar staan de berichten.
   const chatDocRef = useMemoFirebase(() => {
       if (!chatId) return null;
       return doc(db, 'p2p_chats', chatId);
@@ -53,8 +53,8 @@ function P2PChatLoader({ chatId }: { chatId: string }) {
         );
   }
   
-  // The `P2PChatInterface` component now receives the complete `chatData` object,
-  // which includes the denormalized `participantProfiles`.
+  // De `P2PChatInterface` component krijgt nu het volledige `chatData`-object,
+  // inclusief de gedenormaliseerde `participantProfiles`.
   return <P2PChatInterface chatId={chatId} chatData={chatData} />;
 }
 

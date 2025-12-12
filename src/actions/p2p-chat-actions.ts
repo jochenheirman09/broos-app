@@ -47,8 +47,7 @@ export async function createOrGetChat(
   try {
     const doc = await chatRef.get();
     
-    // Altijd de profielen ophalen om de meest recente data te garanderen.
-    // Deze query vereist dat de security rules een 'list' op 'users' toestaan met een 'uid' in 'in' filter.
+    // Haal de profielen van alle deelnemers op om hun naam en foto te denormaliseren.
     const userDocs = await db.collection('users').where('uid', 'in', participantIds).get();
     const participantProfiles: { [key: string]: { name: string; photoURL?: string } } = {};
     
@@ -68,14 +67,16 @@ export async function createOrGetChat(
         id: chatId,
         participants: participantIds,
         isGroupChat,
-        name: groupName || undefined,
-        participantProfiles, 
+        participantProfiles, // Nieuw: voeg de profielen direct toe
         lastMessage: isGroupChat ? `Groepschat "${groupName}" aangemaakt.` : "Gesprek is gestart.",
         lastMessageTimestamp: FieldValue.serverTimestamp(),
+        // VOEG 'name' ALLEEN TOE ALS HET EEN GROEPSCHAT IS
+        ...(isGroupChat && { name: groupName! })
       };
       
       batch.set(chatRef, chatData);
       
+      // Denormaliseer de volledige chat-metadata naar de 'myChats' subcollectie van elke gebruiker.
       participantIds.forEach(userId => {
         const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
         batch.set(myChatRef, chatData);
@@ -89,13 +90,17 @@ export async function createOrGetChat(
       const existingChatData = doc.data() as Conversation;
       const batch = db.batch();
       
+      // Creëer de geüpdatete data, inclusief de nieuwste profielinformatie.
+      const updatedChatData = { ...existingChatData, participantProfiles };
+
       // Update de hoofd-chat met de nieuwste profielinformatie.
       batch.set(chatRef, { participantProfiles }, { merge: true });
 
+      // Ververs ook de gedenormaliseerde data voor elke deelnemer.
       for (const userId of existingChatData.participants) {
         const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
-        // Gebruik `set` met `merge:true` om te creëren als het niet bestaat, of bij te werken als het wel bestaat.
-        batch.set(myChatRef, { ...existingChatData, participantProfiles }, { merge: true });
+        // Gebruik set met merge om ervoor te zorgen dat 'myChats' wordt aangemaakt als het niet bestaat.
+        batch.set(myChatRef, updatedChatData, { merge: true });
       }
       
       await batch.commit();
@@ -108,14 +113,12 @@ export async function createOrGetChat(
     console.error(`[P2P Chat Action] ERROR creating/getting chat for ${chatId}:`, e);
 
     if (e.code === 'permission-denied') {
-        // Maak en propageer een contextuele fout
         const permissionError = new FirestorePermissionError({
             path: 'users',
             operation: 'list',
             requestResourceData: { where: `uid in [${participantIds.join(', ')}]` }
         });
         errorEmitter.emit('permission-error', permissionError);
-        // Geef een generieke fout terug naar de client, de gedetailleerde fout is voor de ontwikkelaar.
         return { chatId: null, error: 'Permissiefout bij het ophalen van deelnemers.' };
     }
 
@@ -150,16 +153,19 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
         lastMessageTimestamp: FieldValue.serverTimestamp(),
     };
 
+    // Update het centrale chatdocument
     const chatRef = db.collection('p2p_chats').doc(chatId);
     batch.update(chatRef, updateData);
 
+    // Update de gedenormaliseerde kopieën voor alle deelnemers
     const chatSnapshot = await chatRef.get();
     const participants = chatSnapshot.data()?.participants;
 
     if (participants && Array.isArray(participants)) {
         for (const userId of participants) {
             const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
-            // Gebruik set met merge:true om te creëren als het niet bestaat, of bij te werken als het wel bestaat.
+            // Gebruik 'set' met 'merge:true' om ervoor te zorgen dat het document wordt bijgewerkt
+            // of aangemaakt als het (in een oud scenario) nog niet bestaat.
             batch.set(myChatRef, updateData, { merge: true });
         }
     }

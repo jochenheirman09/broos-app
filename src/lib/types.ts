@@ -126,8 +126,8 @@ export interface Conversation {
 }
 
 export interface MyChat extends Conversation {
-    // This is the denormalized document that will be stored in `/users/{userId}/myChats`.
-    // It's a direct copy of the Conversation document for easy and secure querying.
+    // Dit is het gedenormaliseerde document dat wordt opgeslagen in `/users/{userId}/myChats`.
+    // Het is een directe kopie van het Conversation-document voor eenvoudig en veilig queryen.
 }
 
 export interface P2PChatMessage {
@@ -223,6 +223,14 @@ export interface WellnessAnalysisInput {
     retrievedDocs?: any;
     todayActivity?: string;
     currentTime?: string;
+    // Add all structured memory fields for context
+    familySituation?: string;
+    schoolSituation?: string;
+    personalGoals?: string;
+    matchPreparation?: string;
+    recoveryHabits?: string;
+    additionalHobbies?: string;
+    personalDetails?: string;
     // Game day context
     isGameDay?: boolean;
     game?: Partial<Game>;

@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useUser } from "@/context/user-context";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, where, getDocs } from "firebase/firestore";
-import type { Conversation, UserProfile, WithId } from "@/lib/types";
+import { collection, query, orderBy } from "firebase/firestore";
+import type { MyChat, WithId } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Users, MessageSquare, User as UserIcon } from "lucide-react";
@@ -11,30 +12,27 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { nl } from "date-fns/locale";
-import React, { useState, useEffect } from "react";
 
-const getInitials = (name: string = '') => {
-    return name.split(' ').map((n) => n[0]).join('').toUpperCase();
-};
-
-function ExistingChatItem({ chat, partnersMap }: { chat: WithId<Conversation>, partnersMap: Map<string, WithId<UserProfile>> }) {
+function ExistingChatItem({ chat }: { chat: WithId<MyChat> }) {
   const { user } = useUser();
 
-  let title = "Gesprek"; // Changed from "Onbekend Gesprek"
+  const getInitials = (name: string = '') => {
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase();
+  };
+
+  const otherParticipants = chat.participantProfiles
+    ? Object.entries(chat.participantProfiles).filter(([uid]) => uid !== user?.uid)
+    : [];
+
+  let title = chat.name || "Groepschat";
   let avatarUrl: string | undefined = undefined;
-  let fallback: React.ReactNode = <UserIcon className="h-6 w-6" />;
+  let fallback: React.ReactNode = <Users className="h-6 w-6" />;
   
-  if (chat.isGroupChat) {
-    title = chat.name || "Groepschat";
-    fallback = <Users className="h-6 w-6" />;
-  } else if (user && chat.participants) {
-    const otherParticipantId = chat.participants.find(p => p !== user.uid);
-    const partnerProfile = otherParticipantId ? partnersMap.get(otherParticipantId) : null;
-    if (partnerProfile) {
-        title = partnerProfile.name;
-        avatarUrl = partnerProfile.photoURL;
-        fallback = <>{getInitials(partnerProfile.name)}</>;
-    }
+  if (!chat.isGroupChat && otherParticipants.length === 1) {
+    const [, otherProfile] = otherParticipants[0];
+    title = otherProfile.name;
+    avatarUrl = otherProfile.photoURL;
+    fallback = <>{getInitials(otherProfile.name)}</>;
   }
 
   const timestamp = chat.lastMessageTimestamp?.toDate();
@@ -64,9 +62,7 @@ export function ExistingChatsList() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   
-  const [partnersMap, setPartnersMap] = useState<Map<string, WithId<UserProfile>>>(new Map());
-  const [partnersLoading, setPartnersLoading] = useState(true);
-
+  // AANGEPAST: De query leest nu de veilige, gedenormaliseerde subcollectie.
   const myChatsQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
@@ -75,56 +71,13 @@ export function ExistingChatsList() {
     );
   }, [user, db]);
 
-  const { data: chats, isLoading: chatsLoading, error } = useCollection<Conversation>(myChatsQuery);
+  // We gebruiken MyChat, wat een kopie is van Conversation
+  const { data: chats, isLoading, error } = useCollection<MyChat>(myChatsQuery);
   
-  useEffect(() => {
-    if (!chats || chats.length === 0) {
-        setPartnersLoading(false);
-        return;
-    };
-    
-    const fetchPartners = async () => {
-        setPartnersLoading(true);
-        const allPartnerIds = new Set<string>();
-        chats.forEach(chat => {
-            if (chat.participants) {
-                chat.participants.forEach(pId => {
-                    if (pId !== user?.uid) allPartnerIds.add(pId);
-                });
-            }
-        });
+  // De partnersMap en de extra fetch zijn niet langer nodig, omdat de profielen
+  // nu al in de 'myChats' documenten zitten.
 
-        if (allPartnerIds.size === 0) {
-            setPartnersLoading(false);
-            return;
-        }
-
-        const idsToFetch = Array.from(allPartnerIds);
-        const newPartnersMap = new Map<string, WithId<UserProfile>>();
-        
-        try {
-             for (let i = 0; i < idsToFetch.length; i += 30) {
-                const chunk = idsToFetch.slice(i, i + 30);
-                const q = query(collection(db, 'users'), where('uid', 'in', chunk));
-                const snapshot = await getDocs(q);
-                snapshot.forEach(doc => {
-                    newPartnersMap.set(doc.id, { ...doc.data() as UserProfile, id: doc.id });
-                });
-            }
-            setPartnersMap(newPartnersMap);
-        } catch (e) {
-            console.error("Failed to fetch partner profiles:", e);
-        } finally {
-            setPartnersLoading(false);
-        }
-    };
-    
-    fetchPartners();
-
-  }, [chats, user, db]);
-
-
-  if (isUserLoading || chatsLoading || partnersLoading) {
+  if (isUserLoading || isLoading) {
     return (
       <div className="flex justify-center items-center h-64"><Spinner /></div>
     );
@@ -149,7 +102,7 @@ export function ExistingChatsList() {
   return (
     <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
         {chats.map(chat => (
-            <ExistingChatItem key={chat.id} chat={chat} partnersMap={partnersMap} />
+            <ExistingChatItem key={chat.id} chat={chat} />
         ))}
     </div>
   );
