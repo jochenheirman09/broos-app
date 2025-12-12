@@ -3,16 +3,16 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import {
   useUser as useFirebaseUser,
+  useFirestore,
   useAuth,
   useDoc,
-  useFirestore,
   useMemoFirebase,
   FirebaseErrorListener, // Import the listener
 } from "@/firebase";
-import { doc, updateDoc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
@@ -113,10 +113,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // DATA SYNC FIX: Ensure emailVerified status in Firestore matches Auth state.
   useEffect(() => {
     if (user && user.emailVerified && userProfile && !userProfile.emailVerified) {
-      console.log(`[UserProvider] Syncing emailVerified status for user ${user.uid}...`);
+      console.log(`[UserProvider] Syncing emailVerified status for user ${'user.uid'}...`);
       const userRef = doc(firestore, "users", user.uid);
       updateDoc(userRef, { emailVerified: true })
-        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${user.uid}.`))
+        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${'user.uid'}.`))
         .catch(err => console.error(`[UserProvider] Failed to sync emailVerified status:`, err));
     }
   }, [user, userProfile, firestore]);

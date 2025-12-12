@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, BookOpen, RefreshCw, KeyRound, Copy, Users } from "lucide-react";
+import { Building, RefreshCw, KeyRound, Copy, Users } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
@@ -22,9 +22,7 @@ import { generateClubInvitationCode } from "@/lib/firebase/firestore/club";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { useUser } from "@/context/user-context";
 import { StaffUpdates } from "./staff-updates";
-import { KnowledgeBaseManager } from "./knowledge-base-stats";
 
 function ResponsibleNoClub() {
   return (
@@ -54,7 +52,6 @@ function ResponsibleNoClub() {
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
-  const { userProfile } = useUser();
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -209,23 +206,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </div>
         </CardContent>
       </Card>
-      
-      {userProfile?.role === 'responsible' && (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <BookOpen />
-                    Kennisbank
-                </CardTitle>
-                <CardDescription>
-                    Beheer de documenten die de AI-buddy gebruikt om contextuele antwoorden te geven.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <KnowledgeBaseManager clubId={clubId} />
-            </CardContent>
-        </Card>
-      )}
     </>
   );
 }

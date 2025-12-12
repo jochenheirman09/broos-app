@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRef, useState } from "react";
@@ -36,17 +35,14 @@ function DocumentItem({ doc }: { doc: WithId<KnowledgeDocument> }) {
   )
 }
 
-export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
+export function KnowledgeBaseManager() {
   const { userProfile } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-
   const docsQuery = useMemoFirebase(() => {
-    // CRITICAL FIX: Only build the query if the user is a 'responsible'.
-    // This prevents the useCollection hook from firing for unauthorized roles.
     if (userProfile?.role !== 'responsible') return null;
     return query(collection(db, `knowledge_base`), orderBy("ingestedAt", "desc"));
   }, [userProfile?.role, db]);
@@ -59,7 +55,7 @@ export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !clubId) return;
+    if (!file || !userProfile?.clubId) return;
 
     setIsUploading(true);
 
@@ -68,7 +64,7 @@ export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
         const result = await ingestDocument({
             fileName: file.name,
             fileContent,
-            clubId,
+            clubId: userProfile.clubId,
         });
 
         if (result.success) {
@@ -89,17 +85,19 @@ export function KnowledgeBaseManager({ clubId }: { clubId: string }) {
         })
     } finally {
         setIsUploading(false);
-        // Reset file input
         if(fileInputRef.current) {
             fileInputRef.current.value = "";
         }
     }
   };
   
-  // If the user is not a responsible, don't render anything.
-  // This is a secondary safeguard. The primary one is the query being null.
   if (userProfile?.role !== 'responsible') {
-    return null;
+    return (
+        <Alert variant="destructive">
+            <AlertTitle>Geen Toegang</AlertTitle>
+            <AlertDescription>Alleen een clubverantwoordelijke kan de kennisbank beheren.</AlertDescription>
+        </Alert>
+    )
   }
 
   return (

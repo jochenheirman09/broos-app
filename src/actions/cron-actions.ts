@@ -6,23 +6,19 @@ import { analyzeTeamData } from '@/ai/flows/team-analysis-flow';
 import { generatePlayerUpdate } from '@/ai/flows/player-update-flow';
 import { analyzeClubData } from '@/ai/flows/club-analysis-flow';
 import { sendNotification } from '@/ai/flows/notification-flow';
-import type { TeamAnalysisInput, TeamAnalysisOutput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary } from '@/ai/types';
+import type { TeamAnalysisInput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary } from '@/ai/types';
 import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, PlayerUpdate, ClubUpdate } from '@/lib/types';
 import { getFirebaseAdmin } from '@/ai/genkit';
+import { formatInTimeZone } from 'date-fns-tz';
 
 /**
  * Executes the full daily analysis and notification job.
- * It will:
- * 1. Send check-in reminders to all players.
- * 2. Analyze each team's data, save a staff insight, and notify staff.
- * 3. Generate and save a personalized "weetje" for each player and notify them.
- * 4. Analyze club-wide data, save a club insight, and notify responsibles.
  */
 export async function runAnalysisJob() {
   console.log('[CRON ACTION] Starting full analysis and notification job...');
-  const { adminDb } = await getFirebaseAdmin();
-  const db: Firestore = adminDb;
-  const today = new Date().toISOString().split('T')[0];
+  const { adminDb: db } = await getFirebaseAdmin();
+  const timeZone = 'Europe/Brussels';
+  const today = formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd');
   
   let notificationCount = 0;
   let teamAnalysisCount = 0;
@@ -35,7 +31,7 @@ export async function runAnalysisJob() {
 
   for (const playerDoc of playersSnapshot.docs) {
     const player = playerDoc.data() as UserProfile;
-    if (player.uid) { // Ensure player uid exists
+    if (player.uid) {
         const notificationInput: NotificationInput = {
             userId: player.uid,
             title: `Tijd voor je check-in, ${player.name.split(' ')[0]}!`,
@@ -60,26 +56,34 @@ export async function runAnalysisJob() {
     const clubId = clubDoc.id;
     const teamSummaries: { teamName: string; summary: AITeamSummary }[] = [];
 
-    // --- TEAM & PLAYER ANALYSIS (per team) ---
     const teamsSnapshot = await clubDoc.ref.collection('teams').get();
     for (const teamDoc of teamsSnapshot.docs) {
       const team = { id: teamDoc.id, ...teamDoc.data() } as WithId<Team>;
       const playersInTeamSnapshot = await db.collection('users').where('teamId', '==', team.id).get();
       
-      if (playersInTeamSnapshot.empty) continue;
+      if (playersInTeamSnapshot.empty) {
+        console.log(`[CRON] Team ${team.name} has no players, skipping.`);
+        continue;
+      }
       
       const playersData: { playerProfile: UserProfile; scores: WellnessScore; }[] = [];
       for (const playerDoc of playersInTeamSnapshot.docs) {
-        const wellnessSnapshot = await playerDoc.ref.collection('wellnessScores').orderBy('date', 'desc').limit(1).get();
-        if (!wellnessSnapshot.empty) {
+        // CORRECTED QUERY: Fetch the wellness score for the specific user for 'today'.
+        const wellnessDocRef = playerDoc.ref.collection('wellnessScores').doc(today);
+        const wellnessDoc = await wellnessDocRef.get();
+
+        if (wellnessDoc.exists) {
           playersData.push({ 
             playerProfile: playerDoc.data() as UserProfile, 
-            scores: wellnessSnapshot.docs[0].data() as WellnessScore 
+            scores: wellnessDoc.data() as WellnessScore 
           });
+        } else {
+           console.log(`[CRON] No wellness score found for today (${today}) for player ${playerDoc.id}.`);
         }
       }
 
       if (playersData.length > 0) {
+        console.log(`[CRON] Analyzing data for ${playersData.length} players in team ${team.name}.`);
         const analysisInput: TeamAnalysisInput = {
           teamId: team.id,
           teamName: team.name,
@@ -97,7 +101,6 @@ export async function runAnalysisJob() {
           await insightRef.set(insightData);
           teamAnalysisCount++;
           
-          // Notify staff members of this team
           const staffQuery = db.collection('users').where('teamId', '==', team.id).where('role', '==', 'staff');
           const staffSnapshot = await staffQuery.get();
           for (const staffDoc of staffSnapshot.docs) {
@@ -105,7 +108,7 @@ export async function runAnalysisJob() {
           }
         }
 
-        // --- PLAYER-SPECIFIC "WEETJES" ---
+        // Player-specific "Weetjes"
         for (const { playerProfile, scores } of playersData) {
             if (teamAnalysisResult?.summary) {
                 const playerUpdateInput: PlayerUpdateInput = {
@@ -123,11 +126,14 @@ export async function runAnalysisJob() {
                 }
             }
         }
+      } else {
+        console.log(`[CRON] No wellness data available today for any player in team ${team.name}.`);
       }
     }
 
-    // --- CLUB-WIDE ANALYSIS ---
+    // Club-wide analysis
     if (teamSummaries.length > 0) {
+        console.log(`[CRON] Analyzing data for ${teamSummaries.length} teams in club ${clubDoc.data().name}.`);
         const clubAnalysisInput: ClubAnalysisInput = { clubId, clubName: clubDoc.data().name, teamSummaries };
         const clubInsightResult = await analyzeClubData(clubAnalysisInput);
 
@@ -137,7 +143,6 @@ export async function runAnalysisJob() {
             await insightRef.set(insightData);
             clubAnalysisCount++;
 
-            // Notify all responsible users of this club
             const responsibleQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
             const responsibleSnapshot = await responsibleQuery.get();
             for (const responsibleDoc of responsibleSnapshot.docs) {

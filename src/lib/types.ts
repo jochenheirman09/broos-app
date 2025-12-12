@@ -115,14 +115,19 @@ export interface ChatMessage {
   sortOrder?: number; // Client-side timestamp for reliable ordering
 }
 
-// Renamed from P2PChat to be more generic for group chats
 export interface Conversation {
-    id: string; // For 1-on-1: uid1_uid2, for groups: unique ID
+    id: string;
     participants: string[];
     isGroupChat?: boolean;
-    name?: string; // Optional name for group chats
+    name?: string;
+    participantProfiles?: { [key: string]: { name: string; photoURL?: string } };
     lastMessage?: string;
-    lastMessageTimestamp?: any; // Firestore ServerTimestamp
+    lastMessageTimestamp?: any;
+}
+
+export interface MyChat extends Conversation {
+    // This is the denormalized document that will be stored in `/users/{userId}/myChats`.
+    // It's a direct copy of the Conversation document for easy and secure querying.
 }
 
 export interface P2PChatMessage {
@@ -222,6 +227,21 @@ export interface WellnessAnalysisInput {
     game?: Partial<Game>;
 }
 
+export interface FullWellnessAnalysisOutput {
+  response: string;
+  summary?: string;
+  wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt" | "sleep" | "sleepReason">>;
+  alert?: {
+    alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
+    triggeringMessage: string;
+    shareWithStaff?: boolean; 
+  };
+  askForConsent?: boolean;
+  updatedFields?: Partial<Pick<UserProfile, 'familySituation' | 'schoolSituation' | 'personalGoals' | 'matchPreparation' | 'recoveryHabits' | 'additionalHobbies' | 'personalDetails'>>;
+  gameUpdate?: Partial<Omit<Game, 'id' | 'userId' | 'date' | 'createdAt' | 'updatedAt'>>;
+}
+
+
 export interface OnboardingInput extends WellnessAnalysisInput {
     currentTopic: OnboardingTopic;
 }
@@ -232,6 +252,8 @@ export interface OnboardingOutput {
   summary?: string;
   isLastTopic?: boolean;
   lastTopic?: OnboardingTopic;
+  siblings?: { name: string; age?: number }[];
+  pets?: { name: string; type: string }[];
 }
 
 export interface NotificationInput {
