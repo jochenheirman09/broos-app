@@ -118,16 +118,16 @@ export interface ChatMessage {
 export interface Conversation {
     id: string;
     participants: string[];
-    isGroupChat?: boolean;
+    isGroupChat: boolean;
     name?: string;
-    participantProfiles?: { [key: string]: { name: string; photoURL?: string } };
-    lastMessage?: string;
-    lastMessageTimestamp?: any;
+    participantProfiles: { [key: string]: { name: string; photoURL?: string } };
+    lastMessage: string;
+    lastMessageTimestamp: any;
 }
 
 export interface MyChat extends Conversation {
-    // Dit is het gedenormaliseerde document dat wordt opgeslagen in `/users/{userId}/myChats`.
-    // Het is een directe kopie van het Conversation-document voor eenvoudig en veilig queryen.
+    // This is the denormalized document stored in /users/{userId}/myChats.
+    // It's a direct copy of the Conversation document for easy and secure querying.
 }
 
 export interface P2PChatMessage {
@@ -271,3 +271,5 @@ export interface NotificationInput {
   body: string;
   link?: string;
 }
+
+    

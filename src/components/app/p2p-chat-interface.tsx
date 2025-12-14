@@ -79,7 +79,7 @@ interface P2PChatInterfaceProps {
 }
 
 export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
-  const { user } = useUser();
+  const { user, userProfile } = useUser();
   const db = useFirestore();
   const viewportRef = useRef<HTMLDivElement>(null);
   
@@ -153,7 +153,7 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     <div className="container mx-auto py-8">
       <Card className="h-[calc(100vh-10rem)] flex flex-col">
         <CardHeader className="flex-row items-center gap-4">
-          <Link href="/p2p-chat" passHref>
+          <Link href={userProfile?.role === 'player' ? '/p2p-chat' : '/dashboard'} passHref>
              <Button variant="ghost" size="icon" className="h-8 w-8">
                 <ArrowLeft />
              </Button>

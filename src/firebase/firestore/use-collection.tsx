@@ -85,24 +85,24 @@ export function useCollection<T = any>(
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const path = getPathFromQuery(memoizedTargetRefOrQuery);
-    console.log(`[useCollection] Subscribing to: ${path}`);
+    
+    // Always start by resetting the state when the dependency changes.
+    setIsLoading(true);
+    setData(null);
+    setError(null);
     
     if (!memoizedTargetRefOrQuery) {
-      console.log(`[useCollection] Subscription skipped (null query) for: ${path}`);
-      setData(null);
+      // If the query is null, we are done loading.
       setIsLoading(false);
-      setError(null);
       return;
     }
-
-    setIsLoading(true);
-    setError(null);
 
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
-        console.log(`[useCollection] Data received for: ${path}`);
+        if (!isMounted) return;
         const results: ResultItemType[] = [];
         for (const doc of snapshot.docs) {
           results.push({ ...(doc.data() as T), id: doc.id });
@@ -112,6 +112,7 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        if (!isMounted) return;
         console.error(`[useCollection] PERMISSION ERROR on: ${path}`, error);
         const contextualError = new FirestorePermissionError({
           operation: 'list',
@@ -128,13 +129,13 @@ export function useCollection<T = any>(
     );
 
     return () => {
-      console.log(`[useCollection] Unsubscribing from: ${path}`);
+      isMounted = false;
       unsubscribe();
     }
   }, [memoizedTargetRefOrQuery, refetchTrigger]); // Re-run if the target query/reference or trigger changes.
 
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
+    throw new Error('useCollection query was not properly memoized using useMemoFirebase');
   }
   return { data, isLoading, error, forceRefetch };
 }

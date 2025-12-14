@@ -3,7 +3,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, doc, getDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import type { UserProfile, Team, WithId } from '@/lib/types';
 import {
@@ -18,8 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Mail, Shield, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
+import { getTeamMembers } from '@/actions/user-actions';
 
 const roleIcons: { [key: string]: React.ReactNode } = {
   player: <UserIcon className="h-4 w-4" />,
@@ -68,7 +67,7 @@ export default function TeamMembersPage({
   params: Promise<{ teamId: string }>;
 }) {
   const { teamId } = use(params);
-  const { userProfile, loading: userLoading } = useUser();
+  const { user, userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   
   const [team, setTeam] = useState<Team | null>(null);
@@ -77,15 +76,7 @@ export default function TeamMembersPage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Defensive check: Wait until the user profile is fully loaded.
-    if (userLoading) {
-      return;
-    }
-    
-    // Defensive check: Ensure all necessary IDs are present before fetching.
-    if (!db || !userProfile?.clubId || !teamId) {
-      setIsLoading(false);
-      setError("Kon de teamgegevens niet laden omdat essentiële informatie (zoals club ID) ontbreekt in je profiel.");
+    if (userLoading || !user || !userProfile?.clubId) {
       return;
     }
 
@@ -101,47 +92,23 @@ export default function TeamMembersPage({
         if (teamSnap.exists()) {
           setTeam(teamSnap.data() as Team);
         } else {
-          // This is a data integrity issue, not a permission issue.
-          throw new Error(`Team met ID "${teamId}" niet gevonden in uw club. Controleer of het team nog bestaat.`);
+          throw new Error(`Team met ID "${teamId}" niet gevonden in uw club.`);
         }
 
-        // Step 2: Fetch team members using a query that matches the security rules.
-        const membersQuery = query(
-          collection(db, 'users'), 
-          where('teamId', '==', teamId)
-        );
-
-        const membersSnapshot = await getDocs(membersQuery);
-        const membersData = membersSnapshot.docs.map(doc => ({
-          ...doc.data() as UserProfile,
-          id: doc.id,
-        }));
-
+        // Step 2: Fetch members using the secure server action.
+        const membersData = await getTeamMembers(user.uid, teamId);
         setMembers(membersData);
 
       } catch (e: any) {
         console.error("Fout bij het ophalen van teamgegevens:", e);
-        // Provide specific, user-friendly error messages.
-        if (e.code === 'permission-denied' || e.message.includes("permission-denied")) {
-            const permissionError = new FirestorePermissionError({
-                path: `users (querying on teamId: ${teamId})`,
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            setError("Permissiefout: Je hebt geen toestemming om de leden van dit team te bekijken. De Firestore-regels staan deze actie niet toe. De regels vereisen dat de 'users' collectie wordt opgevraagd met een filter op 'teamId'.");
-        } else if (e.message.includes("index")) {
-            // Firestore often includes a link to create the required index in the error message.
-            setError("Indexeringsfout: Firestore vereist een samengestelde index voor deze query. Controleer de ontwikkelaarsconsole van uw browser voor een directe link om deze index aan te maken.");
-        } else {
-            setError(e.message || "Er is een onbekende fout opgetreden bij het laden van de gegevens.");
-        }
+        setError(e.message || "Er is een onbekende fout opgetreden bij het laden van de gegevens.");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, [db, userProfile, teamId, userLoading]);
+  }, [db, user, userProfile, teamId, userLoading]);
 
 
   return (

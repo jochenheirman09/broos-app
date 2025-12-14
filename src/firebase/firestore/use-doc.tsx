@@ -50,21 +50,24 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const path = memoizedDocRef ? memoizedDocRef.path : 'unknown path';
     
+    // Always start by resetting the state when the dependency changes.
+    setIsLoading(true);
+    setData(null);
+    setError(null);
+    
     if (!memoizedDocRef) {
-      setData(null);
+      // If the ref is null, we are done loading.
       setIsLoading(false); 
-      setError(null);
       return;
     }
-    
-    setIsLoading(true);
-    setError(null);
     
     const unsubscribe = onSnapshot(
       memoizedDocRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
+        if (!isMounted) return;
         if (snapshot.exists()) {
           setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
@@ -75,6 +78,7 @@ export function useDoc<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        if (!isMounted) return;
         console.error(`[useDoc] PERMISSION ERROR on: ${path}`, error);
         const contextualError = new FirestorePermissionError({
           operation: 'get',
@@ -90,6 +94,7 @@ export function useDoc<T = any>(
     );
 
     return () => {
+      isMounted = false;
       unsubscribe();
     }
   }, [memoizedDocRef]);
@@ -100,5 +105,3 @@ export function useDoc<T = any>(
 
   return { data, isLoading, error };
 }
-
-

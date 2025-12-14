@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
@@ -11,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, RefreshCw, KeyRound, Copy, Users } from "lucide-react";
+import { Building, RefreshCw, KeyRound, Copy, Users, BookOpen } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
@@ -23,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { StaffUpdates } from "./staff-updates";
+import { KnowledgeBaseManager } from "./knowledge-base-stats";
 
 function ResponsibleNoClub() {
   return (
@@ -57,7 +59,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const clubRef = useMemoFirebase(
-    () => (firestore ? doc(firestore, "clubs", clubId) : null),
+    () => (firestore && clubId ? doc(firestore, "clubs", clubId) : null),
     [firestore, clubId]
   );
   const { data: club, isLoading } = useDoc<Club>(clubRef);
@@ -186,6 +188,23 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
       <Card>
         <CardHeader>
+            <CardTitle className="flex items-center">
+                <Users className="h-6 w-6 mr-3" />
+                Team Chat
+            </CardTitle>
+            <CardDescription>
+                Start een gesprek met een speler of staflid binnen je club.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Link href="/p2p-chat" passHref>
+                <Button>Open Team Chat</Button>
+            </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Team Management</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -205,6 +224,21 @@ function ClubManagement({ clubId }: { clubId: string }) {
             <CreateTeamForm clubId={club.id} onTeamCreated={handleTeamChange} />
           </div>
         </CardContent>
+      </Card>
+      
+      <Card>
+          <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                  <BookOpen />
+                  Kennisbank
+              </CardTitle>
+              <CardDescription>
+                  Beheer de documenten die de AI-buddy gebruikt om contextuele antwoorden te geven.
+              </CardDescription>
+          </CardHeader>
+          <CardContent>
+              <KnowledgeBaseManager clubId={clubId} />
+          </CardContent>
       </Card>
     </>
   );

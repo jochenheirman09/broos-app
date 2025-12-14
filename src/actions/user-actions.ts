@@ -4,7 +4,6 @@
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
-// CORRECTIE: Gebruik de types van de admin SDK, niet de client SDK functies
 import type { Firestore } from 'firebase-admin/firestore';
 
 /**
@@ -22,7 +21,6 @@ async function validateTeamCode(db: Firestore, teamCode: string): Promise<{ team
       throw new Error("Database service is niet beschikbaar.");
   }
 
-  // CORRECTIE: Gebruik admin SDK syntax
   const clubsSnapshot = await db.collection("clubs").get();
 
   if (clubsSnapshot.empty) {
@@ -33,7 +31,6 @@ async function validateTeamCode(db: Firestore, teamCode: string): Promise<{ team
 
   for (const clubDoc of clubsSnapshot.docs) {
     const club = { id: clubDoc.id, ...clubDoc.data() } as Club;
-    // CORRECTIE: Gebruik admin SDK syntax voor subcollectie query
     const teamQuery = db.collection("clubs").doc(club.id).collection("teams")
       .where("invitationCode", "==", teamCode)
       .limit(1);
@@ -118,8 +115,8 @@ export async function getChatPartners(userId: string): Promise<WithId<UserProfil
   }
   const userProfile = userDoc.data() as UserProfile;
   
-  if (!userProfile.clubId || !userProfile.teamId) {
-      console.log('[User Action] Current user profile is incomplete (missing clubId or teamId). Returning empty list.');
+  if (!userProfile.clubId) {
+      console.log('[User Action] Current user profile is incomplete (missing clubId). Returning empty list.');
       return [];
   }
 
@@ -130,6 +127,11 @@ export async function getChatPartners(userId: string): Promise<WithId<UserProfil
     chatPartnersQuery = adminDb.collection('users')
         .where('clubId', '==', userProfile.clubId);
   } else {
+    // Players and Staff can only see their team. This requires a teamId.
+    if (!userProfile.teamId) {
+      console.log('[User Action] Player/Staff profile is incomplete (missing teamId). Returning empty list.');
+      return [];
+    }
     console.log(`[User Action] User is staff/player, querying for users in teamId: ${userProfile.teamId}`);
     chatPartnersQuery = adminDb.collection('users')
         .where('teamId', '==', userProfile.teamId);
@@ -152,4 +154,52 @@ export async function getChatPartners(userId: string): Promise<WithId<UserProfil
 
   console.log(`[User Action] Found ${partners.length} valid chat partners.`);
   return partners;
+}
+
+
+/**
+ * Server Action to securely fetch the members of a specific team.
+ * This is only allowed if the requesting user is part of the same club.
+ */
+export async function getTeamMembers(requesterId: string, teamId: string): Promise<WithId<UserProfile>[]> {
+  if (!requesterId || !teamId) {
+    throw new Error("Requesting user ID and Team ID are required.");
+  }
+  
+  console.log(`[User Action] User ${requesterId} is requesting members for team ${teamId}`);
+  const { adminDb } = await getFirebaseAdmin();
+
+  const requesterRef = adminDb.collection('users').doc(requesterId);
+  const requesterDoc = await requesterRef.get();
+
+  if (!requesterDoc.exists()) {
+    throw new Error("Aanvragende gebruiker niet gevonden.");
+  }
+  const requesterProfile = requesterDoc.data() as UserProfile;
+  
+  // Security check: user must have a club ID
+  if (!requesterProfile.clubId) {
+      throw new Error("Je hebt geen club en kunt geen teamleden opvragen.");
+  }
+  
+  // Security check: staff can only see their own team, responsible can see any in their club
+  if (requesterProfile.role === 'staff' && requesterProfile.teamId !== teamId) {
+      throw new Error("Je hebt geen toegang tot de leden van dit team.");
+  }
+
+  const membersQuery = adminDb.collection('users').where('teamId', '==', teamId);
+  const snapshot = await membersQuery.get();
+
+  if (snapshot.empty) {
+    console.log(`[User Action] No members found for team ${teamId}.`);
+    return [];
+  }
+
+  const members = snapshot.docs
+    .map(doc => ({ ...doc.data() as UserProfile, id: doc.id }))
+    // Ensure the members are part of the same club as the requester, preventing cross-club data leakage
+    .filter(member => member.clubId === requesterProfile.clubId);
+  
+  console.log(`[User Action] Found ${members.length} members for team ${teamId}.`);
+  return members;
 }

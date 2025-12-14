@@ -7,7 +7,7 @@ import { collection, query, orderBy } from "firebase/firestore";
 import type { MyChat, WithId } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Users, MessageSquare, User as UserIcon } from "lucide-react";
+import { Users, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
@@ -74,9 +74,6 @@ export function ExistingChatsList() {
   // We gebruiken MyChat, wat een kopie is van Conversation
   const { data: chats, isLoading, error } = useCollection<MyChat>(myChatsQuery);
   
-  // De partnersMap en de extra fetch zijn niet langer nodig, omdat de profielen
-  // nu al in de 'myChats' documenten zitten.
-
   if (isUserLoading || isLoading) {
     return (
       <div className="flex justify-center items-center h-64"><Spinner /></div>
@@ -107,3 +104,5 @@ export function ExistingChatsList() {
     </div>
   );
 }
+
+    

@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { StaffUpdates } from "./staff-updates";
 import { useUser } from "@/context/user-context";
