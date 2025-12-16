@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser } from '@/context/user-context';
-import type { UserProfile, WithId } from '@/lib/types';
-import { getChatPartners } from '@/actions/user-actions';
+import type { UserProfile, WithId, Team } from '@/lib/types';
+import { getChatPartnersData } from '@/actions/user-actions';
 import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,6 +16,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 function P2PChatPartnerItem({
   partner,
@@ -54,13 +56,78 @@ function P2PChatPartnerItem({
   );
 }
 
+function TeamChatTree({ 
+    teams, 
+    members, 
+    onTogglePartner, 
+    selectedPartnerIds 
+}: { 
+    teams: WithId<Team>[]; 
+    members: WithId<UserProfile>[];
+    onTogglePartner: (id: string) => void;
+    selectedPartnerIds: Set<string>;
+}) {
+    const membersByTeam = useMemo(() => {
+        const map = new Map<string, WithId<UserProfile>[]>();
+        const unassigned: WithId<UserProfile>[] = [];
+
+        for (const member of members) {
+            const teamId = member.teamId;
+            if (teamId && teams.some(t => t.id === teamId)) {
+                if (!map.has(teamId)) {
+                    map.set(teamId, []);
+                }
+                map.get(teamId)!.push(member);
+            } else {
+                unassigned.push(member);
+            }
+        }
+
+        if (unassigned.length > 0) {
+            map.set('unassigned', unassigned);
+        }
+
+        return map;
+    }, [teams, members]);
+    
+    // Default open all collapsibles if there are few teams/members
+    const defaultOpen = teams.length <= 3 && members.length <= 15;
+
+    return (
+        <div className="border rounded-lg max-h-96 overflow-y-auto">
+            {teams.map(team => {
+                const teamMembers = membersByTeam.get(team.id) || [];
+                if (teamMembers.length === 0) return null;
+                
+                return (
+                    <Collapsible key={team.id} defaultOpen={defaultOpen} className="border-b last:border-b-0">
+                        <CollapsibleTrigger className="p-4 w-full flex justify-between items-center hover:bg-muted/50 font-semibold">
+                            <span>{team.name} ({teamMembers.length})</span>
+                            <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:-rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            {teamMembers.map(partner => (
+                                <P2PChatPartnerItem
+                                    key={partner.id}
+                                    partner={partner}
+                                    onToggle={onTogglePartner}
+                                    isSelected={selectedPartnerIds.has(partner.id)}
+                                />
+                            ))}
+                        </CollapsibleContent>
+                    </Collapsible>
+                );
+            })}
+        </div>
+    );
+}
 
 export function NewChat() {
-  const { user, isUserLoading } = useUser();
+  const { user, userProfile, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
   
-  const [partners, setPartners] = useState<WithId<UserProfile>[] | null>(null);
+  const [chatData, setChatData] = useState<{ teams: WithId<Team>[], members: WithId<UserProfile>[] } | null>(null);
   const [selectedPartnerIds, setSelectedPartnerIds] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -75,21 +142,21 @@ export function NewChat() {
       return;
     }
 
-    const fetchPartners = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const fetchedPartners = await getChatPartners(user.uid);
-        setPartners(fetchedPartners);
+        const fetchedData = await getChatPartnersData(user.uid);
+        setChatData(fetchedData);
       } catch (e: any) {
-        console.error("Failed to fetch chat partners via Server Action:", e);
+        console.error("Failed to fetch chat partners data via Server Action:", e);
         setError(e.message || "Kon geen chatpartners ophalen.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchPartners();
+    fetchData();
   }, [user, isUserLoading]);
 
   const handleTogglePartner = (partnerId: string) => {
@@ -144,6 +211,7 @@ export function NewChat() {
 
   const selectedCount = selectedPartnerIds.size;
   const isGroupCreation = selectedCount > 1;
+  const isResponsible = userProfile?.role === 'responsible';
 
   return (
       <div>
@@ -165,16 +233,27 @@ export function NewChat() {
             </div>
         )}
 
-        {!error && partners && partners.length > 0 && (
-            <div className="border rounded-lg mb-4 max-h-96 overflow-y-auto">
-            {partners.map(partner => (
-                <P2PChatPartnerItem 
-                key={partner.id} 
-                partner={partner}
-                onToggle={handleTogglePartner}
-                isSelected={selectedPartnerIds.has(partner.id)}
-                />
-            ))}
+        {!error && chatData && chatData.members.length > 0 && (
+            <div className="mb-4">
+                {isResponsible ? (
+                    <TeamChatTree 
+                        teams={chatData.teams}
+                        members={chatData.members}
+                        selectedPartnerIds={selectedPartnerIds}
+                        onTogglePartner={handleTogglePartner}
+                    />
+                ) : (
+                    <div className="border rounded-lg max-h-96 overflow-y-auto">
+                        {chatData.members.map(partner => (
+                            <P2PChatPartnerItem 
+                                key={partner.id} 
+                                partner={partner}
+                                onToggle={handleTogglePartner}
+                                isSelected={selectedPartnerIds.has(partner.id)}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         )}
         
@@ -193,9 +272,9 @@ export function NewChat() {
             </Button>
         )}
 
-        {!error && (!partners || partners.length === 0) && (
+        {!error && (!chatData || chatData.members.length === 0) && (
             <Alert>
-            <Users className="h-4 w-4" /><AlertTitle>Geen Teamleden</AlertTitle><AlertDescription>Er zijn geen andere leden in je team gevonden om mee te chatten.</AlertDescription>
+            <Users className="h-4 w-4" /><AlertTitle>Geen Teamleden</AlertTitle><AlertDescription>Er zijn geen andere leden in je club/team gevonden om mee te chatten.</AlertDescription>
             </Alert>
         )}
       </div>

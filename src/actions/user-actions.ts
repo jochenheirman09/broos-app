@@ -4,7 +4,6 @@
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
-import type { Firestore } from 'firebase-admin/firestore';
 
 /**
  * Validates a team invitation code across all clubs and returns the team and club IDs.
@@ -13,7 +12,7 @@ import type { Firestore } from 'firebase-admin/firestore';
  * @param teamCode The invitation code to validate.
  * @returns An object with teamId and clubId, or null if not found.
  */
-async function validateTeamCode(db: Firestore, teamCode: string): Promise<{ teamId: string; clubId: string } | null> {
+async function validateTeamCode(db: any, teamCode: string): Promise<{ teamId: string; clubId: string } | null> {
   console.log(`[User Action] CORRECTLY entering validateTeamCode with code: ${teamCode}`);
   
   if (!db) {
@@ -96,10 +95,10 @@ export async function updateUserTeam(userId: string, teamCode: string, updates: 
 
 
 /**
- * Server Action to securely fetch a list of potential chat partners
- * based on the current user's role and affiliation.
+ * Server Action to securely fetch data needed for the chat partner selection UI.
+ * Returns a structured object with teams and their members.
  */
-export async function getChatPartners(userId: string): Promise<WithId<UserProfile>[]> {
+export async function getChatPartnersData(userId: string): Promise<{ teams: WithId<Team>[]; members: WithId<UserProfile>[] }> {
   if (!userId) {
     throw new Error("User ID must be provided.");
   }
@@ -116,44 +115,39 @@ export async function getChatPartners(userId: string): Promise<WithId<UserProfil
   const userProfile = userDoc.data() as UserProfile;
   
   if (!userProfile.clubId) {
-      console.log('[User Action] Current user profile is incomplete (missing clubId). Returning empty list.');
-      return [];
+      console.log('[User Action] Current user profile is incomplete (missing clubId). Returning empty data.');
+      return { teams: [], members: [] };
   }
 
-  let chatPartnersQuery;
+  let membersQuery;
+  let teamsQuery;
 
   if (userProfile.role === 'responsible') {
-    console.log(`[User Action] User is responsible, querying for all users in clubId: ${userProfile.clubId}`);
-    chatPartnersQuery = adminDb.collection('users')
-        .where('clubId', '==', userProfile.clubId);
+    console.log(`[User Action] User is responsible, querying for all users and teams in clubId: ${userProfile.clubId}`);
+    membersQuery = adminDb.collection('users').where('clubId', '==', userProfile.clubId);
+    teamsQuery = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams');
   } else {
-    // Players and Staff can only see their team. This requires a teamId.
     if (!userProfile.teamId) {
-      console.log('[User Action] Player/Staff profile is incomplete (missing teamId). Returning empty list.');
-      return [];
+        return { teams: [], members: [] };
     }
-    console.log(`[User Action] User is staff/player, querying for users in teamId: ${userProfile.teamId}`);
-    chatPartnersQuery = adminDb.collection('users')
-        .where('teamId', '==', userProfile.teamId);
+    console.log(`[User Action] User is staff/player, querying for users and team in teamId: ${userProfile.teamId}`);
+    membersQuery = adminDb.collection('users').where('teamId', '==', userProfile.teamId);
+    teamsQuery = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').where('id', '==', userProfile.teamId);
   }
 
-  const snapshot = await chatPartnersQuery.get();
+  const [membersSnapshot, teamsSnapshot] = await Promise.all([
+    membersQuery.get(),
+    teamsQuery.get()
+  ]);
   
-  if (snapshot.empty) {
-    console.log('[User Action] No chat partners found for the query.');
-    return [];
-  }
-
-  const partners = snapshot.docs
+  const members = membersSnapshot.docs
     .map(doc => ({ ...doc.data() as UserProfile, id: doc.id }))
-    .filter(partner => 
-        partner.uid !== userId &&
-        !!partner.clubId && 
-        !!partner.teamId
-    );
+    .filter(partner => partner.uid !== userId && !!partner.clubId);
+    
+  const teams = teamsSnapshot.docs.map(doc => ({ ...doc.data() as Team, id: doc.id }));
 
-  console.log(`[User Action] Found ${partners.length} valid chat partners.`);
-  return partners;
+  console.log(`[User Action] Found ${members.length} members and ${teams.length} teams.`);
+  return { teams, members };
 }
 
 

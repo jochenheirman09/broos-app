@@ -56,21 +56,6 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
       
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
-            Individuele Alerts
-          </CardTitle>
-          <CardDescription>
-            Een overzicht van zorgwekkende signalen die de AI heeft gedetecteerd bij spelers in jouw team.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AlertList />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
             <CardTitle className="flex items-center">
                 <Users className="h-6 w-6 mr-3" />
                 Team Chat

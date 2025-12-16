@@ -6,6 +6,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import type { UserProfile, Conversation, MyChat } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { sendNotification } from '@/ai/flows/notification-flow';
 
 /**
  * Creëert of haalt een chat-sessie op en denormaliseert de metadata.
@@ -69,7 +70,6 @@ export async function createOrGetChat(
         participantProfiles, 
         lastMessage: isGroupChat ? `Groepschat "${groupName}" aangemaakt.` : "Gesprek is gestart.",
         lastMessageTimestamp: FieldValue.serverTimestamp(),
-        // FIX: Add 'name' ONLY if it's a group chat to avoid writing 'null' or 'undefined'
         ...(isGroupChat && { name: groupName! })
       };
       
@@ -122,10 +122,7 @@ export async function createOrGetChat(
 }
 
 /**
- * Verstuurt een P2P-bericht. Deze actie is atomisch.
- * 1. Voegt het bericht toe aan de centrale `/p2p_chats/{chatId}/messages` collectie.
- * 2. Werkt `lastMessage` bij in het centrale `/p2p_chats/{chatId}` document.
- * 3. Werkt `lastMessage` bij in de gedenormaliseerde `/users/{userId}/myChats/{chatId}` documenten voor ALLE deelnemers.
+ * Verstuurt een P2P-bericht en triggert notificaties naar andere deelnemers.
  */
 export async function sendP2PMessage(chatId: string, senderId: string, content: string) {
     if (!chatId || !senderId || !content) {
@@ -134,6 +131,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
     const db = getAdminDb();
     const batch = db.batch();
 
+    // 1. Save the new message
     const messagesRef = db.collection('p2p_chats').doc(chatId).collection('messages');
     const newMessageRef = messagesRef.doc();
     batch.set(newMessageRef, {
@@ -142,16 +140,17 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
         timestamp: FieldValue.serverTimestamp(),
     });
 
+    // 2. Update last message info on the root chat doc and all denormalized copies
     const updateData = {
         lastMessage: content,
         lastMessageTimestamp: FieldValue.serverTimestamp(),
     };
-
     const chatRef = db.collection('p2p_chats').doc(chatId);
     batch.update(chatRef, updateData);
 
     const chatSnapshot = await chatRef.get();
-    const participants = chatSnapshot.data()?.participants;
+    const chatData = chatSnapshot.data() as Conversation | undefined;
+    const participants = chatData?.participants;
 
     if (participants && Array.isArray(participants)) {
         for (const userId of participants) {
@@ -159,6 +158,26 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
             batch.set(myChatRef, updateData, { merge: true });
         }
     }
-
+    
+    // Commit the message and all updates
     await batch.commit();
+
+    // 3. Send notifications (after message is committed)
+    if (participants && chatData) {
+        const senderProfile = chatData.participantProfiles?.[senderId];
+        const senderName = senderProfile?.name || "Iemand";
+        const title = chatData.isGroupChat ? `${senderName} in ${chatData.name}` : senderName;
+        
+        for (const userId of participants) {
+            // Don't send a notification to the sender
+            if (userId === senderId) continue;
+
+            sendNotification({
+                userId: userId,
+                title: title,
+                body: content,
+                link: `/p2p-chat/${chatId}`
+            }).catch(e => console.error(`Failed to send P2P notification to ${userId}:`, e));
+        }
+    }
 }

@@ -1,30 +1,30 @@
+"use client"
 
-"use client";
-
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { useUser } from "@/context/user-context";
-import { collection, query, orderBy, limit } from "firebase/firestore";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { useUser } from "@/context/user-context"
+import { collection, query, orderBy, limit } from "firebase/firestore"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts"
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart";
-import type { WellnessScore } from "@/lib/types";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { TrendingUp, FileWarning } from "lucide-react";
-import { Spinner } from "../ui/spinner";
-import { useState } from "react";
-import { Button } from "../ui/button";
+} from "@/components/ui/chart"
+import type { WellnessScore } from "@/lib/types"
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
+import { TrendingUp, FileWarning } from "lucide-react"
+import { Spinner } from "../ui/spinner"
+import { useState } from "react"
+import { Button } from "../ui/button"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+} from "@/components/ui/sheet"
+import { cn } from "@/lib/utils"
+import { ScrollArea, ScrollViewport } from "../ui/scroll-area"
 
 const chartConfig = {
   mood: { label: "Stemming", color: "hsl(var(--chart-1))" },
@@ -220,34 +220,38 @@ export function WellnessChart() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="flex flex-col p-0">
+          <SheetHeader className="p-6 pb-4">
             <SheetTitle>Details van je Welzijnsscores</SheetTitle>
             <SheetDescription>
               Hier is een gedetailleerd overzicht van de scores uit je laatste
               gesprek.
             </SheetDescription>
           </SheetHeader>
-          <div className="py-4 space-y-6">
-            {chartData.map((item) => {
-                const isPlaceholder = item.isPlaceholder;
-                const displayValue = item.value;
-                const displayReason = item.reason;
-                const formattedValue = displayValue % 1 === 0 ? displayValue.toFixed(0) : displayValue.toFixed(1);
+          <ScrollArea className="flex-1 min-h-0">
+            <ScrollViewport>
+              <div className="px-6 pb-6 space-y-6">
+                {chartData.map((item) => {
+                    const isPlaceholder = item.isPlaceholder;
+                    const displayValue = item.value;
+                    const displayReason = item.reason;
+                    const formattedValue = displayValue % 1 === 0 ? displayValue.toFixed(0) : displayValue.toFixed(1);
 
-                return (
-              <div key={item.metric} className={cn("p-4 rounded-xl shadow-clay-card", isPlaceholder ? "bg-muted/50" : "bg-card/50")}>
-                 <div className="flex items-center justify-between mb-2">
-                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.emoji}</span>
-                    <h3 className="font-bold text-lg">{item.metric}</h3>
-                   </div>
-                   <div className={cn("font-bold text-lg", isPlaceholder && "text-muted-foreground")}>{formattedValue}</div>
-                 </div>
-                 <p className="text-muted-foreground text-sm">{displayReason}</p>
+                    return (
+                  <div key={item.metric} className={cn("p-4 rounded-xl shadow-clay-card", isPlaceholder ? "bg-muted/50" : "bg-card/50")}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{item.emoji}</span>
+                        <h3 className="font-bold text-lg">{item.metric}</h3>
+                      </div>
+                      <div className={cn("font-bold text-lg", isPlaceholder && "text-muted-foreground")}>{formattedValue}</div>
+                    </div>
+                    <p className="text-muted-foreground text-sm">{displayReason}</p>
+                  </div>
+                )})}
               </div>
-            )})}
-          </div>
+            </ScrollViewport>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
     </div>

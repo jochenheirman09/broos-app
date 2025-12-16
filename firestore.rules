@@ -7,23 +7,16 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // 1. USER PROFILES - Blijft veilig
+    // 1. USER PROFILES
     match /users/{userId} {
+      // Gebruikers mogen alleen hun eigen data lezen en schrijven.
       allow read, write: if request.auth.uid == userId;
-
-      // Subcollecties vallen onder de catch-all hieronder
-      match /{path=**} {
-        allow read, list: if isSignedIn();
-        allow write: if false;
-      }
     }
-    
-    // 2. CATCH-ALL: OPEN VOOR ALLE INGELOGDE GEBRUIKERS
-    // Dit is het tijdelijke noodplan. Alle paden die niet specifiek
-    // hierboven zijn gedefinieerd (zoals /clubs, /knowledge_base, etc.)
-    // vallen onder deze regel.
+
+    // 2. TIJDELIJKE CATCH-ALL: OPEN VOOR ALLE INGELOGDE GEBRUIKERS
+    // Dit is de set die de app functioneel maakte (behalve alerts).
     match /{path=**} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn(); 
       allow write: if false;
     }
   }

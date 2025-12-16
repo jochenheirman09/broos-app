@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import {
   LayoutGrid,
@@ -24,8 +24,8 @@ import { ProfileSheet } from "./profile-sheet";
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
   { href: "/chat", icon: MessageSquare, label: "Chat" },
-  { href: "/archive", icon: Archive, label: "Archief" },
   { href: "/p2p-chat", icon: Users, label: "Team" },
+  { href: "/archive", icon: Archive, label: "Archief" },
 ];
 
 export function PlayerLayout({ children }: { children: React.ReactNode }) {

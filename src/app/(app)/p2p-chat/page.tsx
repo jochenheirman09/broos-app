@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -24,8 +23,8 @@ export default function P2PChatOverviewPage() {
     <div className="container mx-auto py-8">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
+          <div className="flex flex-wrap justify-between items-start gap-4">
+            <div className="flex-grow">
               <CardTitle className="flex items-center text-2xl">
                 <Users className="h-6 w-6 mr-3" />
                 Team Chat
@@ -36,7 +35,7 @@ export default function P2PChatOverviewPage() {
             </div>
             {!isPlayer && (
                  <Link href="/dashboard" passHref>
-                    <Button variant="outline">
+                    <Button variant="outline" className="w-full sm:w-auto">
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Terug naar Dashboard
                     </Button>
@@ -46,7 +45,7 @@ export default function P2PChatOverviewPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="existing">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
               <TabsTrigger value="existing">
                 <MessageSquare className="mr-2 h-4 w-4" />
                 Bestaande Gesprekken
