@@ -118,7 +118,7 @@ export function CompleteProfileForm() {
                           onClick={() => setIsPopoverOpen(false)}
                           disabled={!field.value}
                         >
-                          Mijn verjaardag!
+                          Selecteer
                         </Button>
                       </div>
                     }
@@ -156,5 +156,3 @@ export function CompleteProfileForm() {
     </Form>
   );
 }
-
-    

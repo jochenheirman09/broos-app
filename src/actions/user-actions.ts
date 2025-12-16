@@ -97,35 +97,26 @@ async function validateTeamCode(db: any, teamCode: string): Promise<{ teamId: st
       throw new Error("Database service is niet beschikbaar.");
   }
 
-  const clubsSnapshot = await db.collection("clubs").get();
+  // Use a collection group query for efficiency. This requires a composite index on 'invitationCode'.
+  const teamQuery = db.collectionGroup("teams")
+    .where("invitationCode", "==", teamCode)
+    .limit(1);
 
-  if (clubsSnapshot.empty) {
-    console.log("[User Action] No clubs found in the system.");
+  const teamSnapshot = await teamQuery.get();
+
+  if (teamSnapshot.empty) {
+    console.log(`[User Action] No team found for code: ${teamCode}`);
     return null;
   }
-  console.log(`[User Action] Found ${clubsSnapshot.docs.length} clubs to search through.`);
-
-  for (const clubDoc of clubsSnapshot.docs) {
-    const club = { id: clubDoc.id, ...clubDoc.data() } as Club;
-    const teamQuery = db.collection("clubs").doc(club.id).collection("teams")
-      .where("invitationCode", "==", teamCode)
-      .limit(1);
-
-    const teamSnapshot = await teamQuery.get();
-
-    if (!teamSnapshot.empty) {
-      const teamDoc = teamSnapshot.docs[0];
-      const teamData = teamDoc.data() as Team;
-      console.log(`[User Action] Found team: ${teamDoc.id} in club: ${teamData.clubId}`);
-      return {
-        teamId: teamDoc.id,
-        clubId: teamData.clubId,
-      };
-    }
-  }
-
-  console.log(`[User Action] No team found for code: ${teamCode}`);
-  return null;
+  
+  const teamDoc = teamSnapshot.docs[0];
+  const teamData = teamDoc.data() as Team;
+  console.log(`[User Action] Found team: ${teamDoc.id} in club: ${teamData.clubId}`);
+  
+  return {
+    teamId: teamDoc.id,
+    clubId: teamData.clubId,
+  };
 }
 
 /**

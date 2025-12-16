@@ -54,6 +54,7 @@ const formSchema = z
     gender: z.enum(["male", "female"], {
       required_error: "Selecteer je geslacht.",
     }),
+    teamCode: z.string().optional(),
     acceptedTerms: z.literal<boolean>(true, {
       errorMap: () => ({ message: "Je moet akkoord gaan met de voorwaarden." }),
     }),
@@ -61,7 +62,12 @@ const formSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Wachtwoorden komen niet overeen.",
     path: ["confirmPassword"],
+  })
+  .refine((data) => (data.role === 'responsible') || (data.teamCode && data.teamCode.length > 0), {
+    message: "Team uitnodigingscode is vereist voor spelers en staf.",
+    path: ["teamCode"],
   });
+
 
 export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -81,6 +87,7 @@ export function RegisterForm() {
       password: "",
       confirmPassword: "",
       role: selectedRole || undefined,
+      teamCode: "",
       acceptedTerms: false,
     },
   });
@@ -95,6 +102,7 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -102,6 +110,11 @@ export function RegisterForm() {
         values.password
       );
       const user = userCredential.user;
+
+      if (values.teamCode && (values.role === 'player' || values.role === 'staff')) {
+          const registrationRef = doc(db, "user_registrations", user.uid);
+          await setDoc(registrationRef, { invitationCode: values.teamCode });
+      }
 
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
@@ -113,6 +126,14 @@ export function RegisterForm() {
         onboardingCompleted: false,
         acceptedTerms: values.acceptedTerms,
       });
+
+      // --- Force Token Refresh Logic ---
+      // Give the Cloud Function some time to run and set the claims.
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log("[Registration] Forcing token refresh to get custom claims...");
+      await user.getIdToken(true);
+      console.log("[Registration] Token refreshed.");
+      // --- End of Force Token Refresh ---
 
       await sendEmailVerification(user);
 
@@ -219,6 +240,22 @@ export function RegisterForm() {
           )}
         />
 
+        {(watchedRole === 'player' || watchedRole === 'staff') && (
+            <FormField
+                control={form.control}
+                name="teamCode"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Team Uitnodigingscode</FormLabel>
+                    <FormControl>
+                    <Input placeholder="Code van je team" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+        )}
+
 
         {!selectedRole && (
           <FormField
@@ -298,3 +335,5 @@ export function RegisterForm() {
     </Form>
   );
 }
+
+    
