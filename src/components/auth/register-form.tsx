@@ -104,6 +104,7 @@ export function RegisterForm() {
     setIsLoading(true);
     
     try {
+      // Step 0: Create the user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
@@ -111,11 +112,8 @@ export function RegisterForm() {
       );
       const user = userCredential.user;
 
-      if (values.teamCode && (values.role === 'player' || values.role === 'staff')) {
-          const registrationRef = doc(db, "user_registrations", user.uid);
-          await setDoc(registrationRef, { invitationCode: values.teamCode });
-      }
-
+      // Step 1: Immediately write the main user profile document.
+      // This is crucial for the UserProvider to find the document right away.
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name: values.name,
@@ -127,14 +125,19 @@ export function RegisterForm() {
         acceptedTerms: values.acceptedTerms,
       });
 
-      // --- Force Token Refresh Logic ---
-      // Give the Cloud Function some time to run and set the claims.
+      // Step 2: Write the temporary registration document to trigger the Cloud Function for claims.
+      if (values.teamCode && (values.role === 'player' || values.role === 'staff')) {
+          const registrationRef = doc(db, "user_registrations", user.uid);
+          await setDoc(registrationRef, { invitationCode: values.teamCode });
+      }
+      
+      // Step 3: Wait for the Cloud Function to run and then force a token refresh.
       await new Promise(resolve => setTimeout(resolve, 3000));
       console.log("[Registration] Forcing token refresh to get custom claims...");
       await user.getIdToken(true);
       console.log("[Registration] Token refreshed.");
-      // --- End of Force Token Refresh ---
 
+      // Step 4: Send the verification email and redirect.
       await sendEmailVerification(user);
 
       toast({
@@ -143,6 +146,7 @@ export function RegisterForm() {
       });
 
       router.push("/verify-email");
+
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -335,5 +339,3 @@ export function RegisterForm() {
     </Form>
   );
 }
-
-    
