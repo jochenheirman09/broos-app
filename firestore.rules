@@ -1,23 +1,65 @@
 rules_version = '2';
 
 service cloud.firestore {
+  
+  // Hulpfuncties
+  function getClubId() {
+    return request.auth.token.clubId;
+  }
+  function isResponsible() {
+    return request.auth.token.role == 'responsible';
+  }
+  function isStaff() {
+    return request.auth.token.role == 'staff' || isResponsible();
+  }
+  
   match /databases/{database}/documents {
-    
-    function isSignedIn() {
-      return request.auth != null;
-    }
     
     // 1. USER PROFILES
     match /users/{userId} {
-      // Gebruikers mogen alleen hun eigen data lezen en schrijven.
       allow read, write: if request.auth.uid == userId;
+      allow get: if request.auth != null; 
+      
+      // Toegang tot ALLE subcollecties van de eigen gebruiker (chats, updates, wellnessScores, etc.)
+      match /{documents=**} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
 
-    // 2. TIJDELIJKE CATCH-ALL: OPEN VOOR ALLE INGELOGDE GEBRUIKERS
-    // Dit is de set die de app functioneel maakte (behalve alerts).
-    match /{path=**} {
-      allow read, list: if isSignedIn(); 
-      allow write: if false;
+    // 2. CLUBS Collectie
+    match /clubs/{clubId} {
+      // Lezen/Lijsten: Vereist dat de gebruiker (Speler, Staff of Responsible) tot die club behoort.
+      allow read, list: if getClubId() == clubId;
+      // Schrijven: Alleen voor Responsible van die club
+      allow write: if isResponsible() && getClubId() == clubId;
+      
+      // ALLE Subcollecties (Teams, Trainingen, etc.)
+      match /{document=**} {
+        allow read: if getClubId() == clubId;
+        allow write: if isResponsible() && getClubId() == clubId;
+      }
+    }
+    
+    // 3. ALERTS COLLECTION GROUP (Robuuste Match Syntax)
+    match /{path=**}/alerts/{alertId} { 
+      // Alleen Staff/Responsible mag lezen.
+      allow read, list: if isStaff() && getClubId() == resource.data.clubId;
+      allow write: if false; 
+    }
+
+    // 4. P2P_CHATS Collectie
+    match /p2p_chats/{chatId} {
+      allow read, write: if request.auth != null && resource.data.participants.hasAny([request.auth.uid]);
+      
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null && get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+      }
+    }
+    
+    // 5. KNOWLEDGE_BASE Collectie (NIEUW)
+    match /knowledge_base/{docId} {
+      allow read, list: if isStaff(); 
+      allow write: if isResponsible();
     }
   }
 }

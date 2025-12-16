@@ -4,6 +4,83 @@
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
+import { collection, query, where, getDocs, limit, doc, writeBatch } from "firebase/firestore";
+
+// Function to generate a random 8-character alphanumeric code
+const generateCode = (length = 8) => {
+  const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+
+/**
+ * SERVER ACTION to create a club and set admin claims.
+ * This is a secure, server-only operation.
+ */
+export async function createClubAndSetClaims(userId: string, clubName: string): Promise<{ success: boolean; message: string; }> {
+    if (!userId || !clubName) {
+        return { success: false, message: "User ID and club name are required." };
+    }
+    
+    console.log(`[Club Action] createClubAndSetClaims invoked for user ${userId} and club ${clubName}`);
+    const { adminDb, adminAuth } = await getFirebaseAdmin();
+    const userRef = adminDb.collection("users").doc(userId);
+
+    try {
+        const userDoc = await userRef.get();
+        const userData = userDoc.data();
+
+        if (!userDoc.exists || !userData || userData.role !== 'responsible') {
+            return { success: false, message: "Alleen een 'responsible' kan een club aanmaken." };
+        }
+
+        const clubsRef = adminDb.collection("clubs");
+        const q = clubsRef.where("name", "==", clubName);
+        const querySnapshot = await q.get();
+
+        if (!querySnapshot.empty) {
+            console.log(`[Club Action] Club "${clubName}" already exists. Fixing claims for user ${userId}.`);
+            const existingClubDoc = querySnapshot.docs[0];
+            const clubId = existingClubDoc.id;
+
+            await userRef.update({ clubId });
+            await adminAuth.setCustomUserClaims(userId, { clubId: clubId, role: 'responsible' });
+            
+            return { success: true, message: "Club bestond al. Je account is hersteld en je rechten zijn bijgewerkt." };
+        }
+
+        console.log(`[Club Action] Creating new club "${clubName}".`);
+        const batch = adminDb.batch();
+        const clubRef = doc(clubsRef);
+        
+        batch.set(clubRef, {
+            name: clubName,
+            ownerId: userId,
+            id: clubRef.id,
+            invitationCode: generateCode(),
+        });
+        
+        batch.update(userRef, { clubId: clubRef.id });
+        await batch.commit();
+
+        await adminAuth.setCustomUserClaims(userId, {
+            clubId: clubRef.id,
+            role: 'responsible',
+        });
+        
+        console.log(`[Club Action] New club created and claims set for user ${userId}.`);
+        return { success: true, message: `Club '${clubName}' succesvol aangemaakt.` };
+
+    } catch (error: any) {
+        console.error("[Club Action] Error:", error);
+        return { success: false, message: error.message || "An unexpected error occurred." };
+    }
+}
+
 
 /**
  * Validates a team invitation code across all clubs and returns the team and club IDs.
@@ -54,6 +131,7 @@ async function validateTeamCode(db: any, teamCode: string): Promise<{ teamId: st
 /**
  * Server Action to securely update a user's team affiliation.
  * This is used for both completing a profile and changing teams.
+ * It now also sets the custom claims for the user.
  * @param userId The UID of the user to update.
  * @param teamCode The new team invitation code.
  * @param updates Additional profile data to update (e.g., birthDate).
@@ -65,7 +143,7 @@ export async function updateUserTeam(userId: string, teamCode: string, updates: 
   }
 
   console.log(`[User Action] Starting updateUserTeam for user ${userId}`);
-  const { adminDb: db } = await getFirebaseAdmin();
+  const { adminDb: db, adminAuth } = await getFirebaseAdmin();
   const userRef = db.collection('users').doc(userId);
   console.log("[User Action] Admin DB and user reference obtained successfully.");
 
@@ -82,10 +160,26 @@ export async function updateUserTeam(userId: string, teamCode: string, updates: 
       clubId: teamInfo.clubId,
     };
     
+    // Get the user's role to set it in the claims
+    const userDoc = await userRef.get();
+    const userRole = userDoc.data()?.role;
+
+    if (!userRole) {
+        throw new Error("Gebruikersrol niet gevonden, kan claims niet instellen.");
+    }
+
+    // Set custom claims AFTER finding team info, before updating the doc
+    await adminAuth.setCustomUserClaims(userId, {
+        clubId: teamInfo.clubId,
+        teamId: teamInfo.teamId,
+        role: userRole
+    });
+    console.log(`[User Action] Custom claims set for user ${userId}: role=${userRole}, clubId=${teamInfo.clubId}, teamId=${teamInfo.teamId}`);
+
     await userRef.update(finalUpdates);
     
     console.log(`[User Action] User ${userId} successfully updated team to ${teamInfo.teamId}`);
-    return { success: true, message: "Team succesvol bijgewerkt!" };
+    return { success: true, message: "Team succesvol bijgewerkt! Je moet mogelijk opnieuw inloggen om de wijzigingen te zien." };
 
   } catch (error: any) {
     console.error(`[User Action] Error updating team for user ${userId}:`, error);

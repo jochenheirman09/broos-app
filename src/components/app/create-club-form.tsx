@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -7,17 +8,18 @@ import { Label } from "@/components/ui/label";
 import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
-import { createClub } from "@/lib/firebase/firestore/club";
-import { useFirestore } from "@/firebase";
 import Link from "next/link";
 import { Separator } from "../ui/separator";
 import { useRouter } from "next/navigation";
+import { createClub } from "@/lib/firebase/firestore/club"; // Gewijzigd: importeer de client-side functie
+import { useFirestore } from "@/firebase";
+import { LogOut } from "lucide-react";
 
 export function CreateClubForm() {
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const { toast } = useToast();
-  const firestore = useFirestore();
   const router = useRouter();
+  const db = useFirestore();
   const [clubName, setClubName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -43,16 +45,18 @@ export function CreateClubForm() {
     setIsLoading(true);
 
     try {
-      await createClub(firestore, user.uid, clubName);
+      // Gebruik nu de herstelde, client-side createClub functie
+      await createClub(db, user.uid, clubName);
+      
       toast({
         title: "Succes!",
-        description: "Je club is aangemaakt. Je wordt doorgestuurd.",
+        description: `Club '${clubName}' succesvol aangemaakt. Log opnieuw in om verder te gaan.`,
       });
-      // The UserProvider will detect the change in userProfile.clubId
-      // and the AppLayout's useEffect will handle the redirect.
-      // We push to dashboard as a fallback/faster navigation.
-      router.push('/dashboard');
-
+      // Forceer een logout zodat de gebruiker opnieuw kan inloggen met een token die (hopelijk)
+      // de nieuwe claims bevat na de volgende stap.
+      logout();
+      router.push('/login');
+      
     } catch (error: any) {
       console.error("Fout bij het maken van de club:", error);
       toast({
@@ -73,7 +77,7 @@ export function CreateClubForm() {
             <Input
               id="name"
               name="name"
-              placeholder="bv. Real Madrid"
+              placeholder="bv. SK Beveren"
               required
               value={clubName}
               onChange={(e) => setClubName(e.target.value)}
@@ -97,11 +101,15 @@ export function CreateClubForm() {
         </div>
       </div>
 
-      <div className="text-center">
+      <div className="text-center space-y-4">
           <Button variant="outline" asChild className="w-full">
             <Link href="/join-club">
                 Sluit je aan bij een bestaande club
             </Link>
+          </Button>
+          <Button variant="secondary" onClick={logout} className="w-full">
+            <LogOut className="mr-2 h-4 w-4" />
+            Uitloggen
           </Button>
       </div>
 

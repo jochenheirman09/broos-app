@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, RefreshCw, KeyRound, Copy, Users, BookOpen } from "lucide-react";
+import { Building, BookOpen, RefreshCw, KeyRound, Copy, Users, LogOut, AlertTriangle } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
@@ -23,29 +23,36 @@ import { generateClubInvitationCode } from "@/lib/firebase/firestore/club";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
+import { useUser } from "@/context/user-context";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
+import { AlertList } from "./alert-list";
 
 function ResponsibleNoClub() {
+  const { logout } = useUser();
   return (
     <Card className="bg-accent/20 border-accent">
       <CardHeader>
         <CardTitle className="flex items-center text-2xl">
           <Building className="h-7 w-7 mr-3 text-accent-foreground" />
-          Creëer Je Club
+          Creëer of Herstel Je Club
         </CardTitle>
         <CardDescription className="text-accent-foreground/80">
-          Om de app te blijven gebruiken, moet je een club aanmaken voor je
-          account.
+          Om de app te blijven gebruiken, moet je een club aanmaken of je opnieuw aansluiten bij je bestaande club om je account te herstellen.
+           Als je dit net hebt gedaan, moet je eerst uitloggen en opnieuw inloggen.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Link href="/create-club">
+      <CardContent className="flex flex-col sm:flex-row gap-4">
+        <Link href="/create-club" passHref>
           <Button variant="accent" size="lg">
             <PlusCircle className="mr-2 h-5 w-5" />
-            Club aanmaken
+            Club Aanmaken of Herstellen
           </Button>
         </Link>
+        <Button variant="outline" size="lg" onClick={logout}>
+          <LogOut className="mr-2 h-5 w-5" />
+          Uitloggen en Opnieuw Inloggen
+        </Button>
       </CardContent>
     </Card>
   );
@@ -54,6 +61,7 @@ function ResponsibleNoClub() {
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const firestore = useFirestore();
+  const { userProfile } = useUser();
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -119,15 +127,8 @@ function ClubManagement({ clubId }: { clubId: string }) {
   }
 
   if (!club) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-destructive">
-            Fout: Clubgegevens niet gevonden voor uw account. Dit kan een permissieprobleem zijn.
-          </p>
-        </CardContent>
-      </Card>
-    );
+    // Show the creation/recovery prompt if club data fails to load for ANY reason
+    return <ResponsibleNoClub />;
   }
 
   return (
@@ -186,6 +187,21 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
 
+       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
+            Individuele Alerts
+          </CardTitle>
+          <CardDescription>
+            Een overzicht van alle zorgwekkende signalen die de AI heeft gedetecteerd binnen de club.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertList />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center">
@@ -237,7 +253,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
               </CardDescription>
           </CardHeader>
           <CardContent>
-              <KnowledgeBaseManager clubId={clubId} />
+              <KnowledgeBaseManager />
           </CardContent>
       </Card>
     </>

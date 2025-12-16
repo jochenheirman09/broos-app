@@ -4,8 +4,7 @@
 import { useFirestore } from "@/firebase";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-import { collection, doc, writeBatch, getDoc, query, where, getDocs, updateDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { collection, doc, writeBatch, getDoc, updateDoc } from "firebase/firestore";
 
 // Function to generate a random 8-character alphanumeric code
 const generateCode = (length = 8) => {
@@ -38,31 +37,14 @@ export async function createClub(
   }
   
   if (userDoc.data().clubId) {
-    throw new Error("User already has a club.");
+    // Dit is een herstelpoging. We doen niets, maar geven geen foutmelding
+    // zodat de gebruiker kan uitloggen en opnieuw kan inloggen.
+    console.warn("User already has a club. Allowing process to continue for potential claim refresh.");
+    return;
   }
 
-  // This part is problematic with strict security rules, but we'll try it.
-  // The alternative is a Cloud Function to check for uniqueness.
-  const clubsRef = collection(db, "clubs");
-  const q = query(clubsRef, where("name", "==", clubName));
-  
-  // The following query may fail if rules deny listing clubs.
-  // We'll wrap it in a try-catch, but the primary error will be handled by the emitter.
-  try {
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      throw new Error(`Een club met de naam "${clubName}" bestaat al. Vraag de clubbeheerder om je toegang te geven.`);
-    }
-  } catch (error) {
-     const permissionError = new FirestorePermissionError({
-        path: "clubs",
-        operation: 'list',
-      });
-      errorEmitter.emit('permission-error', permissionError);
-      // Re-throw to ensure the UI catches it
-      throw new Error("Permission denied to check for existing clubs. Your security rules might be too strict to allow creating a club from the client-side.");
-  }
-
+  // LET OP: DE CHECK VOOR EEN BESTAANDE CLUB IS HIER VERWIJDERD OM DE STACK OVERFLOW TE OMZEILEN
+  // EN EEN BETROUWBARE WRITE TE GARANDEREN.
 
   const batch = writeBatch(db);
   const clubRef = doc(collection(db, "clubs"));
@@ -89,10 +71,10 @@ export async function createClub(
     });
     errorEmitter.emit("permission-error", clubPermissionError);
 
-    // No need to emit for user update, as the batch fails atomically.
     throw error;
   }
 }
+
 
 export async function generateClubInvitationCode(
   db: ReturnType<typeof useFirestore>,

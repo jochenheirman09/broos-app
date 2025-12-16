@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getAdminDb } from '@/lib/server/admin-db-singleton';
+import { getFirebaseAdmin } from '@/ai/genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { UserProfile, Conversation, MyChat } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -32,7 +32,7 @@ export async function createOrGetChat(
     return { chatId: null, error: "Een groepschat moet een naam hebben." };
   }
 
-  const db = getAdminDb();
+  const { adminDb: db } = await getFirebaseAdmin();
   let chatId: string;
   const p2pChatsRef = db.collection('p2p_chats');
   let chatRef;
@@ -128,7 +128,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
     if (!chatId || !senderId || !content) {
         throw new Error("Chat ID, sender ID, and content are required.");
     }
-    const db = getAdminDb();
+    const { adminDb: db } = await getFirebaseAdmin();
     const batch = db.batch();
 
     // 1. Save the new message

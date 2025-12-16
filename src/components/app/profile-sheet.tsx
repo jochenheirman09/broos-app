@@ -1,3 +1,4 @@
+
 "use client";
 import { useUser } from "@/context/user-context";
 import {
@@ -16,6 +17,7 @@ import * as z from "zod";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -23,7 +25,7 @@ import {
 } from "@/components/ui/form";
 import { useRef, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, useFirestore } from "@/firebase";
+import { useAuth, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { updateProfile as updateAuthProfile } from "firebase/auth";
 import { Spinner } from "@/components/ui/spinner";
 import { Camera, LogOut, Sparkles, CalendarPlus, Users } from "lucide-react";
@@ -53,6 +55,8 @@ import { BuddyProfileCustomizer } from "./buddy-profile/page";
 import { ScrollArea, ScrollViewport } from "../ui/scroll-area";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { updateUserTeam } from "@/actions/user-actions";
+import { doc } from 'firebase/firestore';
+import type { Team } from '@/lib/types';
 
 
 const profileFormSchema = z.object({
@@ -69,9 +73,17 @@ type ChangeTeamFormValues = z.infer<typeof changeTeamFormSchema>;
 
 // Sub-component for changing teams
 function ChangeTeamForm() {
-  const { user } = useUser();
+  const { user, userProfile } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const db = useFirestore();
+
+  // Fetch current team info to show the placeholder
+  const teamRef = useMemoFirebase(() => {
+    if (!userProfile?.clubId || !userProfile?.teamId) return null;
+    return doc(db, "clubs", userProfile.clubId, "teams", userProfile.teamId);
+  }, [db, userProfile?.clubId, userProfile?.teamId]);
+  const { data: teamData } = useDoc<Team>(teamRef);
 
   const form = useForm<ChangeTeamFormValues>({
     resolver: zodResolver(changeTeamFormSchema),
@@ -82,12 +94,13 @@ function ChangeTeamForm() {
     if (!user) return;
     setIsLoading(true);
 
+    // This server action now correctly sets custom claims
     const result = await updateUserTeam(user.uid, values.teamCode);
 
     if (result.success) {
       toast({
-        title: "Team Gewijzigd!",
-        description: "Je bent succesvol van team gewisseld.",
+        title: "Team Gewijzigd/Hersteld!",
+        description: "Je teamgegevens zijn bijgewerkt. Mogelijk moet je opnieuw inloggen om alle wijzigingen te zien.",
       });
       form.reset();
     } else {
@@ -108,9 +121,12 @@ function ChangeTeamForm() {
           name="teamCode"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nieuwe Team Uitnodigingscode</FormLabel>
+              <FormLabel>Nieuwe of Huidige Teamcode</FormLabel>
+              <FormDescription>
+                Voer een nieuwe code in om van team te wisselen, of voer je huidige code opnieuw in om je account te herstellen.
+              </FormDescription>
               <FormControl>
-                <Input placeholder="ABCDEF" {...field} />
+                <Input placeholder={teamData?.invitationCode ? `Huidige code: ${teamData.invitationCode}` : 'ABCDEF'} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -118,7 +134,7 @@ function ChangeTeamForm() {
         />
         <Button type="submit" disabled={isLoading} className="w-full">
           {isLoading && <Spinner size="small" className="mr-2" />}
-          {isLoading ? "Verwerken..." : "Verander van Team"}
+          {isLoading ? "Verwerken..." : "Team Bijwerken"}
         </Button>
       </form>
     </Form>
@@ -337,8 +353,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                         </div>
                         <Separator />
                         <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Verander van Team</h3>
-                            <p className="text-sm text-muted-foreground">Voer de uitnodigingscode van je nieuwe team in om te wisselen.</p>
+                            <h3 className="text-lg font-medium">Team & Account Herstel</h3>
                             <ChangeTeamForm />
                         </div>
                         </>
