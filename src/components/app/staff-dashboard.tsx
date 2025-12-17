@@ -15,12 +15,16 @@ import { AlertTriangle, Users } from "lucide-react";
 import { AlertList } from "./alert-list";
 import Link from "next/link";
 import { Button } from "../ui/button";
+import { Spinner } from "../ui/spinner";
 
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
-  const { userProfile } = useUser();
+  const { userProfile, loading } = useUser();
   const teamId = userProfile?.teamId;
 
+  if (loading) {
+    return <div className="flex justify-center items-center h-64"><Spinner /></div>;
+  }
 
   if (!teamId) {
     return (
@@ -39,6 +43,8 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
        </Card>
     )
   }
+
+  const claimsReady = !!(userProfile && userProfile.role && userProfile.clubId && userProfile.teamId);
 
   return (
     <div className="space-y-6">
@@ -65,7 +71,11 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AlertList />
+           {claimsReady ? (
+                <AlertList />
+            ) : (
+                <div className="flex justify-center items-center h-20"><Spinner /></div>
+            )}
         </CardContent>
       </Card>
       

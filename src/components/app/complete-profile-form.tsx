@@ -24,6 +24,9 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
 import { updateUserTeam } from "@/actions/user-actions";
+import { useRouter } from "next/navigation";
+import { updateUserProfile } from "@/lib/firebase/firestore/user";
+import { useFirestore } from "@/firebase";
 
 const formSchema = z.object({
   birthDate: z.date({
@@ -36,7 +39,9 @@ export function CompleteProfileForm() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const db = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,31 +52,43 @@ export function CompleteProfileForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
-      console.error("[Submit Aborted] No user.");
+      toast({ variant: "destructive", title: "Fout", description: "Je bent niet ingelogd." });
       return;
     }
 
     setIsLoading(true);
 
-    const result = await updateUserTeam(user.uid, values.teamCode, {
-      birthDate: values.birthDate.toISOString().split("T")[0],
-    });
-
-    if (result.success) {
-      toast({
-        title: "Profiel Bijgewerkt",
-        description: "Je bent succesvol aan het team toegevoegd!",
+    try {
+      // The server action now handles setting claims.
+      const result = await updateUserTeam(user.uid, values.teamCode, {
+        birthDate: values.birthDate.toISOString().split("T")[0],
       });
-      // The redirect will be handled by the AppLayout's useEffect.
-    } else {
+
+      if (result.success) {
+        toast({
+          title: "Profiel Voltooid!",
+          description: `${result.message} De pagina wordt herladen.`,
+        });
+        
+        // CRITICAL: Force a token refresh on the client to get the new custom claims.
+        console.log("[Complete Profile Form] Forcing token refresh...");
+        await user.getIdToken(true);
+        console.log("[Complete Profile Form] Token refreshed, reloading page.");
+        window.location.reload(); // Force a full reload to apply context changes
+      
+      } else {
+        throw new Error(result.message);
+      }
+
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Fout",
-        description: result.message,
+        description: error.message || "Er is een onbekende fout opgetreden.",
       });
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   }
 
   return (
@@ -118,7 +135,7 @@ export function CompleteProfileForm() {
                           onClick={() => setIsPopoverOpen(false)}
                           disabled={!field.value}
                         >
-                          Selecteer
+                          Mijn verjaardag!
                         </Button>
                       </div>
                     }
@@ -136,13 +153,12 @@ export function CompleteProfileForm() {
             <FormItem>
               <FormLabel>Team Uitnodigingscode</FormLabel>
               <FormControl>
-                <Input placeholder="ABCDEF" {...field} />
+                <Input placeholder="Code van je coach" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-
         <Button
           type="submit"
           className="w-full"

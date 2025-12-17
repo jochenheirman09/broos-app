@@ -1,5 +1,5 @@
 
-'use server';
+"use server";
 
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
@@ -37,20 +37,24 @@ export async function createClubAndSetClaims(userId: string, clubName: string): 
         if (!userDoc.exists || !userData || userData.role !== 'responsible') {
             return { success: false, message: "Alleen een 'responsible' kan een club aanmaken." };
         }
+        
+        if (userData.clubId) {
+            // User is already associated with a club. Let's just ensure claims are correct.
+            console.log(`[Club Action] User ${userId} already has clubId ${userData.clubId}. Refreshing claims.`);
+             await adminAuth.setCustomUserClaims(userId, {
+                clubId: userData.clubId,
+                role: 'responsible',
+            });
+            return { success: true, message: "Je account is al gekoppeld aan een club. Rechten zijn hersteld." };
+        }
+
 
         const clubsRef = adminDb.collection("clubs");
-        const q = clubsRef.where("name", "==", clubName);
+        const q = clubsRef.where("name", "==", clubName).limit(1);
         const querySnapshot = await q.get();
 
         if (!querySnapshot.empty) {
-            console.log(`[Club Action] Club "${clubName}" already exists. Fixing claims for user ${userId}.`);
-            const existingClubDoc = querySnapshot.docs[0];
-            const clubId = existingClubDoc.id;
-
-            await userRef.update({ clubId });
-            await adminAuth.setCustomUserClaims(userId, { clubId: clubId, role: 'responsible' });
-            
-            return { success: true, message: "Club bestond al. Je account is hersteld en je rechten zijn bijgewerkt." };
+            return { success: false, message: `Een club met de naam "${clubName}" bestaat al.`};
         }
 
         console.log(`[Club Action] Creating new club "${clubName}".`);
@@ -282,3 +286,5 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   console.log(`[User Action] Found ${members.length} members for team ${teamId}.`);
   return members;
 }
+
+    

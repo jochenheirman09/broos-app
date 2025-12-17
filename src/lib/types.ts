@@ -1,4 +1,3 @@
-
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -145,6 +144,7 @@ export interface Alert {
   clubId: string; // Denormalized for security rules
   teamId: string; // Denormalized for security rules
   date: string; // YYYY-MM-DD
+  topic: string; // The topic of conversation when the alert was triggered
   alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
   triggeringMessage: string;
   status: 'new' | 'acknowledged' | 'resolved';
@@ -241,6 +241,7 @@ export interface FullWellnessAnalysisOutput {
   summary?: string;
   wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt" | "sleep" | "sleepReason">>;
   alert?: {
+    topic: string;
     alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
     triggeringMessage: string;
     shareWithStaff?: boolean; 
@@ -271,5 +272,3 @@ export interface NotificationInput {
   body: string;
   link?: string;
 }
-
-    

@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
@@ -44,7 +43,11 @@ export async function saveUserMessage(userId: string, today: string, userMessage
     const { adminDb } = await getFirebaseAdmin();
     const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
     const clientTimestampMs = Date.now();
-    await messagesColRef.add({
+    
+    // Using a specific document ID to avoid race conditions from `addDoc`
+    const newMessageRef = messagesColRef.doc(`msg_${clientTimestampMs}_user`);
+    
+    await newMessageRef.set({
         role: 'user',
         content: userMessage,
         timestamp: FieldValue.serverTimestamp(),
@@ -57,7 +60,11 @@ export async function saveAssistantResponse(userId: string, today: string, assis
   const { adminDb } = await getFirebaseAdmin();
   const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
   const clientTimestampMs = Date.now() + 1; // Ensure it's after user message
-  await messagesColRef.add({
+  
+  // Using a specific document ID to avoid race conditions from `addDoc`
+  const newMessageRef = messagesColRef.doc(`msg_${clientTimestampMs}_assistant`);
+
+  await newMessageRef.set({
       role: 'assistant',
       content: assistantResponse,
       timestamp: FieldValue.serverTimestamp(),
@@ -98,6 +105,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
           foodReason: z.string().optional(),
       }).optional(),
       alert: z.object({
+          topic: z.string().describe("Het onderwerp van gesprek waar de alert over ging, bv. 'School', 'Training', 'Familie'."),
           alertType: z.enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity']),
           triggeringMessage: z.string(),
       }).optional(),
@@ -111,7 +119,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
     });
 
     const analysisPrompt = ai.definePrompt({
-        name: 'chatDataExtractorPrompt',
+        name: 'chatDataExtractorPrompt_v2_topic',
         model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.object({ chatHistory: z.string() }) },
         output: { schema: AnalysisOutputSchema },
@@ -119,7 +127,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
             Je bent een data-analist. Analyseer het volgende gesprek en extraheer de data.
             - **Samenvatting:** Geef een korte samenvatting van het hele gesprek.
             - **Welzijnsscores:** Leid scores (1-5) en redenen af voor de 8 welzijnsthema's. VRAAG NOOIT OM EEN SCORE. Een hoog stress-cijfer betekent WEINIG stress.
-            - **Alerts:** Als er zorgwekkende signalen zijn, vul het 'alert' object.
+            - **Alerts:** Als er zorgwekkende signalen zijn, vul het 'alert' object. Bepaal het 'topic' van het gespreksonderdeel waar het signaal werd gedetecteerd (bv. 'School', 'Training', 'Thuis').
             - **Wedstrijd:** Als er over een wedstrijd is gesproken, vul het 'gameUpdate' object.
 
             Gespreksgeschiedenis:
@@ -158,8 +166,12 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                 batch.set(alertDocRef, {
                     ...output.alert,
                     id: alertDocRef.id,
-                    userId, clubId: userData.clubId, teamId: userData.teamId,
-                    date: today, status: 'new', createdAt: FieldValue.serverTimestamp(),
+                    userId, 
+                    clubId: userData.clubId, 
+                    teamId: userData.teamId,
+                    date: today, 
+                    status: 'new', 
+                    createdAt: FieldValue.serverTimestamp(),
                 });
             }
         }

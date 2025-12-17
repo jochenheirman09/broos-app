@@ -12,21 +12,21 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Building, BookOpen, RefreshCw, KeyRound, Copy, Users, LogOut, AlertTriangle } from "lucide-react";
+import { Building, BookOpen, RefreshCw, KeyRound, Copy, Users, LogOut, PlusCircle, AlertTriangle, Archive } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { ClubUpdates } from "./club-updates";
 import { Button } from "../ui/button";
-import { generateClubInvitationCode } from "@/lib/firebase/firestore/club";
+import { generateClubInvitationCode } from "@/actions/club-actions";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@/context/user-context";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { AlertList } from "./alert-list";
+import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 
 function ResponsibleNoClub() {
   const { logout } = useUser();
@@ -60,11 +60,11 @@ function ResponsibleNoClub() {
 
 
 function ClubManagement({ clubId }: { clubId: string }) {
-  const firestore = useFirestore();
   const { userProfile } = useUser();
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const firestore = useFirestore();
 
   const clubRef = useMemoFirebase(
     () => (firestore && clubId ? doc(firestore, "clubs", clubId) : null),
@@ -80,17 +80,20 @@ function ClubManagement({ clubId }: { clubId: string }) {
     if (!club) return;
     setIsGenerating(true);
     try {
-      await generateClubInvitationCode(firestore, club.id);
-      toast({
-        title: "Code gegenereerd!",
-        description: `Een nieuwe uitnodigingscode is gegenereerd voor ${club.name}.`,
-      });
-      // The useDoc hook will automatically show the new code
-    } catch (error) {
+      const result = await generateClubInvitationCode(club.id);
+      if (result.success) {
+        toast({
+            title: "Code gegenereerd!",
+            description: `Een nieuwe uitnodigingscode is gegenereerd voor ${club.name}. De lijst wordt vernieuwd.`,
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Fout",
-        description: "Kon geen uitnodigingscode genereren.",
+        description: error.message || "Kon geen uitnodigingscode genereren.",
       });
     } finally {
       setIsGenerating(false);
@@ -116,7 +119,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
     );
   };
 
-  if (isLoading) {
+  if (isLoading || !userProfile) {
     return (
       <Card>
         <CardContent className="flex justify-center items-center p-8">
@@ -127,9 +130,19 @@ function ClubManagement({ clubId }: { clubId: string }) {
   }
 
   if (!club) {
-    // Show the creation/recovery prompt if club data fails to load for ANY reason
-    return <ResponsibleNoClub />;
+    return (
+        <Card>
+            <CardContent className="p-6">
+                 <p className="text-muted-foreground">
+                    Clubgegevens worden geladen of zijn niet beschikbaar...
+                </p>
+            </CardContent>
+        </Card>
+    );
   }
+  
+  const claimsReady = !!(userProfile && userProfile.role && userProfile.clubId);
+
 
   return (
     <>
@@ -172,7 +185,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
                 </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="grid gap-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-muted-foreground">Club-brede Inzichten</h3>
             <ClubUpdates clubId={club.id} />
@@ -189,22 +202,36 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
        <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
-            Individuele Alerts
-          </CardTitle>
-          <CardDescription>
-            Een overzicht van alle zorgwekkende signalen die de AI heeft gedetecteerd binnen de club.
-          </CardDescription>
+          <div className="flex flex-wrap justify-between items-start gap-4">
+            <div className="flex-grow">
+              <CardTitle className="flex items-center text-2xl">
+                <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
+                Actieve Alerts
+              </CardTitle>
+              <CardDescription>
+                Een overzicht van alle nieuwe, zorgwekkende signalen binnen de club.
+              </CardDescription>
+            </div>
+            <Link href="/alerts/archive" passHref>
+              <Button variant="outline" className="w-full sm:w-auto">
+                Bekijk Archief
+                <Archive className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
-          <AlertList />
+          {claimsReady ? (
+              <AlertList status="new" />
+          ) : (
+              <div className="flex justify-center items-center h-20"><Spinner /></div>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center text-2xl">
                 <Users className="h-6 w-6 mr-3" />
                 Team Chat
             </CardTitle>
@@ -221,9 +248,9 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Team Management</CardTitle>
+          <CardTitle className="text-2xl">Team Management</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="grid gap-6 md:grid-cols-2">
           <div>
             <h3 className="text-xl font-semibold mb-4">Jouw Teams</h3>
             <TeamList
@@ -232,7 +259,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
               onTeamChange={handleTeamChange}
             />
           </div>
-          <Separator />
           <div>
             <h3 className="text-xl font-semibold mb-4">
               Voeg een Nieuw Team Toe
@@ -242,20 +268,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
       
-      <Card>
-          <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                  <BookOpen />
-                  Kennisbank
-              </CardTitle>
-              <CardDescription>
-                  Beheer de documenten die de AI-buddy gebruikt om contextuele antwoorden te geven.
-              </CardDescription>
-          </CardHeader>
-          <CardContent>
-              <KnowledgeBaseManager />
-          </CardContent>
-      </Card>
+      <KnowledgeBaseManager />
     </>
   );
 }

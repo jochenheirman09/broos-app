@@ -11,7 +11,6 @@ import {
   useAuth,
   useDoc,
   useMemoFirebase,
-  FirebaseErrorListener, // Import the listener
 } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
@@ -51,41 +50,59 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   } = useDoc<UserProfile>(userDocRef);
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
+  // State to explicitly track if we have forced a token refresh for custom claims.
+  const [isTokenRefreshed, setIsTokenRefreshed] = useState(false);
 
-  // The context is loading if Firebase Auth is checking the user OR if we have a user
-  // but are still waiting for their Firestore profile. This is the source of truth.
-  const loading = isAuthLoading || (!!user && isProfileLoading);
+  // The context is loading if auth is checking, or we're fetching the profile, or we are waiting for the critical token refresh.
+  const loading = isAuthLoading || (!!user && (isProfileLoading || !isTokenRefreshed));
   
   useEffect(() => {
-    if (loading) {
-      console.log('[UserProvider] Context is loading...');
-      return;
-    }
-
-    // --- Start of Centralized Routing Logic ---
-    const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/' || pathname.startsWith('/verify-email');
-
-    if (!user) {
-      // If not logged in, should be on an auth page. If not, redirect.
-      if (!isAuthPage) {
-        console.log('[UserProvider] No user, redirecting to /login.');
-        router.replace("/login");
-      }
+    if (isAuthLoading) {
+      console.log('[UserProvider] Auth state is loading...');
       return;
     }
     
-    // User is logged in, but might be on an auth page they shouldn't be on.
-    if (isAuthPage && user.emailVerified) {
-       console.log('[UserProvider] User is logged in and verified, redirecting from auth page to /dashboard.');
-       router.replace('/dashboard');
+    const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/' || pathname.startsWith('/verify-email');
+    
+    if (!user) {
+        // Not logged in. Reset token state for next login.
+        setIsTokenRefreshed(false); 
+        if (!isAuthPage) {
+            console.log('[UserProvider] No user, redirecting to /login.');
+            router.replace("/login");
+        }
+        return;
     }
 
+    // User object exists. Now we handle token refresh and routing.
+    // If token hasn't been refreshed for this session, do it now.
+    if (!isTokenRefreshed) {
+        console.log('[UserProvider] User found, forcing token refresh for custom claims...');
+        user.getIdToken(true).then(() => {
+            console.log('[UserProvider] Token refreshed successfully. Claims are now available on the client.');
+            setIsTokenRefreshed(true); // This will trigger a re-render, and `loading` will become false.
+        }).catch(err => {
+            console.error("[UserProvider] CRITICAL: Failed to refresh token. Logging out.", err);
+            logout();
+        });
+        return; // IMPORTANT: Wait for the refresh to complete before proceeding.
+    }
+    
+    // Once the token is refreshed, proceed with routing logic.
+    // This block will only run AFTER isTokenRefreshed is true.
     if (!user.emailVerified) {
       if (pathname !== '/verify-email') {
         console.log('[UserProvider] User not verified, redirecting to /verify-email.');
         router.replace("/verify-email");
       }
       return;
+    }
+
+    if (isAuthPage) {
+       console.log('[UserProvider] User is logged in and verified, redirecting from auth page to /dashboard.');
+       router.replace('/dashboard');
+       return;
     }
 
     if (userProfile) {
@@ -95,13 +112,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('[UserProvider] Player/Staff profile incomplete, redirecting to /complete-profile.');
         router.replace('/complete-profile');
       } else if (!isPlayerStaffProfileIncomplete && pathname === '/complete-profile') {
-         console.log('[UserProvider] Player/Staff profile is complete, redirecting to /dashboard.');
+        console.log('[UserProvider] Player/Staff profile is complete, redirecting to /dashboard.');
         router.replace('/dashboard');
       }
     }
-    // --- End of Centralized Routing Logic ---
 
-  }, [user, userProfile, loading, router, pathname]);
+  }, [user, userProfile, isAuthLoading, isTokenRefreshed, router, pathname]);
 
 
   useEffect(() => {
@@ -110,13 +126,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [profileError]);
 
-  // DATA SYNC FIX: Ensure emailVerified status in Firestore matches Auth state.
   useEffect(() => {
     if (user && user.emailVerified && userProfile && !userProfile.emailVerified) {
-      console.log(`[UserProvider] Syncing emailVerified status for user ${'user.uid'}...`);
+      console.log(`[UserProvider] Syncing emailVerified status for user ${user.uid}...`);
       const userRef = doc(firestore, "users", user.uid);
       updateDoc(userRef, { emailVerified: true })
-        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${'user.uid'}.`))
+        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${user.uid}.`))
         .catch(err => console.error(`[UserProvider] Failed to sync emailVerified status:`, err));
     }
   }, [user, userProfile, firestore]);
@@ -124,6 +139,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsLoggingOut(true);
     await auth.signOut();
+    // Resetting states on logout
+    setIsTokenRefreshed(false); 
     router.push("/");
     setIsLoggingOut(false);
   };
@@ -149,7 +166,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         logout,
       }}
     >
-      <FirebaseErrorListener />
       {children}
     </UserContext.Provider>
   );

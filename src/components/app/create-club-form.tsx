@@ -11,15 +11,13 @@ import { Spinner } from "../ui/spinner";
 import Link from "next/link";
 import { Separator } from "../ui/separator";
 import { useRouter } from "next/navigation";
-import { createClub } from "@/lib/firebase/firestore/club"; // Gewijzigd: importeer de client-side functie
-import { useFirestore } from "@/firebase";
+import { createClubAndSetClaims } from "@/actions/user-actions";
 import { LogOut } from "lucide-react";
 
 export function CreateClubForm() {
   const { user, logout } = useUser();
   const { toast } = useToast();
   const router = useRouter();
-  const db = useFirestore();
   const [clubName, setClubName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,17 +43,25 @@ export function CreateClubForm() {
     setIsLoading(true);
 
     try {
-      // Gebruik nu de herstelde, client-side createClub functie
-      await createClub(db, user.uid, clubName);
+      // The server action now handles setting claims.
+      const result = await createClubAndSetClaims(user.uid, clubName);
       
-      toast({
-        title: "Succes!",
-        description: `Club '${clubName}' succesvol aangemaakt. Log opnieuw in om verder te gaan.`,
-      });
-      // Forceer een logout zodat de gebruiker opnieuw kan inloggen met een token die (hopelijk)
-      // de nieuwe claims bevat na de volgende stap.
-      logout();
-      router.push('/login');
+      if (result.success) {
+        toast({
+          title: "Succes!",
+          description: `${result.message} De pagina wordt vernieuwd.`,
+        });
+        
+        // The server action has set the claims. We force a token refresh on the client
+        // to make sure the new claims are active before redirecting.
+        console.log("[Create Club Form] Forcing token refresh...");
+        await user.getIdToken(true);
+        console.log("[Create Club Form] Token refreshed, redirecting to dashboard.");
+        router.push("/dashboard");
+
+      } else {
+        throw new Error(result.message);
+      }
       
     } catch (error: any) {
       console.error("Fout bij het maken van de club:", error);
@@ -116,3 +122,5 @@ export function CreateClubForm() {
     </div>
   );
 }
+
+    

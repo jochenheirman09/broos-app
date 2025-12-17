@@ -9,23 +9,35 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
-import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, Archive } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AlertsPage() {
   return (
     <div className="container mx-auto py-8">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center text-2xl">
-            <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
-            Gegenereerde Alerts
-          </CardTitle>
-          <CardDescription>
-            Een overzicht van door de AI gedetecteerde zorgwekkende signalen.
-          </CardDescription>
+           <div className="flex flex-wrap justify-between items-start gap-4">
+            <div className="flex-grow">
+              <CardTitle className="flex items-center text-2xl">
+                <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
+                Actieve Alerts
+              </CardTitle>
+              <CardDescription>
+                Een overzicht van de meest recente zorgwekkende signalen die aandacht vereisen.
+              </CardDescription>
+            </div>
+            <Link href="/alerts/archive" passHref>
+              <Button variant="outline" className="w-full sm:w-auto">
+                Bekijk Archief
+                <Archive className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
-          <AlertList />
+          <AlertList status="new" />
         </CardContent>
       </Card>
     </div>

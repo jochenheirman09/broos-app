@@ -104,16 +104,16 @@ export function RegisterForm() {
     setIsLoading(true);
     
     try {
-      // Step 0: Create the user in Firebase Auth
+      console.log("[REG] Starting registration...");
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         values.email,
         values.password
       );
       const user = userCredential.user;
+      console.log(`[REG] Auth user created: ${user.uid}`);
 
-      // Step 1: Immediately write the main user profile document.
-      // This is crucial for the UserProvider to find the document right away.
+      // 1. Write user profile to Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name: values.name,
@@ -124,21 +124,24 @@ export function RegisterForm() {
         onboardingCompleted: false,
         acceptedTerms: values.acceptedTerms,
       });
+      console.log("[REG] Users document written.");
 
-      // Step 2: Write the temporary registration document to trigger the Cloud Function for claims.
+      // 2. Write temporary registration document to trigger Cloud Function
       if (values.teamCode && (values.role === 'player' || values.role === 'staff')) {
           const registrationRef = doc(db, "user_registrations", user.uid);
           await setDoc(registrationRef, { invitationCode: values.teamCode });
+          console.log(`[REG] Registration trigger written for code: ${values.teamCode}`);
       }
       
-      // Step 3: Wait for the Cloud Function to run and then force a token refresh.
+      // 3. Wait for the Cloud Function to set claims and then force a token refresh.
+      console.log("[REG] Waiting 3 seconds for Cloud Function to run...");
       await new Promise(resolve => setTimeout(resolve, 3000));
-      console.log("[Registration] Forcing token refresh to get custom claims...");
+      console.log("[REG] Forcing token refresh to get custom claims...");
       await user.getIdToken(true);
-      console.log("[Registration] Token refreshed.");
+      console.log("[REG] Token refreshed successfully.");
 
-      // Step 4: Send the verification email and redirect.
       await sendEmailVerification(user);
+      console.log("[REG] Verification email sent.");
 
       toast({
         title: "Registratie succesvol",
@@ -148,14 +151,17 @@ export function RegisterForm() {
       router.push("/verify-email");
 
     } catch (error: any) {
+      const errorMessage = error.message || "Er is een onbekende fout opgetreden.";
+      const errorCode = error.code || "unknown";
+      
+      console.error(`[REG ERROR] Code: ${errorCode}. Message: ${errorMessage}`);
+      
       toast({
         variant: "destructive",
         title: "Registratie mislukt",
-        description:
-          error.code === "auth/email-already-in-use"
-            ? "Dit e-mailadres is al in gebruik."
-            : error.message || "Er is een onbekende fout opgetreden.",
+        description: `${errorCode}: ${errorMessage}`,
       });
+
     } finally {
       setIsLoading(false);
     }
@@ -339,3 +345,5 @@ export function RegisterForm() {
     </Form>
   );
 }
+
+    
