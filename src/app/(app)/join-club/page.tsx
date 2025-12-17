@@ -1,3 +1,4 @@
+
 "use client";
 
 import { JoinClubForm } from "@/components/app/join-club-form";
@@ -9,14 +10,13 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Users, Wrench } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { handleRepairUserClaims } from "@/actions/cleanup-actions";
+import { useState } from "react";
 import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
+import { handleRepairUserClaims } from "@/actions/cleanup-actions";
+import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 
 // New component for the repair functionality
 function RepairCard() {
@@ -38,6 +38,7 @@ function RepairCard() {
                     title: "Account Hersteld!",
                     description: `${result.message} U wordt nu uitgelogd.`,
                 });
+                console.log("REPAIRED CLAIMS:", result.claims);
                 // Force an immediate logout to get a new token.
                 await logout();
                 router.push('/login');
@@ -60,16 +61,16 @@ function RepairCard() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-accent-foreground">
                     <Wrench className="h-6 w-6" />
-                    Problemen met Inloggen?
+                    Problemen met Toegang?
                 </CardTitle>
                 <CardDescription>
-                    Als u na het aanmaken van een club of het joinen van een team nog steeds fouten ziet, klik dan hier om uw account te herstellen.
+                    Als u na het aanmaken van een club of het joinen van een team fouten blijft zien, klik dan hier om uw accountrechten te herstellen. U wordt daarna uitgelogd.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <Button onClick={onRepair} variant="accent" className="w-full" disabled={isLoading}>
                     {isLoading && <Spinner size="small" className="mr-2" />}
-                    Herstel Mijn Account
+                    Herstel Mijn Accountrechten
                 </Button>
             </CardContent>
         </Card>

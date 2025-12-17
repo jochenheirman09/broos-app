@@ -4,7 +4,6 @@
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
-import { collection, query, where, getDocs, limit, doc, writeBatch } from "firebase/firestore";
 
 // Function to generate a random 8-character alphanumeric code
 const generateCode = (length = 8) => {
@@ -59,7 +58,7 @@ export async function createClubAndSetClaims(userId: string, clubName: string): 
 
         console.log(`[Club Action] Creating new club "${clubName}".`);
         const batch = adminDb.batch();
-        const clubRef = doc(clubsRef);
+        const clubRef = clubsRef.doc();
         
         batch.set(clubRef, {
             name: clubName,
@@ -221,7 +220,10 @@ export async function getChatPartnersData(userId: string): Promise<{ teams: With
     }
     console.log(`[User Action] User is staff/player, querying for users and team in teamId: ${userProfile.teamId}`);
     membersQuery = adminDb.collection('users').where('teamId', '==', userProfile.teamId);
+    // Fetch the specific team document using its ID
+    const teamDocRef = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').doc(userProfile.teamId);
     teamsQuery = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').where('id', '==', userProfile.teamId);
+
   }
 
   const [membersSnapshot, teamsSnapshot] = await Promise.all([

@@ -106,17 +106,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (userProfile) {
-      const isPlayerStaffProfileIncomplete = (userProfile.role === 'player' || userProfile.role === 'staff') && (!userProfile.teamId || !userProfile.birthDate);
-      
-      if (isPlayerStaffProfileIncomplete && pathname !== '/complete-profile') {
-        console.log('[UserProvider] Player/Staff profile incomplete, redirecting to /complete-profile.');
-        router.replace('/complete-profile');
-      } else if (!isPlayerStaffProfileIncomplete && pathname === '/complete-profile') {
-        console.log('[UserProvider] Player/Staff profile is complete, redirecting to /dashboard.');
-        router.replace('/dashboard');
+      // Player now only needs birthDate to complete profile
+      const isPlayerProfileIncomplete = userProfile.role === 'player' && !userProfile.birthDate;
+      // Staff profile is considered complete if they have a teamId
+      const isStaffProfileIncomplete = userProfile.role === 'staff' && !userProfile.teamId;
+
+      if ((isPlayerProfileIncomplete || isStaffProfileIncomplete) && pathname !== '/complete-profile') {
+          console.log('[UserProvider] Profile incomplete, redirecting to /complete-profile.');
+          router.replace('/complete-profile');
+      } else if (!isPlayerProfileIncomplete && !isStaffProfileIncomplete && pathname === '/complete-profile') {
+          console.log('[UserProvider] Profile is complete, redirecting from /complete-profile to /dashboard.');
+          router.replace('/dashboard');
       }
     }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userProfile, isAuthLoading, isTokenRefreshed, router, pathname]);
 
 

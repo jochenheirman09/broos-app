@@ -25,23 +25,19 @@ import { format } from "date-fns";
 import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
 import { updateUserTeam } from "@/actions/user-actions";
 import { useRouter } from "next/navigation";
-import { updateUserProfile } from "@/lib/firebase/firestore/user";
-import { useFirestore } from "@/firebase";
 
+// A staff member only needs to provide a team code. A player needs both.
 const formSchema = z.object({
-  birthDate: z.date({
-    required_error: "Geboortedatum is vereist.",
-  }),
+  birthDate: z.date().optional(),
   teamCode: z.string().min(1, { message: "Teamcode is vereist." }),
 });
 
 export function CompleteProfileForm() {
-  const { user } = useUser();
+  const { user, userProfile } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const db = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,19 +46,27 @@ export function CompleteProfileForm() {
     },
   });
 
+  const isPlayer = userProfile?.role === 'player';
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
       toast({ variant: "destructive", title: "Fout", description: "Je bent niet ingelogd." });
       return;
     }
+    // A player MUST provide a birthdate.
+    if (isPlayer && !values.birthDate) {
+        form.setError("birthDate", { message: "Geboortedatum is vereist voor spelers." });
+        return;
+    }
 
     setIsLoading(true);
 
     try {
-      // The server action now handles setting claims.
-      const result = await updateUserTeam(user.uid, values.teamCode, {
-        birthDate: values.birthDate.toISOString().split("T")[0],
-      });
+      const updates = isPlayer 
+        ? { birthDate: values.birthDate!.toISOString().split("T")[0] }
+        : {};
+
+      const result = await updateUserTeam(user.uid, values.teamCode, updates);
 
       if (result.success) {
         toast({
@@ -70,11 +74,10 @@ export function CompleteProfileForm() {
           description: `${result.message} De pagina wordt herladen.`,
         });
         
-        // CRITICAL: Force a token refresh on the client to get the new custom claims.
         console.log("[Complete Profile Form] Forcing token refresh...");
         await user.getIdToken(true);
         console.log("[Complete Profile Form] Token refreshed, reloading page.");
-        window.location.reload(); // Force a full reload to apply context changes
+        window.location.reload(); 
       
       } else {
         throw new Error(result.message);
@@ -94,58 +97,60 @@ export function CompleteProfileForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="birthDate"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Geboortedatum</FormLabel>
-              <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      {field.value ? (
-                        format(field.value, "PPP")
-                      ) : (
-                        <span>Kies een datum</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <DatePickerWithDropdowns
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
-                    }
-                    initialFocus
-                    footer={
-                      <div className="p-2 border-t">
+        {isPlayer && (
+            <FormField
+            control={form.control}
+            name="birthDate"
+            render={({ field }) => (
+                <FormItem className="flex flex-col">
+                <FormLabel>Geboortedatum</FormLabel>
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                    <PopoverTrigger asChild>
+                    <FormControl>
                         <Button
-                          className="w-full"
-                          onClick={() => setIsPopoverOpen(false)}
-                          disabled={!field.value}
+                        variant={"outline"}
+                        className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                        )}
                         >
-                          Mijn verjaardag!
+                        {field.value ? (
+                            format(field.value, "PPP")
+                        ) : (
+                            <span>Kies een datum</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
-                      </div>
-                    }
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                    </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <DatePickerWithDropdowns
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                        date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                        footer={
+                        <div className="p-2 border-t">
+                            <Button
+                            className="w-full"
+                            onClick={() => setIsPopoverOpen(false)}
+                            disabled={!field.value}
+                            >
+                            Selecteer
+                            </Button>
+                        </div>
+                        }
+                    />
+                    </PopoverContent>
+                </Popover>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        )}
         <FormField
           control={form.control}
           name="teamCode"

@@ -43,7 +43,6 @@ export function CreateClubForm() {
     setIsLoading(true);
 
     try {
-      // The server action now handles setting claims.
       const result = await createClubAndSetClaims(user.uid, clubName);
       
       if (result.success) {
@@ -52,12 +51,11 @@ export function CreateClubForm() {
           description: `${result.message} De pagina wordt vernieuwd.`,
         });
         
-        // The server action has set the claims. We force a token refresh on the client
-        // to make sure the new claims are active before redirecting.
+        // CRITICAL FIX: Force a token refresh on the client to get the new custom claims.
         console.log("[Create Club Form] Forcing token refresh...");
         await user.getIdToken(true);
-        console.log("[Create Club Form] Token refreshed, redirecting to dashboard.");
-        router.push("/dashboard");
+        console.log("[Create Club Form] Token refreshed, reloading page to apply new context.");
+        window.location.reload(); 
 
       } else {
         throw new Error(result.message);
@@ -122,5 +120,3 @@ export function CreateClubForm() {
     </div>
   );
 }
-
-    

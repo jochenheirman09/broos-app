@@ -112,6 +112,8 @@ export function RegisterForm() {
       );
       const user = userCredential.user;
       console.log(`[REG] Auth user created: ${user.uid}`);
+      
+      const isPlayer = values.role === 'player';
 
       // 1. Write user profile to Firestore
       await setDoc(doc(db, "users", user.uid), {
@@ -121,7 +123,7 @@ export function RegisterForm() {
         role: values.role,
         gender: values.gender,
         emailVerified: false,
-        onboardingCompleted: false,
+        onboardingCompleted: !isPlayer, // Set to true for staff/responsible, false for player
         acceptedTerms: values.acceptedTerms,
       });
       console.log("[REG] Users document written.");
@@ -345,5 +347,3 @@ export function RegisterForm() {
     </Form>
   );
 }
-
-    

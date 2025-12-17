@@ -26,7 +26,6 @@ import { useUser } from "@/context/user-context";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { AlertList } from "./alert-list";
-import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 
 function ResponsibleNoClub() {
   const { logout } = useUser();
@@ -35,18 +34,17 @@ function ResponsibleNoClub() {
       <CardHeader>
         <CardTitle className="flex items-center text-2xl">
           <Building className="h-7 w-7 mr-3 text-accent-foreground" />
-          Creëer of Herstel Je Club
+          Creëer Je Club
         </CardTitle>
         <CardDescription className="text-accent-foreground/80">
-          Om de app te blijven gebruiken, moet je een club aanmaken of je opnieuw aansluiten bij je bestaande club om je account te herstellen.
-           Als je dit net hebt gedaan, moet je eerst uitloggen en opnieuw inloggen.
+          Om te beginnen, maak een club aan of sluit je aan bij een bestaande club. Als je dit net hebt gedaan, log dan uit en opnieuw in om de wijzigingen te zien.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col sm:flex-row gap-4">
         <Link href="/create-club" passHref>
           <Button variant="accent" size="lg">
             <PlusCircle className="mr-2 h-5 w-5" />
-            Club Aanmaken of Herstellen
+            Club aanmaken
           </Button>
         </Link>
         <Button variant="outline" size="lg" onClick={logout}>
@@ -268,7 +266,20 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
       
-      <KnowledgeBaseManager />
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-2xl">
+                <BookOpen className="h-7 w-7 text-primary" />
+                Kennisbank Beheer
+            </CardTitle>
+            <CardDescription>
+                Beheer de documenten die de AI-buddy gebruikt om contextuele antwoorden te geven.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <KnowledgeBaseManager />
+        </CardContent>
+    </Card>
     </>
   );
 }
