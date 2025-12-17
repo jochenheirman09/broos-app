@@ -3,50 +3,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // --- HELPERS ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // We halen de data uit Firestore ipv uit het token
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    // Checkt de claim die je Cloud Function zet
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
     }
 
+    function getClubId() {
+      return request.auth.token.clubId;
+    }
+
+    // --- RULES ---
+
     match /clubs/{clubId} {
-      // Sta GET toe voor iedereen die ingelogd is (veilig voor metadata)
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      // Iedereen mag de club/teams zien om lid te kunnen worden of dashboard te laden
+      allow get, list: if isSignedIn();
+      
+      // Alleen eigenaar mag club aanpassen
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /teams/{teamId} {
-        // Belangrijk: Geen complexe checks voor de 'get' van een team
-        allow get: if isSignedIn();
-        allow list: if isSignedIn();
+        // ESSENTIEEL: Sta 'get' EN 'list' toe voor alle ingelogde gebruikers
+        // Dit stopt de "Missing Permissions" crash op het dashboard
+        allow get, list: if isSignedIn();
 
+        // Alleen responsible of staff mag teams aanpassen binnen de club
+        allow create, update, delete: if isSignedIn() && (hasRole('responsible') || hasRole('staff')) && getClubId() == clubId;
+        
         match /summaries/{summaryId} {
-          // Check de rol in de database document, niet in de claim
-          allow read: if isSignedIn() && getUserData().clubId == clubId;
-          allow write: if false;
+          // Gebruik de database-check als backup voor de claims
+          allow read: if isSignedIn() && (
+            request.auth.token.clubId == clubId || 
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId
+          );
+           allow write: if false;
         }
+
+        match /staffUpdates/{updateId} {
+          allow read: if (isResponsible() || isStaff()) && getClubId() == clubId;
+          allow write: if false; 
+        }
+      }
+      
+      match /clubUpdates/{updateId} {
+        allow read: if isResponsible() && getClubId() == clubId;
+        allow write: if false; 
       }
     }
 
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || getUserData().role == 'responsible');
-      allow list: if isSignedIn();
-      allow create, update: if request.auth.uid == userId;
-
-      match /wellnessScores/{scoreId} {
-        allow read, write: if request.auth.uid == userId;
-      }
+      // Je mag je eigen profiel zien
+      allow get: if isSignedIn() && (request.auth.uid == userId || hasRole('responsible'));
       
-      match /trainings/{trainingId} {
+      // List query voor dashboard (nu veilig via claims)
+      allow list: if isSignedIn() && (
+        request.query.where[0][0] == 'uid' || 
+        (hasRole('responsible') && request.query.where[0][0] == 'clubId' && request.query.where[0][2] == getClubId()) ||
+        (hasRole('staff') && request.query.where[0][0] == 'teamId')
+      );
+
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      
+      // Sub-collecties onder user
+      match /{allPaths=**} {
         allow read, write: if request.auth.uid == userId;
       }
     }
 
-    // --- ALERTS (Collection Group) ---
     match /{path=**}/alerts/{alertId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn() && resource.data.clubId == getClubId();
+    }
+
+    match /user_registrations/{uid} {
+      allow create: if request.auth.uid == uid;
     }
   }
 }

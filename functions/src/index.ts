@@ -1,15 +1,13 @@
-
-import * as functions from 'firebase-functions/v1'; // Gebruik v1 om auth te krijgen
+import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 
-// Initialize Admin SDK
-admin.initializeApp();
+// Initialize Admin SDK (slechts één keer)
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
 
 /**
  * Triggered after a new user is created in Firebase Authentication.
- * This function reads a temporary document from 'user_registrations' which should contain
- * the team invitation code entered by the user. It then uses a collection group query
- * to find the team, determines the clubId, and sets the custom claims on the user.
  */
 export const setInitialUserClaims = functions.auth.user().onCreate(async (user: functions.auth.UserRecord) => {    
     const uid = user.uid;
@@ -20,12 +18,11 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
     }
 
     try {
-        // 1. Read the temporary registration document to get the team invitation code.
+        // 1. Read the temporary registration document
         const registrationRef = admin.firestore().doc(`user_registrations/${uid}`);
         const registrationSnap = await registrationRef.get();
         
         if (!registrationSnap.exists) {
-            // This is expected for 'responsible' users who don't enter a code.
             console.log(`Registration document not found for ${uid}. This is normal for a 'responsible' role.`);
             return null;
         }
@@ -33,11 +30,11 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         const invitationCode = registrationSnap.data()?.invitationCode;
         if (!invitationCode) {
             console.error(`Invitation code is missing in registration document for ${uid}.`);
-            await registrationRef.delete(); // Clean up invalid document
+            await registrationRef.delete();
             return null;
         }
 
-        // 2. Use a collection group query to find the team with the given invitation code.
+        // 2. Find the team with the invitation code
         const teamsQuery = admin.firestore().collectionGroup('teams').where('invitationCode', '==', invitationCode).limit(1);
         const teamSnapshot = await teamsQuery.get();
 
@@ -57,7 +54,7 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
              return null;
         }
         
-        // Get the role from the user's permanent profile document created on the client
+        // Get the role from the user's permanent profile document
         const userProfileDoc = await admin.firestore().collection('users').doc(uid).get();
         const userRole = userProfileDoc.data()?.role;
 
@@ -67,14 +64,14 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
             return null;
         }
 
-        // 3. Set the Custom Claims on the user's authentication record.
+        // 3. Set the Custom Claims
         const customClaims = { role: userRole, clubId, teamId };
         await admin.auth().setCustomUserClaims(uid, customClaims);
         
-        // 4. Update the permanent user document with the resolved IDs.
+        // 4. Update the permanent user document
         await admin.firestore().collection('users').doc(uid).update({ clubId, teamId });
 
-        // 5. Clean up the temporary registration document.
+        // 5. Clean up
         await registrationRef.delete(); 
 
         console.log(`✅ Claims successfully set for new user ${uid}: ${JSON.stringify(customClaims)}`);
@@ -83,5 +80,36 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
     } catch (error) {
         console.error(`❌ Critical error setting claims for ${uid}:`, error);
         return null;
+    }
+});
+
+/**
+ * TIJDELIJKE FIX FUNCTIE
+ * Run dit via: firebase deploy --only functions:fixUserClaims
+ * Roep daarna de URL aan in je browser.
+ */
+export const fixUserClaims = functions.https.onRequest(async (req, res) => {
+    const uid = "sPMqxc2bXAWMDuaW03DlVpss2Ol2";
+    const claims = {
+        admin: true,
+        role: "admin",
+        clubId: "udj0TS8Z0eOsvrqhLyWP"
+    };
+
+    try {
+        // Forceer de claims op de server
+        await admin.auth().setCustomUserClaims(uid, claims);
+        
+        // Haal de gebruiker opnieuw op om te verifiëren
+        const user = await admin.auth().getUser(uid);
+        
+        res.status(200).send({
+            message: "Success! Claims zijn handmatig bijgewerkt voor test-user.",
+            uid: uid,
+            appliedClaims: user.customClaims
+        });
+    } catch (error: any) {
+        console.error("Error in fixUserClaims:", error);
+        res.status(500).send("Fout bij bijwerken: " + error.message);
     }
 });
