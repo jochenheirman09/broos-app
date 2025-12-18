@@ -26,14 +26,17 @@ import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
 import { updateUserTeam } from "@/actions/user-actions";
 import { useRouter } from "next/navigation";
 
-// A staff member only needs to provide a team code. A player needs both.
+
 const formSchema = z.object({
-  birthDate: z.date().optional(),
-  teamCode: z.string().min(1, { message: "Teamcode is vereist." }),
+  birthDate: z.date({
+    required_error: "Geboortedatum is vereist.",
+  }),
+  buddyName: z.string().min(1, { message: "Naam van je buddy is vereist." }),
+  teamCode: z.string().min(1, { message: "Team uitnodigingscode is vereist." }),
 });
 
 export function CompleteProfileForm() {
-  const { user, userProfile } = useUser();
+  const { user, forceRefetch } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -42,123 +45,124 @@ export function CompleteProfileForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      buddyName: "Broos",
       teamCode: "",
     },
   });
-
-  const isPlayer = userProfile?.role === 'player';
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
       toast({ variant: "destructive", title: "Fout", description: "Je bent niet ingelogd." });
       return;
     }
-    // A player MUST provide a birthdate.
-    if (isPlayer && !values.birthDate) {
-        form.setError("birthDate", { message: "Geboortedatum is vereist voor spelers." });
-        return;
-    }
 
     setIsLoading(true);
 
     try {
-      const updates = isPlayer 
-        ? { birthDate: values.birthDate!.toISOString().split("T")[0] }
-        : {};
-
-      const result = await updateUserTeam(user.uid, values.teamCode, updates);
-
-      if (result.success) {
-        toast({
-          title: "Profiel Voltooid!",
-          description: `${result.message} De pagina wordt herladen.`,
+        const result = await updateUserTeam(user.uid, values.teamCode, {
+            birthDate: values.birthDate.toISOString().split("T")[0],
+            buddyName: values.buddyName,
         });
-        
-        console.log("[Complete Profile Form] Forcing token refresh...");
-        await user.getIdToken(true);
-        console.log("[Complete Profile Form] Token refreshed, reloading page.");
-        window.location.reload(); 
-      
-      } else {
-        throw new Error(result.message);
-      }
+
+        if (result.success) {
+          toast({
+            title: "Profiel Voltooid",
+            description: "Je bent helemaal klaar om te beginnen! De pagina wordt herladen.",
+          });
+          // The UserProvider will now automatically handle the redirect to the dashboard.
+          forceRefetch(); // Trigger a refetch of the user profile context
+          router.push('/dashboard');
+        } else {
+          throw new Error(result.message);
+        }
 
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Fout",
-        description: error.message || "Er is een onbekende fout opgetreden.",
+        description: error.message || "Er is een onbekende fout opgetreden bij het opslaan.",
       });
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {isPlayer && (
-            <FormField
-            control={form.control}
-            name="birthDate"
-            render={({ field }) => (
-                <FormItem className="flex flex-col">
-                <FormLabel>Geboortedatum</FormLabel>
-                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                    <PopoverTrigger asChild>
-                    <FormControl>
-                        <Button
-                        variant={"outline"}
-                        className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                        )}
-                        >
-                        {field.value ? (
-                            format(field.value, "PPP")
-                        ) : (
-                            <span>Kies een datum</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                    </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                    <DatePickerWithDropdowns
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                        footer={
-                        <div className="p-2 border-t">
-                            <Button
-                            className="w-full"
-                            onClick={() => setIsPopoverOpen(false)}
-                            disabled={!field.value}
-                            >
-                            Selecteer
-                            </Button>
-                        </div>
-                        }
-                    />
-                    </PopoverContent>
-                </Popover>
-                <FormMessage />
-                </FormItem>
-            )}
-            />
-        )}
         <FormField
           control={form.control}
-          name="teamCode"
+          name="birthDate"
+          render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel>Geboortedatum</FormLabel>
+              <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full pl-3 text-left font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value ? (
+                        format(field.value, "PPP")
+                      ) : (
+                        <span>Kies een datum</span>
+                      )}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <DatePickerWithDropdowns
+                    mode="single"
+                    selected={field.value}
+                    onSelect={field.onChange}
+                    disabled={(date) =>
+                      date > new Date() || date < new Date("1900-01-01")
+                    }
+                    initialFocus
+                    footer={
+                      <div className="p-2 border-t">
+                        <Button
+                          className="w-full"
+                          onClick={() => setIsPopoverOpen(false)}
+                          disabled={!field.value}
+                        >
+                          Selecteer
+                        </Button>
+                      </div>
+                    }
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+            control={form.control}
+            name="teamCode"
+            render={({ field }) => (
+            <FormItem>
+                <FormLabel>Team Uitnodigingscode</FormLabel>
+                <FormControl>
+                <Input placeholder="Code van je team" {...field} />
+                </FormControl>
+                <FormMessage />
+            </FormItem>
+            )}
+        />
+        <FormField
+          control={form.control}
+          name="buddyName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Team Uitnodigingscode</FormLabel>
+              <FormLabel>Hoe wil je je AI-buddy noemen?</FormLabel>
               <FormControl>
-                <Input placeholder="Code van je coach" {...field} />
+                <Input placeholder="bv. Broos, Sparky,..." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

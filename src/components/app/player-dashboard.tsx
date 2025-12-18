@@ -10,95 +10,49 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Users, Info } from "lucide-react";
+import { ArrowRight, Users, Info, Archive } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
-import { useCollection, useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, limit, query, where, doc } from "firebase/firestore";
-import { Chat, Team, Club } from "@/lib/types";
-import { RequestNotificationPermission } from "./request-notification-permission";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
+import { WelcomeHeader } from "./welcome-header";
 
+
+function ProfileIncompleteAlert() {
+  return (
+    <Alert variant="destructive">
+      <Info className="h-4 w-4" />
+      <AlertTitle>Profiel Onvolledig</AlertTitle>
+      <AlertDescription>
+        Je profiel is nog niet volledig ingevuld.
+        <Link href="/complete-profile" className="font-bold underline ml-1">Klik hier</Link> om het af te maken.
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 export function PlayerDashboard() {
-  const { userProfile, user } = useUser();
-  const db = useFirestore();
+  const { userProfile } = useUser();
 
-  const firstName = userProfile?.name?.split(" ")[0];
-  const buddyName = userProfile?.buddyName || "Broos";
-
-  const teamRef = useMemoFirebase(() => {
-    if (!userProfile?.clubId || !userProfile?.teamId) return null;
-    return doc(db, "clubs", userProfile.clubId, "teams", userProfile.teamId);
-  }, [db, userProfile?.clubId, userProfile?.teamId]);
-  const { data: teamData, isLoading: teamLoading } = useDoc<Team>(teamRef);
-
-  const clubRef = useMemoFirebase(() => {
-    if (!userProfile?.clubId) return null;
-    return doc(db, "clubs", userProfile.clubId);
-  }, [db, userProfile?.clubId]);
-  const { data: clubData, isLoading: clubLoading } = useDoc<Club>(clubRef);
-
-
-  // Check if there's any chat history to adjust the button text
-  const previousChatsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(collection(db, "users", user.uid, "chats"), limit(1));
-  }, [user, db]);
-
-  const { data: previousChats } = useCollection<Chat>(previousChatsQuery);
-
-  const hasChatHistory = previousChats ? previousChats.length > 0 : false;
-  
-  const isLoadingAffiliation = teamLoading || clubLoading;
-
-  if (!firstName || !userProfile?.teamId) {
-    return (
-        <Alert variant="destructive">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Profiel Onvolledig</AlertTitle>
-            <AlertDescription>
-                Je profiel is nog niet volledig ingevuld. 
-                <Link href="/complete-profile" className="font-bold underline ml-1">Klik hier</Link> om het af te maken.
-            </AlertDescription>
-        </Alert>
-    )
+  if (!userProfile) {
+    return null;
   }
 
+  if (!userProfile.birthDate || !userProfile.teamId) {
+    return (
+      <div className="space-y-6">
+        <WelcomeHeader />
+        <ProfileIncompleteAlert />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
-       <RequestNotificationPermission />
-
-      <Card className="text-center">
-        <CardHeader>
-          <CardTitle>
-            Jouw Dashboard{firstName ? `, ${firstName}` : ""}
-          </CardTitle>
-          {isLoadingAffiliation ? (
-            <div className="flex justify-center items-center h-5">
-              <Spinner size="small" />
-            </div>
-          ) : (
-            teamData && clubData && (
-              <CardDescription className="flex items-center justify-center gap-2">
-                <Users className="h-4 w-4" /> Lid van team <strong>{teamData.name}</strong> van <strong>{clubData.name}</strong>
-              </CardDescription>
-            )
-          )}
-        </CardHeader>
-        <CardContent>
-          <Link href="/chat">
-            <Button size="lg" className="w-full sm:w-auto">
-              {hasChatHistory
-                ? `Zet je gesprek verder met ${buddyName}`
-                : `Start Gesprek met ${buddyName}`}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
       
       <Card>
         <CardHeader>
@@ -114,13 +68,23 @@ export function PlayerDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Jouw Recente Weetjes</CardTitle>
-          <CardDescription>
-            Interessante inzichten en vergelijkingen met je team.
-          </CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <CardTitle>Jouw Recente Weetjes</CardTitle>
+                    <CardDescription>
+                        Interessante inzichten en vergelijkingen met je team.
+                    </CardDescription>
+                </div>
+                <Link href="/archive/player-updates" passHref>
+                    <Button variant="secondary" size="sm">
+                        <Archive className="mr-2 h-4 w-4" />
+                        Bekijk Archief
+                    </Button>
+                </Link>
+            </div>
         </CardHeader>
         <CardContent>
-          <PlayerUpdates />
+          <PlayerUpdates status="new" />
         </CardContent>
       </Card>
     </div>

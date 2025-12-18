@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useFirestore } from '@/firebase';
-import { doc, getDoc, collection, collectionGroup, query, where, getDocs, orderBy, limit as firestoreLimit } from 'firebase/firestore';
+import { doc, getDoc, collection, collectionGroup, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import type { UserProfile, Alert as AlertType, WithId, Team } from '@/lib/types';
 import { Spinner } from '../ui/spinner';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { AlertTriangle, Archive, Check, Shield, Calendar, MessageSquare, Tag, Users, MoreVertical } from 'lucide-react';
+import { AlertTriangle, Archive, Check, Shield, Calendar, MessageSquare, Tag, Users, MoreVertical, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -30,34 +30,81 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { createOrGetChat } from '@/actions/p2p-chat-actions';
 import { cn } from '@/lib/utils';
+import { Card } from "@/components/ui/card";
 
+
+// Helper function to get initials from a name
 const getInitials = (name: string = '') => {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase();
 };
 
-const alertTypeTranslations: Record<AlertType['alertType'], string> = {
-    'Mental Health': 'Mentale Gezondheid',
-    'Aggression': 'Agressie',
-    'Substance Abuse': 'Middelengebruik',
-    'Extreme Negativity': 'Extreme Negativiteit',
-};
+// Represents alerts grouped under a single player
+interface PlayerAlertGroup {
+    player: WithId<UserProfile>;
+    alerts: WithId<AlertType>[];
+}
 
-function AlertCard({ alert, player, team, onStatusChange }: { alert: WithId<AlertType>, player: WithId<UserProfile>, team?: WithId<Team>, onStatusChange: () => void }) {
+// Represents players and their alerts, grouped under a single team
+interface TeamAlertGroup {
+    team: WithId<Team>;
+    players: PlayerAlertGroup[];
+}
+
+
+function SingleAlertDetail({ alert }: { alert: WithId<AlertType> }) {
+  const translatedType = alertTypeTranslations[alert.alertType] || alert.alertType;
+
+  return (
+    <div className="pl-6 border-l ml-6 my-4 space-y-2">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Calendar className="h-4 w-4" />
+        <span>{format(new Date(alert.date), 'dd MMM yyyy, HH:mm', { locale: nl })}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+         <Tag className="h-4 w-4" />
+         <span>{alert.shareWithStaff ? translatedType : 'Gevoelig onderwerp'}</span>
+      </div>
+      <p className="flex items-start gap-2 text-sm">
+        <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+        {alert.shareWithStaff ? (
+            <span className="italic">"{alert.triggeringMessage}"</span>
+        ) : (
+            <span className="italic text-muted-foreground">De speler heeft geen toestemming gegeven om de details van dit bericht te delen.</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+
+function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlerts: PlayerAlertGroup, teamId: string, onStatusChange: () => void }) {
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
+  const { player, alerts } = playerAlerts;
 
-  const handleUpdateStatus = async (status: 'acknowledged' | 'resolved') => {
+  const handleUpdateAllStatus = async (status: 'acknowledged' | 'resolved') => {
     if (!user) return;
     setIsUpdating(true);
-    const result = await updateAlertStatus(user.uid, alert.clubId, alert.teamId, alert.id, status);
-    if (result.success) {
-      toast({ title: "Status bijgewerkt", description: result.message });
-      onStatusChange();
+    
+    // Create a promise for each alert update
+    const updatePromises = alerts.map(alert => 
+        updateAlertStatus(user.uid, alert.clubId, teamId, alert.id, status)
+    );
+
+    // Wait for all updates to complete
+    const results = await Promise.all(updatePromises);
+    
+    const failedUpdates = results.filter(r => !r.success);
+
+    if (failedUpdates.length > 0) {
+        toast({ variant: "destructive", title: "Fout", description: `Kon ${failedUpdates.length} alert(s) niet bijwerken.` });
     } else {
-      toast({ variant: "destructive", title: "Fout", description: result.message });
+        toast({ title: "Status bijgewerkt", description: `Alle alerts voor ${player.name} zijn bijgewerkt.` });
+        onStatusChange();
     }
+    
     setIsUpdating(false);
   };
   
@@ -73,89 +120,58 @@ function AlertCard({ alert, player, team, onStatusChange }: { alert: WithId<Aler
     setIsUpdating(false);
   };
 
-  const translatedType = alertTypeTranslations[alert.alertType] || alert.alertType;
-  
   return (
-    <AccordionItem value={alert.id}>
-      <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-lg">
-        <div className="flex flex-row items-center justify-between w-full gap-x-4">
-            <div className="flex items-center gap-4 text-left">
-                <Avatar className="h-10 w-10 border-2 border-destructive">
-                    <AvatarImage src={player.photoURL} />
-                    <AvatarFallback className="bg-destructive/10 text-destructive font-bold">
-                        {getInitials(player.name)}
-                    </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col items-start gap-1">
-                    <p className="font-bold">{player.name}</p>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                        <span>{alert.shareWithStaff ? translatedType : 'Gevoelig onderwerp'}</span>
-                        {team && (
-                          <>
-                            <span className="text-xs">•</span>
-                            <span className='flex items-center gap-1'><Users className='h-3 w-3'/> {team.name}</span>
-                          </>
-                        )}
-                    </div>
-                     <div className="flex items-center gap-2 text-sm text-muted-foreground sm:hidden">
-                        <Calendar className="h-4 w-4" />
-                        <span>{format(new Date(alert.date), 'dd MMM yyyy', { locale: nl })}</span>
+    <AccordionItem value={player.id} className="border-t">
+        <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50">
+            <div className="flex justify-between items-center w-full">
+                <div className="flex items-center gap-4 text-left">
+                    <Avatar className="h-10 w-10">
+                        <AvatarImage src={player.photoURL} />
+                        <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                            {getInitials(player.name)}
+                        </AvatarFallback>
+                    </Avatar>
+                     <div>
+                        <p className="font-bold">{player.name}</p>
+                        <p className="text-sm text-muted-foreground">{alerts.length} {alerts.length > 1 ? 'actieve alerts' : 'actieve alert'}</p>
                     </div>
                 </div>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={isUpdating} onClick={e => e.stopPropagation()}>
+                            {isUpdating ? <Spinner size="small"/> : <MoreVertical className="h-4 w-4" />}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                        <DropdownMenuItem onSelect={handleChatWithPlayer}>
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            <span>Chat met {player.name.split(' ')[0]}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleUpdateAllStatus('acknowledged')}>
+                            <Archive className="mr-2 h-4 w-4" />
+                            <span>Markeer alles als Behandeld</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleUpdateAllStatus('resolved')}>
+                            <Check className="mr-2 h-4 w-4" />
+                            <span>Markeer alles als Opgelost</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-            
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span>{format(new Date(alert.date), 'dd MMM yyyy', { locale: nl })}</span>
-            </div>
-        </div>
-      </AccordionTrigger>
-      <AccordionContent className="p-4 bg-muted/20 rounded-b-lg">
-        <div className="space-y-4">
-            <div className="flex justify-between items-start">
-              <div className='space-y-3 flex-grow'>
-                {alert.topic && (
-                    <p className="flex items-start gap-3">
-                        <Tag className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                        <span>Onderwerp: <span className="font-semibold">{alert.topic}</span></span>
-                    </p>
-                )}
-                <p className="flex items-start gap-3">
-                  <MessageSquare className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                  {alert.shareWithStaff ? (
-                      <span className="italic">"{alert.triggeringMessage}"</span>
-                  ) : (
-                      <span className="italic text-muted-foreground">De speler heeft geen toestemming gegeven om de details van dit bericht te delen. Neem op een algemene, ondersteunende manier contact op.</span>
-                  )}
-                </p>
-              </div>
-               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" disabled={isUpdating} onClick={e => e.stopPropagation()}>
-                    {isUpdating ? <Spinner size="small"/> : <MoreVertical className="h-4 w-4" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={handleChatWithPlayer}>
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    <span>Chat met {player.name.split(' ')[0]}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => handleUpdateStatus('acknowledged')}>
-                    <Archive className="mr-2 h-4 w-4" />
-                    <span>Markeer als Behandeld</span>
-                  </DropdownMenuItem>
-                   <DropdownMenuItem onSelect={() => handleUpdateStatus('resolved')}>
-                    <Check className="mr-2 h-4 w-4" />
-                    <span>Markeer als Opgelost</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-        </div>
-      </AccordionContent>
+        </AccordionTrigger>
+        <AccordionContent className="p-4 pt-0 bg-muted/20">
+             {alerts.map(alert => <SingleAlertDetail key={alert.id} alert={alert} />)}
+        </AccordionContent>
     </AccordionItem>
   )
 }
+
+const alertTypeTranslations: Record<AlertType['alertType'], string> = {
+    'Mental Health': 'Mentale Gezondheid',
+    'Aggression': 'Agressie',
+    'Substance Abuse': 'Middelengebruik',
+    'Extreme Negativity': 'Extreme Negativiteit',
+};
 
 export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archived', limit?: number }) {
   const { userProfile } = useUser();
@@ -206,20 +222,13 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
               return;
             }
             
-            console.log('[AlertList] Fetching alerts...');
             const alertsSnapshot = await getDocs(alertsQuery);
-            console.log(`[AlertList] Found ${alertsSnapshot.docs.length} total alerts.`);
             
             const allAlerts = alertsSnapshot.docs.map(doc => ({ ...doc.data() as AlertType, id: doc.id }));
 
-            // CLIENT-SIDE FILTERING to avoid needing another index
             const filteredAlerts = allAlerts.filter(alert => {
-              if (status === 'new') {
-                return alert.status === 'new';
-              }
-              if (status === 'archived') {
-                return alert.status === 'acknowledged' || alert.status === 'resolved';
-              }
+              if (status === 'new') return alert.status === 'new';
+              if (status === 'archived') return alert.status === 'acknowledged' || alert.status === 'resolved';
               return true; 
             });
 
@@ -232,21 +241,18 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
             const teamsMap = new Map<string, WithId<Team>>();
 
             if (userIdsToFetch.length > 0) {
-              console.log('[AlertList] Fetching players directly by ID:', userIdsToFetch);
               const playerPromises = userIdsToFetch.map(uid => getDoc(doc(db, 'users', uid)));
               const playerSnapshots = await Promise.all(playerPromises);
 
               playerSnapshots.forEach((snapshot) => {
                 if (snapshot.exists()) {
                   playersMap.set(snapshot.id, { ...snapshot.data() as UserProfile, id: snapshot.id });
-                } else {
-                  console.warn(`[AlertList] Player with ID ${snapshot.id} not found in /users/`);
                 }
               });
-              console.log(`[AlertList] Successfully mapped ${playersMap.size} players.`);
+              setPlayers(playersMap);
             }
 
-            if (teamIdsToFetch.length > 0 && role === 'responsible') {
+            if (teamIdsToFetch.length > 0) {
                 const teamPromises = teamIdsToFetch.map(tid => getDoc(doc(db, `clubs/${clubId}/teams`, tid)));
                 const teamSnapshots = await Promise.all(teamPromises);
 
@@ -255,13 +261,9 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
                         teamsMap.set(snapshot.id, { ...snapshot.data() as Team, id: snapshot.id });
                     }
                 });
+                setTeams(teamsMap);
             }
-            
-            setPlayers(playersMap);
-            setTeams(teamsMap);
-
       } catch (e: any) {
-        console.error("[AlertList] FULL ERROR:", e);
         setError("Fout bij ophalen van alerts: " + e.message);
       } finally {
         setIsLoading(false);
@@ -272,19 +274,57 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
 
   }, [db, userProfile, limit, status, refreshKey]);
 
+  // Grouping logic, runs whenever data changes
+  const groupedData: TeamAlertGroup[] = useMemo(() => {
+    if (alerts.length === 0 || players.size === 0 || teams.size === 0) {
+      return [];
+    }
+
+    const teamPlayerMap = new Map<string, Map<string, PlayerAlertGroup>>();
+
+    for (const alert of alerts) {
+      const teamId = alert.teamId;
+      const playerId = alert.userId;
+
+      // Ensure team exists in map
+      if (!teamPlayerMap.has(teamId)) {
+        teamPlayerMap.set(teamId, new Map());
+      }
+      const playerMap = teamPlayerMap.get(teamId)!;
+      
+      // Ensure player exists in map
+      if (!playerMap.has(playerId)) {
+        const playerProfile = players.get(playerId);
+        if (playerProfile) {
+          playerMap.set(playerId, { player: playerProfile, alerts: [] });
+        }
+      }
+
+      // Add alert to player's list
+      const playerGroup = playerMap.get(playerId);
+      if (playerGroup) {
+        playerGroup.alerts.push(alert);
+      }
+    }
+    
+    // Convert maps to sorted arrays for rendering
+    return Array.from(teamPlayerMap.entries()).map(([teamId, playerMap]) => {
+      const team = teams.get(teamId)!; // Assume team exists if it's in the map
+      const playerGroups = Array.from(playerMap.values()).sort((a, b) => b.alerts.length - a.alerts.length);
+      return { team, players: playerGroups };
+    }).sort((a, b) => a.team.name.localeCompare(b.team.name));
+
+  }, [alerts, players, teams]);
+
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-40">
-        <Spinner />
-      </div>
-    );
+    return <div className="flex justify-center items-center h-40"><Spinner /></div>;
   }
 
   if (error) {
     return <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Fout</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
   }
 
-  if (alerts.length === 0) {
+  if (groupedData.length === 0) {
     return (
       <Alert className="bg-green-500/10 border-green-500/50 text-green-700 dark:text-green-400">
         <Shield className="h-4 w-4 !text-green-500" />
@@ -297,12 +337,27 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
   }
 
   return (
-    <Accordion type="multiple" className="w-full space-y-2">
-      {alerts.map(alert => {
-        const player = players.get(alert.userId);
-        const team = teams.get(alert.teamId);
-        return player ? <AlertCard key={alert.id} alert={alert} player={player} team={team} onStatusChange={handleStatusChange} /> : null;
-      })}
+    <Accordion type="multiple" className="w-full space-y-4">
+      {groupedData.map(({ team, players: playerGroups }) => (
+        <AccordionItem value={team.id} key={team.id} className="border-b-0">
+          <Card>
+            <AccordionTrigger className="p-4 hover:no-underline rounded-t-lg">
+                <div className="flex items-center gap-3">
+                    <Users className="h-6 w-6 text-primary"/>
+                    <h3 className="text-xl font-bold">{team.name}</h3>
+                    <span className="text-muted-foreground font-normal">({playerGroups.reduce((acc, p) => acc + p.alerts.length, 0)} alerts)</span>
+                </div>
+            </AccordionTrigger>
+            <AccordionContent className="p-0">
+                <Accordion type="multiple" className="w-full">
+                    {playerGroups.map(playerGroup => (
+                        <PlayerAccordion key={playerGroup.player.id} playerAlerts={playerGroup} teamId={team.id} onStatusChange={handleStatusChange} />
+                    ))}
+                </Accordion>
+            </AccordionContent>
+          </Card>
+        </AccordionItem>
+      ))}
     </Accordion>
   );
 }

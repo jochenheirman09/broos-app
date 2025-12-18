@@ -1,5 +1,5 @@
 
-"use server";
+'use server';
 
 import { getFirebaseAdmin } from "@/ai/genkit";
 
@@ -12,6 +12,65 @@ const generateCode = (length = 8) => {
   }
   return result;
 };
+
+/**
+ * Creates a new club, storing the provided logo as a base64 data URL in Firestore.
+ * @param userId The UID of the user creating the club.
+ * @param clubName The name of the new club.
+ * @param logoDataURL The base64-encoded data URL of the logo image.
+ * @returns An object indicating success or failure.
+ */
+export async function createClubWithLogo(userId: string, clubName: string, logoDataURL?: string): Promise<{ success: boolean; message: string; }> {
+    if (!userId || !clubName) {
+        return { success: false, message: "Gebruikers-ID en clubnaam zijn vereist." };
+    }
+    const { adminDb, adminAuth } = await getFirebaseAdmin();
+    const clubRef = adminDb.collection("clubs").doc();
+
+    try {
+        const batch = adminDb.batch();
+        batch.set(clubRef, {
+            name: clubName,
+            ownerId: userId,
+            id: clubRef.id,
+            invitationCode: generateCode(),
+            ...(logoDataURL && { logoURL: logoDataURL }),
+        });
+        batch.update(adminDb.collection("users").doc(userId), { clubId: clubRef.id });
+        await batch.commit();
+
+        await adminAuth.setCustomUserClaims(userId, { clubId: clubRef.id, role: 'responsible' });
+        
+        return { success: true, message: `Club '${clubName}' succesvol aangemaakt.` };
+    } catch (error: any) {
+        console.error("[Club Action] Fout bij aanmaken club met logo:", error);
+        return { success: false, message: error.message || "Kon de club niet aanmaken." };
+    }
+}
+
+/**
+ * Updates an existing club's logo by saving the new logo as a base64 data URL.
+ * @param clubId The ID of the club to update.
+ * @param logoDataURL The new base64-encoded logo data URL.
+ * @returns An object indicating success or failure.
+ */
+export async function updateClubLogo(clubId: string, logoDataURL: string): Promise<{ success: boolean; message: string; }> {
+    if (!clubId || !logoDataURL) {
+        return { success: false, message: "Club ID en logo zijn vereist." };
+    }
+    const { adminDb } = await getFirebaseAdmin();
+    const clubRef = adminDb.collection("clubs").doc(clubId);
+
+    try {
+        // CORRECTED: Ensure the update call receives an object.
+        await clubRef.update({ logoURL: logoDataURL });
+        return { success: true, message: "Clublogo succesvol bijgewerkt." };
+    } catch (error: any) {
+        console.error("[Club Action] Fout bij het bijwerken van clublogo:", error);
+        return { success: false, message: error.message || "Kon het clublogo niet bijwerken." };
+    }
+}
+
 
 export async function generateClubInvitationCode(clubId: string): Promise<{ success: boolean; message: string; }> {
     if (!clubId) {

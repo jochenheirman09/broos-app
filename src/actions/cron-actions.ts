@@ -1,7 +1,7 @@
 
 'use server';
 
-import { Firestore } from 'firebase-admin/firestore';
+import { Firestore, WriteBatch } from 'firebase-admin/firestore';
 import { analyzeTeamData } from '@/ai/flows/team-analysis-flow';
 import { generatePlayerUpdate } from '@/ai/flows/player-update-flow';
 import { analyzeClubData } from '@/ai/flows/club-analysis-flow';
@@ -68,7 +68,6 @@ export async function runAnalysisJob() {
       
       const playersData: { playerProfile: UserProfile; scores: WellnessScore; }[] = [];
       for (const playerDoc of playersInTeamSnapshot.docs) {
-        // CORRECTED QUERY: Fetch the wellness score for the specific user for 'today'.
         const wellnessDocRef = playerDoc.ref.collection('wellnessScores').doc(today);
         const wellnessDoc = await wellnessDocRef.get();
 
@@ -108,7 +107,6 @@ export async function runAnalysisJob() {
           }
         }
 
-        // Player-specific "Weetjes"
         for (const { playerProfile, scores } of playersData) {
             if (teamAnalysisResult?.summary) {
                 const playerUpdateInput: PlayerUpdateInput = {
@@ -131,7 +129,6 @@ export async function runAnalysisJob() {
       }
     }
 
-    // Club-wide analysis
     if (teamSummaries.length > 0) {
         console.log(`[CRON] Analyzing data for ${teamSummaries.length} teams in club ${clubDoc.data().name}.`);
         const clubAnalysisInput: ClubAnalysisInput = { clubId, clubName: clubDoc.data().name, teamSummaries };

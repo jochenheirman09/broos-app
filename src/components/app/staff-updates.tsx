@@ -3,12 +3,12 @@
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
-import { collection, query, orderBy, where, getDocs, collectionGroup } from "firebase/firestore";
+import { collection, query, orderBy, where, getDocs, doc, getDoc, limit } from "firebase/firestore";
 import type { StaffUpdate, WithId, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Users, Activity, HeartPulse, AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   'Team Performance': <Activity className="h-5 w-5 text-primary" />,
@@ -17,29 +17,41 @@ const categoryIcons: { [key: string]: React.ReactNode } = {
   default: <Users className="h-5 w-5 text-primary" />,
 };
 
-function TeamUpdates({ teamId, teamName, clubId }: { teamId: string, teamName: string, clubId: string }) {
+function TeamUpdates({ teamId, teamName, clubId, status }: { teamId: string, teamName: string, clubId: string, status: 'new' | 'archived' }) {
   const db = useFirestore();
 
   const updatesQuery = useMemoFirebase(() => {
     return query(
       collection(db, `clubs/${clubId}/teams/${teamId}/staffUpdates`),
-      orderBy("date", "desc")
+      orderBy("date", "desc"),
+      limit(status === 'new' ? 5 : 50)
     );
-  }, [db, clubId, teamId]);
+  }, [db, clubId, teamId, status]);
 
-  const { data: updates, isLoading } = useCollection<StaffUpdate>(updatesQuery);
+  const { data: allUpdates, isLoading } = useCollection<StaffUpdate>(updatesQuery);
+  
+  const updates = useMemo(() => {
+    if (!allUpdates || allUpdates.length === 0) return [];
+    if (status === 'archived') return allUpdates;
+    const latestDate = allUpdates[0].date;
+    return allUpdates.filter(update => update.date === latestDate);
+  }, [allUpdates, status]);
+
 
   if (isLoading) {
     return <div className="p-4"><Spinner size="small" /></div>;
   }
 
   if (!updates || updates.length === 0) {
+     const message = status === 'new'
+      ? "Zodra de wekelijkse analyse is gedraaid, verschijnen hier de inzichten voor dit team."
+      : "Dit team heeft nog geen gearchiveerde inzichten.";
     return (
         <div className="mb-6">
             <h3 className="font-bold text-lg mb-2">{teamName}</h3>
             <Alert>
                 <AlertTitle>Nog geen inzichten</AlertTitle>
-                <AlertDescription>Zodra de wekelijkse analyse is gedraaid, verschijnen hier de inzichten voor dit team.</AlertDescription>
+                <AlertDescription>{message}</AlertDescription>
             </Alert>
         </div>
     )
@@ -65,7 +77,7 @@ function TeamUpdates({ teamId, teamName, clubId }: { teamId: string, teamName: s
   );
 }
 
-export function StaffUpdates({ clubId, teamId }: { clubId: string, teamId?: string }) {
+export function StaffUpdates({ clubId, teamId, status = 'new' }: { clubId: string, teamId?: string, status?: 'new' | 'archived' }) {
   const { userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   const [teams, setTeams] = useState<WithId<Team>[]>([]);
@@ -85,13 +97,15 @@ export function StaffUpdates({ clubId, teamId }: { clubId: string, teamId?: stri
         try {
             let teamsQuery;
             if (userProfile.role === 'responsible' && clubId) {
-                // Responsible: fetch all teams for the club
                 teamsQuery = query(collection(db, `clubs/${clubId}/teams`), orderBy("name"));
             } else if (userProfile.role === 'staff' && teamId && clubId) {
-                // Staff: fetch only their own team
-                teamsQuery = query(collection(db, `clubs/${clubId}/teams`), where("id", "==", teamId));
+                const teamDoc = await getDoc(doc(db, `clubs/${clubId}/teams`, teamId));
+                if (teamDoc.exists()) {
+                    setTeams([{ id: teamDoc.id, ...teamDoc.data() } as WithId<Team>]);
+                }
+                setIsLoading(false);
+                return;
             } else {
-                 // No relevant role or IDs, do nothing.
                 setTeams([]);
                 setIsLoading(false);
                 return;
@@ -145,7 +159,7 @@ export function StaffUpdates({ clubId, teamId }: { clubId: string, teamId?: stri
   return (
     <div className="space-y-6">
       {teams.map((team) => (
-        <TeamUpdates key={team.id} teamId={team.id} teamName={team.name} clubId={clubId} />
+        <TeamUpdates key={team.id} teamId={team.id} teamName={team.name} clubId={clubId} status={status} />
       ))}
     </div>
   );

@@ -10,7 +10,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Archive } from 'lucide-react';
+import { AlertTriangle, Archive, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AlertsPage() {
@@ -28,12 +28,20 @@ export default function AlertsPage() {
                 Een overzicht van de meest recente zorgwekkende signalen die aandacht vereisen.
               </CardDescription>
             </div>
-            <Link href="/alerts/archive" passHref>
-              <Button variant="outline" className="w-full sm:w-auto">
-                Bekijk Archief
-                <Archive className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Link href="/dashboard" passHref>
+                <Button variant="outline" className="w-full">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Terug naar Dashboard
+                </Button>
+              </Link>
+              <Link href="/alerts/archive" passHref>
+                <Button variant="secondary" className="w-full">
+                  Bekijk Archief
+                  <Archive className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

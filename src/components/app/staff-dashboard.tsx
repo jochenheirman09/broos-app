@@ -11,7 +11,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
-import { AlertTriangle, Users } from "lucide-react";
+import { AlertTriangle, Users, Archive } from "lucide-react";
 import { AlertList } from "./alert-list";
 import Link from "next/link";
 import { Button } from "../ui/button";
@@ -50,29 +50,48 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Team Inzichten</CardTitle>
-          <CardDescription>
-            Een overzicht van de wekelijkse trends en aandachtspunten voor je team.
-          </CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                  <CardTitle>Team Inzichten</CardTitle>
+                  <CardDescription>
+                      De meest recente trends en aandachtspunten voor je team.
+                  </CardDescription>
+              </div>
+              <Link href="/archive/staff-updates" passHref>
+                  <Button variant="secondary" size="sm">
+                      <Archive className="mr-2 h-4 w-4" />
+                      Bekijk Archief
+                  </Button>
+              </Link>
+            </div>
         </CardHeader>
         <CardContent>
-          <StaffUpdates clubId={clubId} teamId={teamId} />
+          <StaffUpdates clubId={clubId} teamId={teamId} status="new" />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <AlertTriangle className="h-6 w-6 mr-3 text-destructive" />
-            Individuele Alerts
-          </CardTitle>
-          <CardDescription>
-            Een overzicht van zorgwekkende signalen die de AI heeft gedetecteerd bij spelers in jouw team.
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center text-2xl">
+                    <AlertTriangle className="mr-3 h-6 w-6 text-destructive" />
+                    Actieve Alerts
+                </CardTitle>
+                <CardDescription>
+                    Een overzicht van zorgwekkende signalen bij spelers in jouw team.
+                </CardDescription>
+              </div>
+              <Link href="/alerts" passHref>
+                <Button variant="outline" className="w-full sm:w-auto">
+                    Bekijk Alle Alerts
+                </Button>
+              </Link>
+          </div>
         </CardHeader>
         <CardContent>
            {claimsReady ? (
-                <AlertList />
+                <AlertList status="new" limit={5} />
             ) : (
                 <div className="flex justify-center items-center h-20"><Spinner /></div>
             )}

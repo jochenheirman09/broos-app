@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import React, { useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';

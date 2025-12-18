@@ -1,32 +1,119 @@
-rules_version = '2';
 
+rules_version = '2';
 service cloud.firestore {
+  
   match /databases/{database}/documents {
     
+    // --- HELPERS ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Match ELK team document, ongeacht waar het staat
-    match /clubs/{clubId}/teams/{teamId} {
-       allow get: if isSignedIn(); // Dit lost de specifieke crash op
-       allow list: if isSignedIn();
+    function isOwner(userId) {
+        return request.auth.uid == userId;
     }
 
-    match /clubs/{clubId} {
-      allow get, list: if isSignedIn();
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
+    }
+    
+    function isStaffOrResponsible() {
+      return hasRole('staff') || hasRole('responsible');
+    }
+    
+    function isClubMember(clubId) {
+        return isSignedIn() && request.auth.token.clubId == clubId;
+    }
 
-      match /teams/{teamId} {
-        // De rest van je bestaande rules...
-        match /summaries/{summaryId} {
-          allow read: if isSignedIn(); // Zet dit even op alleen isSignedIn() om te testen
-          allow write: if false;
+    // --- USER-SPECIFIC DATA ---
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update, delete: if isOwner(userId);
+
+      // Staff/responsibles can list users in their team/club.
+      allow list: if (isResponsible() && request.query.where[0][0] == 'clubId') ||
+                   (isStaff() && request.query.where[0][0] == 'teamId') ||
+                   (isSignedIn() && request.query.where[0][0] == 'uid');
+
+      // Player-specific subcollections
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /updates/{updateId} {
+        allow read: if isOwner(userId);
+        allow write: if false; 
+      }
+      match /trainings/{trainingId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /games/{gameId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /chats/{chatId} {
+        allow read, write: if isOwner(userId);
+        match /messages/{messageId} {
+          allow read, write: if isOwner(userId);
         }
+      }
+      match /wellnessScores/{scoreId} {
+        allow read, write: if isOwner(userId);
+      }
+       match /myChats/{chatId} {
+        allow read, write: if isOwner(userId);
       }
     }
 
-    match /users/{userId} {
-      allow get, list, write: if request.auth.uid == userId;
+    // --- CLUB & TEAM DATA ---
+    match /clubs/{clubId} {
+      allow get: if isClubMember(clubId);
+      allow create: if isResponsible();
+      allow update: if isResponsible() && isClubMember(clubId);
+
+      match /teams/{teamId} {
+        allow get: if isClubMember(clubId);
+        allow list: if isClubMember(clubId) && isStaffOrResponsible();
+        allow create, update, delete: if isResponsible() && isClubMember(clubId);
+
+        // Team-specific subcollections
+        match /staffUpdates/{updateId} {
+          allow read: if isClubMember(clubId) && isStaffOrResponsible();
+          allow write: if false;
+        }
+        match /summaries/{summaryId} {
+          allow read: if isClubMember(clubId) && isStaffOrResponsible();
+          allow write: if false;
+        }
+        match /alerts/{alertId} {
+          allow read: if isClubMember(clubId) && isStaffOrResponsible();
+          allow write: if false; 
+        }
+      }
+
+      match /clubUpdates/{updateId} {
+        allow read: if isResponsible() && isClubMember(clubId);
+        allow write: if false;
+      }
+    }
+    
+    // --- OTHER COLLECTIONS ---
+    match /user_registrations/{userId} {
+      allow create: if isOwner(userId);
+    }
+    
+    match /p2p_chats/{chatId} {
+      allow read, write: if isSignedIn() && resource.data.participants.hasAny([request.auth.uid]);
+      match /messages/{messageId} {
+         allow read, write: if isSignedIn() && get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+      }
+    }
+    
+    match /knowledge_base/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isResponsible();
+    }
+    match /knowledge_stats/{statId} {
+      allow read, write: if false; // Only backend can write
     }
   }
 }

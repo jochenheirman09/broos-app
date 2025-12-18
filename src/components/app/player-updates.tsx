@@ -8,6 +8,7 @@ import type { PlayerUpdate } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Info, Sparkles, Lightbulb, BrainCircuit } from "lucide-react";
+import { useMemo } from "react";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   Sleep: <Lightbulb className="h-5 w-5 text-primary" />,
@@ -18,7 +19,7 @@ const categoryIcons: { [key: string]: React.ReactNode } = {
   default: <Info className="h-5 w-5 text-primary" />,
 };
 
-export function PlayerUpdates() {
+export function PlayerUpdates({ status = 'new' }: { status?: 'new' | 'archived' }) {
   const { user } = useUser();
   const db = useFirestore();
 
@@ -27,15 +28,25 @@ export function PlayerUpdates() {
     return query(
       collection(db, `users/${user.uid}/updates`),
       orderBy("date", "desc"),
-      limit(5)
+      limit(status === 'new' ? 5 : 50) 
     );
-  }, [user, db]);
+  }, [user, db, status]);
 
   const {
-    data: updates,
+    data: allUpdates,
     isLoading,
     error,
   } = useCollection<PlayerUpdate>(updatesQuery);
+
+  const updates = useMemo(() => {
+    if (!allUpdates || allUpdates.length === 0) return [];
+    if (status === 'archived') return allUpdates;
+
+    // Only show updates from the most recent day on the dashboard
+    const latestDate = allUpdates[0].date;
+    return allUpdates.filter(update => update.date === latestDate);
+  }, [allUpdates, status]);
+
 
   if (isLoading) {
     return (
@@ -57,12 +68,15 @@ export function PlayerUpdates() {
   }
 
   if (!updates || updates.length === 0) {
+    const message = status === 'new'
+      ? "Zodra er nieuwe weetjes zijn, verschijnen ze hier."
+      : "Je hebt nog geen gearchiveerde weetjes.";
     return (
       <Alert>
         <Sparkles className="h-4 w-4" />
-        <AlertTitle>Nog geen weetjes</AlertTitle>
+        <AlertTitle>Nog geen {status === 'new' ? 'recente' : ''} weetjes</AlertTitle>
         <AlertDescription>
-          Zodra er genoeg data is, verschijnen hier interessante weetjes en vergelijkingen.
+          {message}
         </AlertDescription>
       </Alert>
     );

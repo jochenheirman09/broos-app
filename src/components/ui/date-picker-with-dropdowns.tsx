@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ScrollArea } from "./scroll-area"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -89,7 +91,7 @@ export function DatePickerWithDropdowns({
                 <SelectValue>{selected?.props?.children}</SelectValue>
               </SelectTrigger>
               <SelectContent position="popper">
-                <div className="max-h-48 overflow-y-auto">
+                <ScrollArea className="h-48">
                     {options.map((option, id: number) => (
                     <SelectItem
                         key={`${option.props.value}-${id}`}
@@ -98,7 +100,7 @@ export function DatePickerWithDropdowns({
                         {option.props.children}
                     </SelectItem>
                     ))}
-                </div>
+                </ScrollArea>
               </SelectContent>
             </Select>
           );

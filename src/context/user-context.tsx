@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User as FirebaseUser } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, terminate, clearIndexedDbPersistence } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import {
   useUser as useFirebaseUser,
@@ -22,6 +22,7 @@ interface UserContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   logout: () => void;
+  forceRefetch: () => void;
 }
 
 const UserContext = createContext<UserContextType>({
@@ -29,7 +30,18 @@ const UserContext = createContext<UserContextType>({
   userProfile: null,
   loading: true,
   logout: async () => {},
+  forceRefetch: () => {},
 });
+
+const LoadingScreen = () => (
+  <div className="flex h-screen w-full items-center justify-center bg-background">
+    <div className="flex flex-col items-center justify-center gap-4">
+      <Logo size="large" />
+      <Wordmark size="large">Broos 2.0</Wordmark>
+      <Spinner size="medium" className="mt-4" />
+    </div>
+  </div>
+);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const { user, isUserLoading: isAuthLoading } = useFirebaseUser();
@@ -37,6 +49,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [claimsReady, setClaimsReady] = useState(false);
 
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -47,120 +61,95 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     data: userProfile,
     isLoading: isProfileLoading,
     error: profileError,
+    forceRefetch
   } = useDoc<UserProfile>(userDocRef);
 
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
-  // State to explicitly track if we have forced a token refresh for custom claims.
-  const [isTokenRefreshed, setIsTokenRefreshed] = useState(false);
-
-  // The context is loading if auth is checking, or we're fetching the profile, or we are waiting for the critical token refresh.
-  const loading = isAuthLoading || (!!user && (isProfileLoading || !isTokenRefreshed));
-  
   useEffect(() => {
-    if (isAuthLoading) {
-      console.log('[UserProvider] Auth state is loading...');
+    const syncClaims = async () => {
+      if (user) {
+        try {
+          await user.getIdToken(true);
+          console.log("[UserProvider] Token refreshed in background.");
+          setClaimsReady(true);
+        } catch (error) {
+           console.error("[UserProvider] Failed to refresh token:", error);
+           setClaimsReady(true);
+        }
+      }
+    };
+
+    if (!isAuthLoading && user) {
+      syncClaims();
+    } else if (!isAuthLoading && !user) {
+      setClaimsReady(true);
+    }
+  }, [user, isAuthLoading]);
+
+  const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady || !!profileError));
+
+  useEffect(() => {
+    if (loading) {
       return;
     }
-    
+
     const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/' || pathname.startsWith('/verify-email');
-    
+
     if (!user) {
-        // Not logged in. Reset token state for next login.
-        setIsTokenRefreshed(false); 
-        if (!isAuthPage) {
-            console.log('[UserProvider] No user, redirecting to /login.');
-            router.replace("/login");
-        }
-        return;
+      if (!isAuthPage) {
+        router.replace("/login");
+      }
+      return;
     }
 
-    // User object exists. Now we handle token refresh and routing.
-    // If token hasn't been refreshed for this session, do it now.
-    if (!isTokenRefreshed) {
-        console.log('[UserProvider] User found, forcing token refresh for custom claims...');
-        user.getIdToken(true).then(() => {
-            console.log('[UserProvider] Token refreshed successfully. Claims are now available on the client.');
-            setIsTokenRefreshed(true); // This will trigger a re-render, and `loading` will become false.
-        }).catch(err => {
-            console.error("[UserProvider] CRITICAL: Failed to refresh token. Logging out.", err);
-            logout();
-        });
-        return; // IMPORTANT: Wait for the refresh to complete before proceeding.
+    if (isAuthPage && user.emailVerified) {
+       router.replace('/dashboard');
     }
-    
-    // Once the token is refreshed, proceed with routing logic.
-    // This block will only run AFTER isTokenRefreshed is true.
+
     if (!user.emailVerified) {
       if (pathname !== '/verify-email') {
-        console.log('[UserProvider] User not verified, redirecting to /verify-email.');
         router.replace("/verify-email");
       }
       return;
     }
 
-    if (isAuthPage) {
-       console.log('[UserProvider] User is logged in and verified, redirecting from auth page to /dashboard.');
-       router.replace('/dashboard');
-       return;
-    }
-
     if (userProfile) {
-      // Player now only needs birthDate to complete profile
-      const isPlayerProfileIncomplete = userProfile.role === 'player' && !userProfile.birthDate;
-      // Staff profile is considered complete if they have a teamId
-      const isStaffProfileIncomplete = userProfile.role === 'staff' && !userProfile.teamId;
+      const isPlayerStaffProfileIncomplete = (userProfile.role === 'player' || userProfile.role === 'staff') && !userProfile.teamId;
 
-      if ((isPlayerProfileIncomplete || isStaffProfileIncomplete) && pathname !== '/complete-profile') {
-          console.log('[UserProvider] Profile incomplete, redirecting to /complete-profile.');
-          router.replace('/complete-profile');
-      } else if (!isPlayerProfileIncomplete && !isStaffProfileIncomplete && pathname === '/complete-profile') {
-          console.log('[UserProvider] Profile is complete, redirecting from /complete-profile to /dashboard.');
-          router.replace('/dashboard');
+      if (isPlayerStaffProfileIncomplete && pathname !== '/complete-profile') {
+        router.replace('/complete-profile');
+      } else if (!isPlayerStaffProfileIncomplete && pathname === '/complete-profile') {
+        router.replace('/dashboard');
       }
+    } else if (!isProfileLoading && user && !userProfile) {
+        console.error("[UserProvider] Profile definitively missing from Firestore for UID:", user.uid);
     }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, userProfile, isAuthLoading, isTokenRefreshed, router, pathname]);
-
-
-  useEffect(() => {
-    if (profileError) {
-      console.error("[UserProvider] Error fetching user profile:", profileError);
-    }
-  }, [profileError]);
+    
+  }, [user, userProfile, loading, router, pathname, isProfileLoading]);
 
   useEffect(() => {
     if (user && user.emailVerified && userProfile && !userProfile.emailVerified) {
-      console.log(`[UserProvider] Syncing emailVerified status for user ${user.uid}...`);
       const userRef = doc(firestore, "users", user.uid);
-      updateDoc(userRef, { emailVerified: true })
-        .then(() => console.log(`[UserProvider] Firestore emailVerified status updated for ${user.uid}.`))
-        .catch(err => console.error(`[UserProvider] Failed to sync emailVerified status:`, err));
+      updateDoc(userRef, { emailVerified: true });
     }
   }, [user, userProfile, firestore]);
-
+  
   const logout = async () => {
     setIsLoggingOut(true);
+    setClaimsReady(false);
     await auth.signOut();
-    // Resetting states on logout
-    setIsTokenRefreshed(false); 
     router.push("/");
     setIsLoggingOut(false);
   };
 
-  if (loading || isLoggingOut) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <Logo size="large" />
-          <Wordmark size="large">Broos 2.0</Wordmark>
-          <Spinner size="medium" className="mt-4" />
-        </div>
-      </div>
-    );
+  const forceRefetchUser = useCallback(() => {
+    forceRefetch();
+  }, [forceRefetch]);
+
+
+  if (loading) {
+    return <LoadingScreen />;
   }
-  
+
   return (
     <UserContext.Provider
       value={{
@@ -168,6 +157,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         userProfile: userProfile as UserProfile | null,
         loading,
         logout,
+        forceRefetch: forceRefetchUser
       }}
     >
       {children}

@@ -4,6 +4,7 @@
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
+import { getStorage } from "firebase-admin/storage";
 
 // Function to generate a random 8-character alphanumeric code
 const generateCode = (length = 8) => {
@@ -20,13 +21,13 @@ const generateCode = (length = 8) => {
  * SERVER ACTION to create a club and set admin claims.
  * This is a secure, server-only operation.
  */
-export async function createClubAndSetClaims(userId: string, clubName: string): Promise<{ success: boolean; message: string; }> {
+export async function createClubAndSetClaims(userId: string, clubName: string, logoDataURL?: string): Promise<{ success: boolean; message: string; }> {
     if (!userId || !clubName) {
         return { success: false, message: "User ID and club name are required." };
     }
     
     console.log(`[Club Action] createClubAndSetClaims invoked for user ${userId} and club ${clubName}`);
-    const { adminDb, adminAuth } = await getFirebaseAdmin();
+    const { adminDb, adminAuth, adminApp } = await getFirebaseAdmin();
     const userRef = adminDb.collection("users").doc(userId);
 
     try {
@@ -38,7 +39,6 @@ export async function createClubAndSetClaims(userId: string, clubName: string): 
         }
         
         if (userData.clubId) {
-            // User is already associated with a club. Let's just ensure claims are correct.
             console.log(`[Club Action] User ${userId} already has clubId ${userData.clubId}. Refreshing claims.`);
              await adminAuth.setCustomUserClaims(userId, {
                 clubId: userData.clubId,
@@ -56,15 +56,17 @@ export async function createClubAndSetClaims(userId: string, clubName: string): 
             return { success: false, message: `Een club met de naam "${clubName}" bestaat al.`};
         }
 
+        const clubRef = clubsRef.doc();
+        
         console.log(`[Club Action] Creating new club "${clubName}".`);
         const batch = adminDb.batch();
-        const clubRef = clubsRef.doc();
         
         batch.set(clubRef, {
             name: clubName,
             ownerId: userId,
             id: clubRef.id,
             invitationCode: generateCode(),
+            ...(logoDataURL && { logoURL: logoDataURL }),
         });
         
         batch.update(userRef, { clubId: clubRef.id });
@@ -93,14 +95,13 @@ export async function createClubAndSetClaims(userId: string, clubName: string): 
  * @returns An object with teamId and clubId, or null if not found.
  */
 async function validateTeamCode(db: any, teamCode: string): Promise<{ teamId: string; clubId: string } | null> {
-  console.log(`[User Action] CORRECTLY entering validateTeamCode with code: ${teamCode}`);
+  console.log(`[User Action] Entering validateTeamCode with code: ${teamCode}`);
   
   if (!db) {
       console.error("[User Action][validateTeamCode] CRITICAL: db instance is null or undefined.");
       throw new Error("Database service is niet beschikbaar.");
   }
 
-  // Use a collection group query for efficiency. This requires a composite index on 'invitationCode'.
   const teamQuery = db.collectionGroup("teams")
     .where("invitationCode", "==", teamCode)
     .limit(1);
@@ -139,41 +140,43 @@ export async function updateUserTeam(userId: string, teamCode: string, updates: 
   console.log(`[User Action] Starting updateUserTeam for user ${userId}`);
   const { adminDb: db, adminAuth } = await getFirebaseAdmin();
   const userRef = db.collection('users').doc(userId);
-  console.log("[User Action] Admin DB and user reference obtained successfully.");
-
+  
   try {
-    const teamInfo = await validateTeamCode(db, teamCode);
+    const userDoc = await userRef.get();
+    const userProfile = userDoc.data() as UserProfile | undefined;
+    
+    if (!userProfile) {
+      throw new Error("Gebruiker niet gevonden.");
+    }
 
+    const teamInfo = await validateTeamCode(db, teamCode);
     if (!teamInfo) {
       return { success: false, message: "Team niet gevonden. Controleer de code en probeer opnieuw." };
+    }
+
+    // Security Check: A user can only switch to a team within their existing club.
+    if (userProfile.clubId && userProfile.clubId !== teamInfo.clubId) {
+        return { success: false, message: "Fout: Je kunt alleen wisselen naar een team binnen je eigen club." };
     }
 
     const finalUpdates: { [key: string]: any } = {
       ...updates,
       teamId: teamInfo.teamId,
-      clubId: teamInfo.clubId,
+      // Only set clubId if it doesn't exist yet (for profile completion)
+      ...(userProfile.clubId ? {} : { clubId: teamInfo.clubId }),
     };
     
-    // Get the user's role to set it in the claims
-    const userDoc = await userRef.get();
-    const userRole = userDoc.data()?.role;
-
-    if (!userRole) {
-        throw new Error("Gebruikersrol niet gevonden, kan claims niet instellen.");
-    }
-
-    // Set custom claims AFTER finding team info, before updating the doc
     await adminAuth.setCustomUserClaims(userId, {
-        clubId: teamInfo.clubId,
+        clubId: userProfile.clubId || teamInfo.clubId,
         teamId: teamInfo.teamId,
-        role: userRole
+        role: userProfile.role
     });
-    console.log(`[User Action] Custom claims set for user ${userId}: role=${userRole}, clubId=${teamInfo.clubId}, teamId=${teamInfo.teamId}`);
+    console.log(`[User Action] Custom claims set for user ${userId}: role=${userProfile.role}, clubId=${userProfile.clubId || teamInfo.clubId}, teamId=${teamInfo.teamId}`);
 
     await userRef.update(finalUpdates);
     
     console.log(`[User Action] User ${userId} successfully updated team to ${teamInfo.teamId}`);
-    return { success: true, message: "Team succesvol bijgewerkt! Je moet mogelijk opnieuw inloggen om de wijzigingen te zien." };
+    return { success: true, message: "Team succesvol bijgewerkt! Het kan nodig zijn om de app te herladen." };
 
   } catch (error: any) {
     console.error(`[User Action] Error updating team for user ${userId}:`, error);
@@ -220,10 +223,7 @@ export async function getChatPartnersData(userId: string): Promise<{ teams: With
     }
     console.log(`[User Action] User is staff/player, querying for users and team in teamId: ${userProfile.teamId}`);
     membersQuery = adminDb.collection('users').where('teamId', '==', userProfile.teamId);
-    // Fetch the specific team document using its ID
-    const teamDocRef = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').doc(userProfile.teamId);
-    teamsQuery = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').where('id', '==', userProfile.teamId);
-
+    teamsQuery = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').where('__name__', '==', userProfile.teamId);
   }
 
   const [membersSnapshot, teamsSnapshot] = await Promise.all([
@@ -262,12 +262,10 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   }
   const requesterProfile = requesterDoc.data() as UserProfile;
   
-  // Security check: user must have a club ID
   if (!requesterProfile.clubId) {
       throw new Error("Je hebt geen club en kunt geen teamleden opvragen.");
   }
   
-  // Security check: staff can only see their own team, responsible can see any in their club
   if (requesterProfile.role === 'staff' && requesterProfile.teamId !== teamId) {
       throw new Error("Je hebt geen toegang tot de leden van dit team.");
   }
@@ -282,7 +280,6 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
 
   const members = snapshot.docs
     .map(doc => ({ ...doc.data() as UserProfile, id: doc.id }))
-    // Ensure the members are part of the same club as the requester, preventing cross-club data leakage
     .filter(member => member.clubId === requesterProfile.clubId);
   
   console.log(`[User Action] Found ${members.length} members for team ${teamId}.`);
@@ -290,3 +287,4 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
 }
 
     
+

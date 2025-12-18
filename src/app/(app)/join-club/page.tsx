@@ -9,73 +9,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Users, Wrench } from "lucide-react";
-import { useState } from "react";
-import { useUser } from "@/context/user-context";
-import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
-import { handleRepairUserClaims } from "@/actions/cleanup-actions";
-import { Spinner } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
-
-// New component for the repair functionality
-function RepairCard() {
-    const { user, logout } = useUser();
-    const { toast } = useToast();
-    const router = useRouter();
-    const [isLoading, setIsLoading] = useState(false);
-
-    const onRepair = async () => {
-        if (!user) {
-            toast({ variant: "destructive", title: "Fout", description: "U bent niet ingelogd."});
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const result = await handleRepairUserClaims(user.uid);
-            if (result.success) {
-                toast({
-                    title: "Account Hersteld!",
-                    description: `${result.message} U wordt nu uitgelogd.`,
-                });
-                console.log("REPAIRED CLAIMS:", result.claims);
-                // Force an immediate logout to get a new token.
-                await logout();
-                router.push('/login');
-            } else {
-                throw new Error(result.message);
-            }
-        } catch (error: any) {
-            toast({
-                variant: "destructive",
-                title: "Herstellen Mislukt",
-                description: error.message || "Er is een onbekende fout opgetreden.",
-            });
-        } finally {
-            setIsLoading(false);
-        }
-    }
-
-    return (
-        <Card className="mt-8 border-accent">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-accent-foreground">
-                    <Wrench className="h-6 w-6" />
-                    Problemen met Toegang?
-                </CardTitle>
-                <CardDescription>
-                    Als u na het aanmaken van een club of het joinen van een team fouten blijft zien, klik dan hier om uw accountrechten te herstellen. U wordt daarna uitgelogd.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button onClick={onRepair} variant="accent" className="w-full" disabled={isLoading}>
-                    {isLoading && <Spinner size="small" className="mr-2" />}
-                    Herstel Mijn Accountrechten
-                </Button>
-            </CardContent>
-        </Card>
-    )
-}
+import { Users } from "lucide-react";
 
 export default function JoinClubPage() {
   return (
@@ -97,7 +31,6 @@ export default function JoinClubPage() {
             <JoinClubForm />
           </CardContent>
         </Card>
-        <RepairCard />
       </div>
     </div>
   );

@@ -24,7 +24,6 @@ import {
   query,
   where,
   getDocs,
-  doc,
 } from "firebase/firestore";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { errorEmitter } from "@/firebase/error-emitter";
@@ -32,20 +31,16 @@ import { Club } from "@/lib/types";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import Link from "next/link";
 import { Separator } from "../ui/separator";
-import { handleRepairUserClaims } from "@/actions/cleanup-actions";
-import { useRouter } from "next/navigation";
-
 
 const formSchema = z.object({
   clubCode: z.string().min(1, { message: "Clubcode is vereist." }),
 });
 
 export function JoinClubForm() {
-  const { user, logout } = useUser();
+  const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const db = useFirestore();
-  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -84,35 +79,29 @@ export function JoinClubForm() {
       const clubData = clubDoc.data() as Club;
       
       const updatedProfile = {
-        clubId: clubDoc.id,
+        clubId: clubData.id, 
       };
+
+      // Use the centralized update function
+      updateUserProfile({
+        db,
+        userId: user.uid,
+        data: updatedProfile,
+      });
+
+      toast({
+        title: "Succes!",
+        description: `Je bent succesvol aan club '${clubData.name}' toegevoegd!`,
+      });
+      // The layout will automatically redirect the user upon context update
       
-      // Update Firestore document first
-      await updateUserProfile({ db, userId: user.uid, data: updatedProfile });
-
-      // Then, trigger the server action to set claims
-      const repairResult = await handleRepairUserClaims(user.uid);
-
-      if (repairResult.success) {
-        toast({
-          title: "Succes!",
-          description: `Je bent lid geworden van '${clubData.name}'. Log opnieuw in om de wijzigingen te zien.`,
-        });
-        await logout();
-        router.push("/login");
-      } else {
-        throw new Error(repairResult.message);
-      }
-
-    } catch (error: any) {
-      console.error("Error joining club:", error);
-      if (error.name !== 'FirebaseError') {
-          const permissionError = new FirestorePermissionError({
-            path: "clubs",
-            operation: "list",
-          });
-          errorEmitter.emit("permission-error", permissionError);
-      }
+    } catch (queryError) {
+      console.error("Error executing clubs query:", queryError);
+      const permissionError = new FirestorePermissionError({
+        path: "clubs", // collection group query
+        operation: "list",
+      });
+      errorEmitter.emit("permission-error", permissionError);
     } finally {
         setIsLoading(false);
     }

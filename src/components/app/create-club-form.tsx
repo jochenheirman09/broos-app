@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,64 +10,61 @@ import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "../ui/spinner";
 import Link from "next/link";
 import { Separator } from "../ui/separator";
-import { useRouter } from "next/navigation";
-import { createClubAndSetClaims } from "@/actions/user-actions";
-import { LogOut } from "lucide-react";
+import { createClubWithLogo } from "@/actions/club-actions";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Upload } from "lucide-react";
 
 export function CreateClubForm() {
-  const { user, logout } = useUser();
+  const { user } = useUser();
   const { toast } = useToast();
-  const router = useRouter();
   const [clubName, setClubName] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({ variant: "destructive", title: "Bestand te groot", description: "Logo moet kleiner zijn dan 2MB." });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: "Je moet ingelogd zijn om een club te maken.",
-      });
+      toast({ variant: "destructive", title: "Fout", description: "Je moet ingelogd zijn om een club te maken." });
       return;
     }
     if (clubName.length < 3) {
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: "Clubnaam moet minstens 3 tekens lang zijn.",
-      });
+      toast({ variant: "destructive", title: "Fout", description: "Clubnaam moet minstens 3 tekens lang zijn." });
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const result = await createClubAndSetClaims(user.uid, clubName);
+      // The logoPreview is the data URL string
+      const result = await createClubWithLogo(user.uid, clubName, logoPreview || undefined);
       
       if (result.success) {
-        toast({
-          title: "Succes!",
-          description: `${result.message} De pagina wordt vernieuwd.`,
-        });
-        
-        // CRITICAL FIX: Force a token refresh on the client to get the new custom claims.
-        console.log("[Create Club Form] Forcing token refresh...");
+        toast({ title: "Succes!", description: `${result.message} De pagina wordt vernieuwd.` });
         await user.getIdToken(true);
-        console.log("[Create Club Form] Token refreshed, reloading page to apply new context.");
-        window.location.reload(); 
-
+        window.location.reload();
       } else {
         throw new Error(result.message);
       }
       
     } catch (error: any) {
       console.error("Fout bij het maken van de club:", error);
-      toast({
-        variant: "destructive",
-        title: "Fout bij het maken van de club",
-        description: error.message || "Er is een onverwachte fout opgetreden.",
-      });
+      toast({ variant: "destructive", title: "Fout bij het maken van de club", description: error.message || "Er is een onverwachte fout opgetreden." });
     } finally {
       setIsLoading(false);
     }
@@ -76,6 +73,18 @@ export function CreateClubForm() {
   return (
     <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex flex-col items-center gap-4">
+            <Avatar className="h-24 w-24">
+                <AvatarImage src={logoPreview ?? undefined} />
+                <AvatarFallback className="text-4xl font-bold bg-muted">?</AvatarFallback>
+            </Avatar>
+            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4"/>
+                Upload Clublogo (Optioneel)
+            </Button>
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp"/>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">Nieuwe Clubnaam</Label>
             <Input
@@ -105,18 +114,13 @@ export function CreateClubForm() {
         </div>
       </div>
 
-      <div className="text-center space-y-4">
+      <div className="text-center">
           <Button variant="outline" asChild className="w-full">
             <Link href="/join-club">
                 Sluit je aan bij een bestaande club
             </Link>
           </Button>
-          <Button variant="secondary" onClick={logout} className="w-full">
-            <LogOut className="mr-2 h-4 w-4" />
-            Uitloggen
-          </Button>
       </div>
-
     </div>
   );
 }

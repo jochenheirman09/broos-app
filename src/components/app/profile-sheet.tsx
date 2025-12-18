@@ -17,7 +17,6 @@ import * as z from "zod";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -66,83 +65,89 @@ const profileFormSchema = z.object({
 });
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
-const changeTeamFormSchema = z.object({
+const teamChangeFormSchema = z.object({
   teamCode: z.string().min(1, { message: "Teamcode is vereist." }),
 });
-type ChangeTeamFormValues = z.infer<typeof changeTeamFormSchema>;
+type TeamChangeFormValues = z.infer<typeof teamChangeFormSchema>;
 
-// Sub-component for changing teams
-function ChangeTeamForm() {
-  const { user, userProfile } = useUser();
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
-  const db = useFirestore();
 
-  // Fetch current team info to show the placeholder
-  const teamRef = useMemoFirebase(() => {
-    if (!userProfile?.clubId || !userProfile?.teamId) return null;
-    return doc(db, "clubs", userProfile.clubId, "teams", userProfile.teamId);
-  }, [db, userProfile?.clubId, userProfile?.teamId]);
-  const { data: teamData } = useDoc<Team>(teamRef);
+function TeamManagementCard() {
+    const { user, forceRefetch } = useUser();
+    const { toast } = useToast();
+    const [isUpdatingTeam, setIsUpdatingTeam] = useState(false);
 
-  const form = useForm<ChangeTeamFormValues>({
-    resolver: zodResolver(changeTeamFormSchema),
-    defaultValues: { teamCode: "" },
-  });
+    const teamForm = useForm<TeamChangeFormValues>({
+        resolver: zodResolver(teamChangeFormSchema),
+        defaultValues: { teamCode: "" },
+    });
 
-  async function onSubmit(values: ChangeTeamFormValues) {
-    if (!user) return;
-    setIsLoading(true);
-
-    // This server action now correctly sets custom claims
-    const result = await updateUserTeam(user.uid, values.teamCode);
-
-    if (result.success) {
-      toast({
-        title: "Team Gewijzigd/Hersteld!",
-        description: "Je teamgegevens zijn bijgewerkt. Mogelijk moet je opnieuw inloggen om alle wijzigingen te zien.",
-      });
-      form.reset();
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: result.message,
-      });
+    async function onTeamChangeSubmit(values: TeamChangeFormValues) {
+        if (!user) return;
+        setIsUpdatingTeam(true);
+        try {
+            const result = await updateUserTeam(user.uid, values.teamCode);
+            if (result.success) {
+                toast({
+                    title: "Team Gewijzigd!",
+                    description: "Je bent succesvol van team gewisseld. De app wordt herladen.",
+                });
+                forceRefetch();
+                // Reload to apply new context and claims everywhere
+                window.location.reload();
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Wisselen Mislukt",
+                description: error.message,
+            });
+        } finally {
+            setIsUpdatingTeam(false);
+        }
     }
-    setIsLoading(false);
-  }
 
-  return (
-     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="teamCode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nieuwe of Huidige Teamcode</FormLabel>
-              <FormDescription>
-                Voer een nieuwe code in om van team te wisselen, of voer je huidige code opnieuw in om je account te herstellen.
-              </FormDescription>
-              <FormControl>
-                <Input placeholder={teamData?.invitationCode ? `Huidige code: ${teamData.invitationCode}` : 'ABCDEF'} {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={isLoading} className="w-full">
-          {isLoading && <Spinner size="small" className="mr-2" />}
-          {isLoading ? "Verwerken..." : "Team Bijwerken"}
-        </Button>
-      </form>
-    </Form>
-  )
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    <span>Team Management</span>
+                </CardTitle>
+                <CardDescription>
+                    Voer een nieuwe teamcode in om van team te wisselen binnen je club.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...teamForm}>
+                    <form onSubmit={teamForm.handleSubmit(onTeamChangeSubmit)} className="space-y-4">
+                        <FormField
+                            control={teamForm.control}
+                            name="teamCode"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nieuwe Team Uitnodigingscode</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Teamcode" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" disabled={isUpdatingTeam} className="w-full">
+                            {isUpdatingTeam && <Spinner className="mr-2 h-4 w-4" />}
+                            Wissel van Team
+                        </Button>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
+    );
 }
 
 export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
-  const { user, userProfile, logout } = useUser();
+  const { user, userProfile, logout, forceRefetch } = useUser();
   const { toast } = useToast();
   const auth = useAuth();
   const db = useFirestore();
@@ -219,6 +224,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
           description: "Je profiel wordt bijgewerkt. Het kan even duren voordat de wijzigingen overal zichtbaar zijn.",
         });
         setNewPhoto(null);
+        forceRefetch();
       } else {
         toast({
           title: "Geen wijzigingen",
@@ -246,7 +252,6 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
     });
   }
 
-  // Reset internal state when sheet is closed
   useEffect(() => {
     if (!isOpen) {
       setShowBuddyCustomizer(false);
@@ -277,7 +282,7 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                     {showBuddyCustomizer ? (
                     <BuddyProfileCustomizer onSave={() => {
                         setShowBuddyCustomizer(false); 
-                        onOpenChange(false);
+                        forceRefetch();
                     }} />
                     ) : (
                     <>
@@ -351,13 +356,11 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                                 </Button>
                             </div>
                         </div>
-                        <Separator />
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Team & Account Herstel</h3>
-                            <ChangeTeamForm />
-                        </div>
                         </>
                     )}
+
+                    {(userProfile.role === 'player' || userProfile.role === 'staff') && <TeamManagementCard />}
+
                     </>
                     )}
                 </div>

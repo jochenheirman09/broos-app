@@ -1,3 +1,4 @@
+
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -38,6 +39,7 @@ export interface Club {
   name:string;
   ownerId: string;
   invitationCode?: string;
+  logoURL?: string;
 }
 
 export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -119,7 +121,7 @@ export interface Conversation {
     participants: string[];
     isGroupChat: boolean;
     name?: string;
-    participantProfiles: { [key: string]: { name: string; photoURL?: string } };
+    participantProfiles?: { [key: string]: { name: string; photoURL?: string } };
     lastMessage: string;
     lastMessageTimestamp: any;
 }

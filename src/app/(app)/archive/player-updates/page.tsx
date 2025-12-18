@@ -1,19 +1,19 @@
 
-'use client';
+"use client";
 
-import { ArchivedAlertList } from '@/components/app/archived-alert-list';
+import { PlayerUpdates } from "@/components/app/player-updates";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Archive, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Sparkles, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
-export default function AlertsArchivePage() {
+export default function PlayerUpdatesArchivePage() {
   return (
     <div className="container mx-auto py-8">
       <Card>
@@ -21,11 +21,11 @@ export default function AlertsArchivePage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <CardTitle className="flex items-center text-2xl">
-                <Archive className="h-6 w-6 mr-3 text-muted-foreground" />
-                Gearchiveerde Alerts
+                <Sparkles className="h-6 w-6 mr-3 text-muted-foreground" />
+                Archief Weetjes
               </CardTitle>
               <CardDescription>
-                Een overzicht van alle alerts die zijn behandeld of afgesloten.
+                Een overzicht van al je eerder ontvangen weetjes.
               </CardDescription>
             </div>
             <Link href="/dashboard" passHref>
@@ -37,7 +37,7 @@ export default function AlertsArchivePage() {
           </div>
         </CardHeader>
         <CardContent>
-          <ArchivedAlertList />
+          <PlayerUpdates status="archived" />
         </CardContent>
       </Card>
     </div>
