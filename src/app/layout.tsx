@@ -32,7 +32,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <meta name="theme-color" content="#E8EAF6" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body className="h-full font-body antialiased">
         <ThemeProvider
