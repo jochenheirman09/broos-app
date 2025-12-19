@@ -1,7 +1,7 @@
 
 'use server';
-import { getAiInstance } from '@/ai/genkit';
-import { ClubAnalysisInputSchema, ClubInsightSchema, type ClubAnalysisInput, type ClubInsight } from '@/ai/types';
+import { getAiInstance } from '../genkit';
+import { ClubAnalysisInputSchema, ClubInsightSchema, type ClubAnalysisInput, type ClubInsight } from '../types';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**

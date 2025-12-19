@@ -17,9 +17,10 @@ export const nightlyAnalysis = onSchedule({
     schedule: "0 3 * * *",
     timeZone: "Europe/Brussels",
     memory: "1GiB", 
-    timeoutSeconds: 540, 
+    timeoutSeconds: 540,
+    secrets: ["GEMINI_API_KEY"],
 }, async (event) => {
-    console.log("--- START CRON JOB: Nightly Analysis ---");
+    console.log("--- START CRON JOB: Nightly Analysis (Koppelings check) ---");
     try {
         // Genereert data in /updates, /staffUpdates en /clubUpdates via Admin SDK
         await runAnalysisJob();

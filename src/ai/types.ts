@@ -31,6 +31,7 @@ export const TeamInsightSchema = z.object({
     title: z.string(),
     content: z.string(),
     category: z.enum(['Team Performance', 'Player Wellness', 'Injury Risk']),
+    date: z.string(),
 });
 export type TeamInsight = z.infer<typeof TeamInsightSchema>;
 
@@ -53,7 +54,7 @@ export const ClubAnalysisInputSchema = z.object({
 export type ClubAnalysisInput = z.infer<typeof ClubAnalysisInputSchema>;
 
 export const ClubInsightSchema = z.object({
-  title: z.string(),
+  title: z.string().optional(),
   content: z.string(),
   category: z.enum(['Club Trends', 'Team Comparison', 'Resource Suggestion']),
 });
@@ -91,3 +92,4 @@ export const NotificationInputSchema = z.object({
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
 
+    

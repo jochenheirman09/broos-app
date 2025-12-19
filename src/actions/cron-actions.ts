@@ -1,196 +1,167 @@
 
 'use server';
-import { Firestore, WriteBatch } from 'firebase-admin/firestore';
-import { analyzeTeamData } from '@/ai/flows/team-analysis-flow';
-import { generatePlayerUpdate } from '@/ai/flows/player-update-flow';
-import { analyzeClubData } from '@/ai/flows/club-analysis-flow';
-import { sendNotification } from '@/ai/flows/notification-flow';
-import type { TeamAnalysisInput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary } from '@/ai/types';
-import type { UserProfile, Team, WellnessScore, WithId, StaffUpdate, PlayerUpdate, ClubUpdate } from '@/lib/types';
-import { getFirebaseAdmin } from '@/ai/genkit';
+import { Firestore, FieldValue } from 'firebase-admin/firestore';
+import { analyzeTeamData } from '../ai/flows/team-analysis-flow';
+import { generatePlayerUpdate } from '../ai/flows/player-update-flow';
+import { analyzeClubData } from '../ai/flows/club-analysis-flow';
+import { sendNotification } from '../ai/flows/notification-flow';
+import type { TeamAnalysisInput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary, TeamInsight } from '../ai/types';
+import type { UserProfile, Team, WellnessScore, WithId, ClubUpdate, PlayerUpdate } from '../lib/types';
+import { getFirebaseAdmin } from '../ai/genkit';
 import { formatInTimeZone } from 'date-fns-tz';
 
 const TIME_ZONE = 'Europe/Brussels';
 
 /**
- * Sends a daily check-in reminder to all players.
- */
-async function sendCheckInReminders(db: Firestore): Promise<number> {
-  let notificationCount = 0;
-  const playersSnapshot = await db.collection('users').where('role', '==', 'player').get();
-
-  for (const playerDoc of playersSnapshot.docs) {
-    const player = playerDoc.data() as UserProfile;
-    if (player.uid) {
-      const notificationInput: NotificationInput = {
-        userId: player.uid,
-        title: `Tijd voor je check-in, ${player.name.split(' ')[0]}!`,
-        body: `Je buddy, ${player.buddyName || 'Broos'}, wacht op je.`,
-        link: '/chat'
-      };
-      try {
-        // This is a direct notification and is okay to send immediately.
-        const result = await sendNotification(notificationInput);
-        if (result.success) notificationCount++;
-      } catch (e) {
-        console.error(`[CRON] Failed to send reminder to user ${player.uid}:`, e);
-      }
-    }
-  }
-  return notificationCount;
-}
-
-/**
- * Analyzes wellness data for a single team and saves insights.
- */
-async function analyzeSingleTeam(db: Firestore, team: WithId<Team>, today: string): Promise<{ teamSummary: AITeamSummary | null, insightGenerated: boolean, playerUpdatesGenerated: number }> {
-    const teamDocRef = db.collection('clubs').doc(team.clubId).collection('teams').doc(team.id);
-    const playersInTeamSnapshot = await db.collection('users').where('teamId', '==', team.id).get();
-    
-    if (playersInTeamSnapshot.empty) {
-        console.log(`[CRON] Team ${team.name} has no players, skipping.`);
-        return { teamSummary: null, insightGenerated: false, playerUpdatesGenerated: 0 };
-    }
-
-    const playersData: { playerProfile: UserProfile; scores: WellnessScore; }[] = [];
-    for (const playerDoc of playersInTeamSnapshot.docs) {
-        const wellnessDocRef = playerDoc.ref.collection('wellnessScores').doc(today);
-        const wellnessDoc = await wellnessDocRef.get();
-        if (wellnessDoc.exists) {
-            playersData.push({ 
-                playerProfile: playerDoc.data() as UserProfile, 
-                scores: wellnessDoc.data() as WellnessScore 
-            });
-        }
-    }
-
-    if (playersData.length === 0) {
-        console.log(`[CRON] No wellness data available today for any player in team ${team.name}.`);
-        return { teamSummary: null, insightGenerated: false, playerUpdatesGenerated: 0 };
-    }
-
-    const analysisInput: TeamAnalysisInput = {
-        teamId: team.id,
-        teamName: team.name,
-        playersData: playersData.map(p => ({ name: p.playerProfile.name, scores: p.scores })),
-    };
-    const teamAnalysisResult = await analyzeTeamData(analysisInput);
-
-    let insightGenerated = false;
-    let playerUpdatesGenerated = 0;
-    const batch = db.batch();
-
-    // Archive old staff updates
-    const oldStaffUpdatesQuery = teamDocRef.collection('staffUpdates').where('status', '==', 'new');
-    const oldStaffUpdatesSnapshot = await oldStaffUpdatesQuery.get();
-    oldStaffUpdatesSnapshot.forEach((doc: any) => batch.update(doc.ref, { status: 'archived' }));
-
-    // Save Staff Insight
-    if (teamAnalysisResult?.insight) {
-        const insightRef = teamDocRef.collection('staffUpdates').doc();
-        batch.set(insightRef, { ...teamAnalysisResult.insight, id: insightRef.id, date: today, status: 'new' });
-        insightGenerated = true;
-    }
-
-    // Generate Player Updates (Weetjes) and archive old ones
-    if (teamAnalysisResult?.summary) {
-        for (const { playerProfile, scores } of playersData) {
-             const playerUpdatesRef = db.collection('users').doc(playerProfile.uid).collection('updates');
-             const oldPlayerUpdatesQuery = await playerUpdatesRef.where('status', '==', 'new').get();
-             oldPlayerUpdatesQuery.forEach((doc: any) => batch.update(doc.ref, { status: 'archived' }));
-            
-            const playerUpdateInput: PlayerUpdateInput = {
-                playerName: playerProfile.name,
-                playerScores: scores,
-                teamAverageScores: teamAnalysisResult.summary,
-            };
-            const playerUpdateResult = await generatePlayerUpdate(playerUpdateInput);
-            if (playerUpdateResult) {
-                const updateRef = playerUpdatesRef.doc();
-                batch.set(updateRef, { ...playerUpdateResult, id: updateRef.id, date: today, status: 'new' });
-                playerUpdatesGenerated++;
-            }
-        }
-    }
-
-    await batch.commit();
-    return { teamSummary: teamAnalysisResult?.summary || null, insightGenerated, playerUpdatesGenerated: 0 };
-}
-
-
-/**
- * Analyzes aggregated data for a single club and saves insights.
- */
-async function analyzeSingleClub(db: Firestore, clubId: string, clubName: string, teamSummaries: { teamName: string; summary: AITeamSummary }[], today: string): Promise<boolean> {
-    if (teamSummaries.length === 0) return false;
-    
-    const clubAnalysisInput: ClubAnalysisInput = { clubId, clubName, teamSummaries };
-    const clubInsightResult = await analyzeClubData(clubAnalysisInput);
-
-    if (clubInsightResult) {
-        const clubUpdatesRef = db.collection('clubs').doc(clubId).collection('clubUpdates');
-        
-        // Archive old club updates
-        const oldUpdatesSnapshot = await clubUpdatesRef.where('status', '==', 'new').get();
-        const batch = db.batch();
-        oldUpdatesSnapshot.forEach((doc: any) => batch.update(doc.ref, { status: 'archived' }));
-
-        // Create new club update
-        const insightRef = clubUpdatesRef.doc();
-        batch.set(insightRef, { ...clubInsightResult, id: insightRef.id, date: today, status: 'new' });
-        
-        await batch.commit();
-        return true;
-    }
-    return false;
-}
-
-
-/**
  * Executes the full daily analysis job.
- * This version ONLY generates data and does NOT send push notifications for insights.
+ * This function is designed to be triggered by a cron job (e.g., via a Cloud Scheduler).
  */
 export async function runAnalysisJob() {
-  console.log('[CRON ACTION] Starting full analysis job...');
   const { adminDb: db } = await getFirebaseAdmin();
+  console.log("[CRON] Starting nightly analysis job...");
   const today = formatInTimeZone(new Date(), TIME_ZONE, 'yyyy-MM-dd');
-  
-  // STEP 1: Send daily check-in reminders. This is time-sensitive and should happen as scheduled.
-  const notificationCount = await sendCheckInReminders(db);
-  console.log(`[CRON] Step 1 complete. Dispatched ${notificationCount} reminders.`);
 
-  // STEP 2, 3 & 4: Analyze data and generate insights.
-  console.log('[CRON] Starting data analysis for teams, players, and clubs...');
-  let teamAnalysisCount = 0;
-  let playerUpdateCount = 0;
-  let clubAnalysisCount = 0;
-  
-  const clubsSnapshot = await db.collection('clubs').get();
-  
-  for (const clubDoc of clubsSnapshot.docs) {
-    const clubId = clubDoc.id;
-    const clubName = clubDoc.data().name;
-    const teamSummariesForClub: { teamName: string; summary: AITeamSummary }[] = [];
+  try {
+    // 1. Get all clubs
+    const clubsSnapshot = await db.collection('clubs').get();
+    if (clubsSnapshot.empty) {
+        console.log("[CRON] No clubs found. Exiting job.");
+        return { success: true, message: "No clubs to process." };
+    }
+    console.log(`[CRON] Found ${clubsSnapshot.size} clubs.`);
 
-    const teamsSnapshot = await clubDoc.ref.collection('teams').get();
-    for (const teamDoc of teamsSnapshot.docs) {
-        const team = { id: teamDoc.id, ...teamDoc.data() } as WithId<Team>;
-        const { teamSummary, insightGenerated, playerUpdatesGenerated } = await analyzeSingleTeam(db, team, today);
+    for (const clubDoc of clubsSnapshot.docs) {
+        const clubId = clubDoc.id;
+        const clubName = clubDoc.data().name || 'Onbekende Club';
+        console.log(`[CRON] Processing club: ${clubName} (${clubId})`);
+        
+        const allTeamSummariesForClub: { teamName: string; summary: AITeamSummary }[] = [];
 
-        if (teamSummary) {
-            teamSummariesForClub.push({ teamName: team.name, summary: teamSummary });
+        // 2. Get all teams within the club
+        const teamsSnapshot = await db.collection('clubs').doc(clubId).collection('teams').get();
+        if (teamsSnapshot.empty) {
+            console.log(`[CRON] No teams found for club ${clubName}.`);
+            continue;
         }
-        if (insightGenerated) teamAnalysisCount++;
-        playerUpdateCount += playerUpdatesGenerated;
-    }
-    
-    // Analyze club data based on team summaries for this club
-    if (await analyzeSingleClub(db, clubId, clubName, teamSummariesForClub, today)) {
-        clubAnalysisCount++;
-    }
+        console.log(`[CRON] Found ${teamsSnapshot.size} teams for club ${clubName}.`);
+
+        for (const teamDoc of teamsSnapshot.docs) {
+            const team = { id: teamDoc.id, ...teamDoc.data() } as WithId<Team>;
+            console.log(`[CRON] Analyzing team: ${team.name} (${team.id})`);
+            
+            // 3. Get all players for the current team
+            const playersQuery = db.collection('users').where('teamId', '==', team.id);
+            const playersSnapshot = await playersQuery.get();
+            
+            if (playersSnapshot.empty) {
+                console.log(`[CRON] No players found for team ${team.name}.`);
+                continue;
+            }
+            console.log(`[CRON] Found ${playersSnapshot.size} players for team ${team.name}.`);
+
+            const playersWithData: { playerProfile: UserProfile; scores: WellnessScore; }[] = [];
+            const playersWithoutData: UserProfile[] = [];
+            
+            // 4. For each player, get their wellness score for today
+            for (const playerDoc of playersSnapshot.docs) {
+                const playerProfile = playerDoc.data() as UserProfile;
+                const wellnessDoc = await db.collection('users').doc(playerProfile.uid).collection('wellnessScores').doc(today).get();
+
+                if (wellnessDoc.exists) {
+                    console.log(`[CRON] Data found for player ${playerProfile.uid}.`);
+                    playersWithData.push({
+                        playerProfile,
+                        scores: wellnessDoc.data() as WellnessScore
+                    });
+                } else {
+                    console.log(`[CRON] No data for ${today} for player ${playerProfile.uid}`);
+                    playersWithoutData.push(playerProfile);
+                }
+            }
+
+            // 5. Send reminder notifications
+            for (const player of playersWithoutData) {
+                console.log(`[CRON] Sending check-in reminder to ${player.name}`);
+                const notificationInput: NotificationInput = {
+                    userId: player.uid,
+                    title: 'Vergeet je check-in niet!',
+                    body: `Hey ${player.name.split(' ')[0]}, je buddy wacht op je om te horen hoe het gaat.`,
+                    link: '/chat'
+                };
+                // Fire and forget
+                sendNotification(notificationInput).catch(e => console.error(`[CRON] Failed to send notification to ${player.uid}`, e));
+            }
+
+
+            if (playersWithData.length > 0) {
+                // 6. Run team-level analysis
+                console.log(`[CRON] Running team analysis for ${team.name} with data from ${playersWithData.length} players.`);
+                const teamAnalysisInput: TeamAnalysisInput = { 
+                    teamId: team.id, 
+                    teamName: team.name, 
+                    playersData: playersWithData.map(p => ({ name: p.playerProfile.name, scores: p.scores }))
+                };
+                const teamAnalysisResult = await analyzeTeamData(teamAnalysisInput);
+
+                if (teamAnalysisResult && teamAnalysisResult.summary && teamAnalysisResult.insight) {
+                    allTeamSummariesForClub.push({ teamName: team.name, summary: teamAnalysisResult.summary });
+                    
+                    // 7. Save the staff update (team insight)
+                    const staffUpdateRef = db.collection('clubs').doc(clubId).collection('teams').doc(team.id).collection('staffUpdates').doc();
+                    const staffUpdateData: Omit<TeamInsight, 'id'> = { ...teamAnalysisResult.insight, date: today };
+                    await staffUpdateRef.set({ ...staffUpdateData, id: staffUpdateRef.id });
+                    console.log(`[CRON] Saved staff update for team ${team.name}`);
+
+                    // 8. Generate and save individual player "weetjes"
+                    for (const playerData of playersWithData) {
+                        const playerUpdateInput: PlayerUpdateInput = {
+                            playerName: playerData.playerProfile.name,
+                            playerScores: playerData.scores,
+                            teamAverageScores: teamAnalysisResult.summary
+                        };
+                        const playerUpdateResult = await generatePlayerUpdate(playerUpdateInput);
+
+                        if (playerUpdateResult) {
+                            const playerUpdateRef = db.collection('users').doc(playerData.playerProfile.uid).collection('updates').doc();
+                            const playerUpdateData: Omit<PlayerUpdate, 'id'> = { 
+                                ...playerUpdateResult, 
+                                title: playerUpdateResult.title ?? "Persoonlijk Weetje",
+                                content: playerUpdateResult.content ?? "Je nieuwe wellness-update staat klaar.",
+                                category: playerUpdateResult.category ?? "Wellness",
+                                date: today 
+                            };
+                            await playerUpdateRef.set({ ...playerUpdateData, id: playerUpdateRef.id });
+                            console.log(`[CRON] Saved player update for ${playerData.playerProfile.name}`);
+                        }
+                    }
+                }
+            }
+        } // End of team loop
+        
+        // 9. Run club-level analysis if there is data from multiple teams
+        if (allTeamSummariesForClub.length > 0) {
+            console.log(`[CRON] Running club analysis for ${clubName}.`);
+            const clubAnalysisInput: ClubAnalysisInput = { clubId, clubName, teamSummaries: allTeamSummariesForClub };
+            const clubInsightResult = await analyzeClubData(clubAnalysisInput);
+
+            if (clubInsightResult) {
+                const clubUpdateRef = db.collection('clubs').doc(clubId).collection('clubUpdates').doc();
+                const clubUpdateData: Omit<ClubUpdate, 'id'> = { 
+                    ...clubInsightResult, 
+                    title: clubInsightResult.title ?? `Club Update ${today}`,
+                    content: clubInsightResult.content ?? "Geen specifieke details beschikbaar voor deze update.",
+                    category: clubInsightResult.category ?? "Club Trends",
+                    date: today
+                };
+                await clubUpdateRef.set({ ...clubUpdateData, id: clubUpdateRef.id });
+                console.log(`[CRON] Saved club update for ${clubName}`);
+            }
+        }
+    } // End of club loop
+
+     return { success: true, message: "Cron job finished successfully." };
+  } catch (error) {
+    console.error("[CRON] CRITICAL ERROR in runAnalysisJob:", error);
+    return { success: false, message: "Cron job failed." };
   }
-  
-  const result = `Job finished. Sent ${notificationCount} reminders. Generated ${teamAnalysisCount} team insights, ${playerUpdateCount} player updates, and ${clubAnalysisCount} club insights. Insight notifications are NOT sent by this job.`;
-  console.log(`[CRON ACTION] ${result}`);
-  return { success: true, message: result };
 }

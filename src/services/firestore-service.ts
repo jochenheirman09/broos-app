@@ -1,8 +1,8 @@
 
 'use server';
-import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
+import { getFirebaseAdmin, getAiInstance } from '../ai/genkit';
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
-import type { OnboardingTopic, UserProfile, Game, WellnessScore, FullWellnessAnalysisOutput } from '@/lib/types';
+import type { OnboardingTopic, UserProfile, Game, WellnessScore, FullWellnessAnalysisOutput } from '../lib/types';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 

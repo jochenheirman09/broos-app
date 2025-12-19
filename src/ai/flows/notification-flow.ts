@@ -1,9 +1,9 @@
 
 'use server';
-import { getFirebaseAdmin } from '@/ai/genkit';
-import type { FcmToken } from '@/lib/types';
+import { getFirebaseAdmin } from '../genkit';
+import type { FcmToken } from '../../lib/types';
 import type { MulticastMessage } from 'firebase-admin/messaging';
-import { type NotificationInput } from '@/ai/types';
+import { type NotificationInput } from '../types';
 
 
 export async function sendNotification(

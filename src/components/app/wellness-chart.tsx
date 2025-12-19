@@ -15,7 +15,7 @@ import type { WellnessScore } from "@/lib/types"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { TrendingUp, FileWarning } from "lucide-react"
 import { Spinner } from "../ui/spinner"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "../ui/button"
 import {
   Sheet,
@@ -137,7 +137,7 @@ export function WellnessChart() {
       // --- END MERGE LOGIC ---
 
       const isPlaceholder = !scoreValue || scoreValue === 0;
-      const displayValue = isPlaceholder ? 3 : scoreValue;
+      const displayValue = isPlaceholder ? 3 : Number(scoreValue);
 
       return {
         metric: config.label,
@@ -234,7 +234,7 @@ export function WellnessChart() {
               <div className="px-6 pb-6 space-y-6">
                 {chartData.map((item) => {
                     const isPlaceholder = item.isPlaceholder;
-                    const displayValue = item.value;
+                    const displayValue = Number(item.value); // Ensure displayValue is a number
                     const displayReason = item.reason;
                     const formattedValue = displayValue % 1 === 0 ? displayValue.toFixed(0) : displayValue.toFixed(1);
 

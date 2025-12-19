@@ -1,9 +1,9 @@
 
 'use server';
-import { getAiInstance } from '@/ai/genkit';
+import { getAiInstance } from '../genkit';
 import { z } from 'zod';
-import type { TeamAnalysisInput, TeamAnalysisOutput } from '@/ai/types';
-import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema } from '@/ai/types';
+import type { TeamAnalysisInput, TeamAnalysisOutput } from '../types';
+import { TeamAnalysisInputSchema, TeamAnalysisOutputSchema } from '../types';
 import { googleAI } from '@genkit-ai/google-genai';
 
 

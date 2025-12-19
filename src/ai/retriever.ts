@@ -1,7 +1,7 @@
 
 'use server';
-import type { KnowledgeDocument } from "@/lib/types";
-import { getFirebaseAdmin } from "@/ai/genkit";
+import type { KnowledgeDocument } from '../lib/types';
+import { getFirebaseAdmin } from './genkit';
 import { FieldValue } from "firebase-admin/firestore";
 
 /**
