@@ -62,7 +62,6 @@ export async function updateClubLogo(clubId: string, logoDataURL: string): Promi
     const clubRef = adminDb.collection("clubs").doc(clubId);
 
     try {
-        // CORRECTED: Ensure the update call receives an object.
         await clubRef.update({ logoURL: logoDataURL });
         return { success: true, message: "Clublogo succesvol bijgewerkt." };
     } catch (error: any) {

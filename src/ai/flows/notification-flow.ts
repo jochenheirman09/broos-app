@@ -1,9 +1,8 @@
 
 'use server';
-
 import { getFirebaseAdmin } from '@/ai/genkit';
 import type { FcmToken } from '@/lib/types';
-import type { Message } from 'firebase-admin/messaging';
+import type { MulticastMessage } from 'firebase-admin/messaging';
 import { type NotificationInput } from '@/ai/types';
 
 
@@ -23,7 +22,7 @@ export async function sendNotification(
     
     const tokens = tokensSnapshot.docs.map(doc => (doc.data() as FcmToken).token);
 
-    const message: Message = {
+    const message: MulticastMessage = {
         notification: { title, body },
         webpush: {
             notification: {
@@ -34,13 +33,16 @@ export async function sendNotification(
                 link: link || '/', // Link to open when notification is clicked
             },
         },
-        tokens: tokens, // Use tokens array here
+        tokens: tokens,
     };
 
     try {
-      // Firebase Admin SDK's sendMulticast is deprecated, but send handles arrays now.
-      const response = await adminMessaging.send(message as any); 
+      const response = await adminMessaging.sendEachForMulticast(message);
       console.log('Successfully sent message:', response);
+
+      if (response.failureCount > 0) {
+        console.warn(`Failed to send notification to ${response.failureCount} tokens.`);
+      }
 
       return { success: true, message: "Notification sent successfully." };
     } catch (error) {

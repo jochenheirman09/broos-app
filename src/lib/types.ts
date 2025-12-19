@@ -267,10 +267,3 @@ export interface OnboardingOutput {
   siblings?: { name: string; age?: number }[];
   pets?: { name: string; type: string }[];
 }
-
-export interface NotificationInput {
-  userId: string;
-  title: string;
-  body: string;
-  link?: string;
-}

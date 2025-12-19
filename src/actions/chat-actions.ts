@@ -109,8 +109,7 @@ export async function chatWithBuddy(
     await saveAssistantResponse(userId, today, result.response);
     console.log("[Chat Action] Assistant response saved.");
     
-    // Fire-and-forget the full analysis. The client doesn't wait for this.
-    // The full chat history now includes the latest user and assistant messages.
+    // Fire-and-forget the full analysis. The full chat history now includes the latest user and assistant messages.
     const finalChatHistory = chatHistory + `\nuser: ${input.userMessage}\nassistant: ${result.response}`;
     analyzeAndSaveChatData(userId, finalChatHistory).catch(err => {
         console.error(`[Chat Action] Background analysis failed for user ${userId}:`, err);
@@ -127,6 +126,7 @@ export async function chatWithBuddy(
         response: "Mijn excuses, ik heb het even te druk. Probeer het over een momentje opnieuw.",
       };
     }
+    // Re-throw other errors so the client-side catch block can handle them.
     throw error;
   }
 }

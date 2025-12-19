@@ -1,5 +1,7 @@
+
 {
-  "include": [
-    ".eslintrc.js"
-  ]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "sourceMap": true
+  }
 }

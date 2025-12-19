@@ -1,5 +1,5 @@
-'use server';
 
+'use server';
 import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
 import type { OnboardingTopic, UserProfile, Game, WellnessScore, FullWellnessAnalysisOutput } from '@/lib/types';
@@ -119,7 +119,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
     });
 
     const analysisPrompt = ai.definePrompt({
-        name: 'chatDataExtractorPrompt_v2_topic',
+        name: 'chatDataExtractorPrompt_v3_topic',
         model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.object({ chatHistory: z.string() }) },
         output: { schema: AnalysisOutputSchema },

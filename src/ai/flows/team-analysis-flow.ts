@@ -1,6 +1,5 @@
 
 'use server';
-
 import { getAiInstance } from '@/ai/genkit';
 import { z } from 'zod';
 import type { TeamAnalysisInput, TeamAnalysisOutput } from '@/ai/types';

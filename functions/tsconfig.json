@@ -1,17 +1,34 @@
 {
   "compilerOptions": {
-    "module": "NodeNext",
-    "esModuleInterop": true,
-    "moduleResolution": "nodenext",
-    "noImplicitReturns": true,
-    "noUnusedLocals": true,
+    "module": "commonjs",
+    "noImplicitAny": false,
+    "target": "es2020",
+    "jsx": "react-jsx",
+    "lib": ["es2020", "dom"],
     "outDir": "lib",
-    "sourceMap": true,
-    "strict": true,
-    "target": "es2017"
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "../src/*"
+      ]
+    },
+    "allowJs": true,
+    "skipLibCheck": true,
+    "noEmit": false
   },
-  "compileOnSave": true,
   "include": [
-    "src"
+    "src",
+    "../src/actions/cron-actions.ts",
+    "../src/ai/flows/**/*",
+    "../src/services/firestore-service.ts",
+    "../src/lib/types.ts",
+    "../src/ai/types.ts",
+    "../src/ai/genkit.ts",
+    "../src/ai/retriever.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../src/app",
+    "../src/components"
   ]
 }

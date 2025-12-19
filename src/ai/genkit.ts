@@ -1,8 +1,4 @@
-// src/ai/genkit.ts
-
-// HOUD DEZE LIJN: Dit bestand bevat server-side logica
 'use server';
-
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
@@ -22,30 +18,24 @@ export async function getAiInstance(): Promise<ReturnType<typeof genkit>> {
 
     if (!apiKey) {
         console.error("[Genkit] CRITICAL: GEMINI_API_KEY is undefined. Cannot initialize Genkit.");
-        throw new Error("AI service is niet geconfigureerd. De GEMINI_API_KEY ontbreekt.");
+        throw new Error("AI service is niet geconfigureerd. De GEMINI_API_KEY ontbreekt in de serveromgeving.");
     }
     
     console.log("[Genkit] Initializing Genkit with a valid API key.");
 
     genkitInstance = genkit({
         plugins: [googleAI({ apiKey: apiKey })], 
-        logLevel: 'debug',
-        enableTracingAndMetrics: true,
     });
     
     return genkitInstance;
 }
 
-// --- Firebase Admin SDK ---
+// --- Firebase Admin SDK --- (Ongewijzigd)
 let _firebaseAdminApp: App | null = null;
 let _adminDb: Firestore | null = null;
 let _adminAuth: Auth | null = null;
 let _adminMessaging: Messaging | null = null;
 
-/**
- * Initializes and returns the Firebase Admin SDK instances.
- * It uses a singleton pattern to ensure it's only initialized once.
- */
 export async function getFirebaseAdmin() {
     if (_firebaseAdminApp) {
         return {

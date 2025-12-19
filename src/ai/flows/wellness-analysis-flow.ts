@@ -1,5 +1,5 @@
-'use server';
 
+'use server';
 import { z } from 'zod';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import type { UserProfile, WellnessAnalysisInput } from '@/lib/types';
@@ -92,11 +92,14 @@ export async function runWellnessAnalysisFlow(
         
         const { output } = await wellnessBuddyPrompt(augmentedInput);
         if (!output || !output.response) {
-            throw new Error("Het AI-model gaf een leeg antwoord.");
+            return { response: "Sorry, er is iets misgegaan. Kun je je vraag herhalen?" };
         }
         
         // Return only the conversational response.
-        return output;
+        return {
+          ...output,
+          response: output.response || ""
+        };
 
     } catch (error: any) {
         const detail = error.message || 'Unknown error';

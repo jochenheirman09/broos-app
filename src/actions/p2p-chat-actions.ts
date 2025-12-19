@@ -4,8 +4,6 @@
 import { getFirebaseAdmin } from '@/ai/genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { UserProfile, Conversation, MyChat } from '@/lib/types';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { sendNotification } from '@/ai/flows/notification-flow';
 
 /**

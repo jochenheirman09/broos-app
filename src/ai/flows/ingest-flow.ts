@@ -1,9 +1,8 @@
 
-"use server";
-
+'use server';
 import { z } from 'genkit';
 import { getFirebaseAdmin, getAiInstance } from '@/ai/genkit';
-import { serverTimestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { KnowledgeDocument } from '@/lib/types';
 import { IngestInputSchema, type IngestInput } from '@/ai/types';
 
@@ -31,7 +30,7 @@ export async function ingestDocument(input: IngestInput): Promise<{ success: boo
     name: fileName,
     content: fileContent,
     status: 'completed', // Simulate immediate completion
-    ingestedAt: serverTimestamp() as any,
+    ingestedAt: FieldValue.serverTimestamp() as any,
   };
 
   try {

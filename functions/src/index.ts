@@ -1,12 +1,37 @@
-import * as functions from 'firebase-functions/v1';
-import * as admin from 'firebase-admin';
 
+import * as functions from 'firebase-functions/v1'; // Voor je bestaande v1 triggers
+import { onSchedule } from "firebase-functions/v2/scheduler"; // Voor de nieuwe cronjob
+import * as admin from 'firebase-admin';
+import { runAnalysisJob } from "../../src/actions/cron-actions";
+
+// Initialiseer Admin SDK (slechts één keer nodig)
 if (!admin.apps.length) {
     admin.initializeApp();
 }
 
 /**
- * Triggered after a new user is created in Firebase Authentication.
+ * 1. NIGHTLY ANALYSIS JOB (v2 Scheduler)
+ * Draait elke nacht om 03:00 om inzichten en weetjes te genereren.
+ */
+export const nightlyAnalysis = onSchedule({
+    schedule: "0 3 * * *",
+    timeZone: "Europe/Brussels",
+    memory: "1GiB", 
+    timeoutSeconds: 540, 
+}, async (event) => {
+    console.log("--- START CRON JOB: Nightly Analysis ---");
+    try {
+        // Genereert data in /updates, /staffUpdates en /clubUpdates via Admin SDK
+        await runAnalysisJob();
+        console.log("--- CRON JOB SUCCESS ---");
+    } catch (error) {
+        console.error("--- CRON JOB FAILED ---", error);
+    }
+});
+
+/**
+ * 2. INITIAL USER CLAIMS (v1 Auth Trigger)
+ * Triggered na registratie om clubId, teamId en rol in te stellen.
  */
 export const setInitialUserClaims = functions.auth.user().onCreate(async (user: functions.auth.UserRecord) => {    
     const uid = user.uid;
@@ -44,7 +69,7 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         const clubId = teamDoc.data().clubId;
 
         const userProfileDoc = await admin.firestore().collection('users').doc(uid).get();
-        const userRole = userProfileDoc.data()?.role || 'player'; // Default naar player als niet gevonden
+        const userRole = userProfileDoc.data()?.role || 'player';
 
         const customClaims = { role: userRole, clubId, teamId };
         await admin.auth().setCustomUserClaims(uid, customClaims);
@@ -62,14 +87,13 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
 });
 
 /**
- * GEAVANCEERDE FIX FUNCTIE
- * Haalt nu dynamisch de data uit Firestore ipv hardcoded 'admin'
+ * 3. FIX USER CLAIMS (v1 HTTP Trigger)
+ * Handmatige herstel-functie voor specifieke UIDs.
  */
 export const fixUserClaims = functions.https.onRequest(async (req, res) => {
     const uid = "sPMqxc2bXAWMDuaW03DlVpss2Ol2";
 
     try {
-        // 1. Haal de echte data op uit Firestore
         const userDoc = await admin.firestore().collection('users').doc(uid).get();
         
         if (!userDoc.exists) {
@@ -82,14 +106,8 @@ export const fixUserClaims = functions.https.onRequest(async (req, res) => {
         const clubId = userData?.clubId || "";
         const teamId = userData?.teamId || "";
 
-        // 2. Bouw de claims op basis van de database (geen hardcoded admin meer!)
-        const claims = {
-            role: role,
-            clubId: clubId,
-            teamId: teamId
-        };
+        const claims = { role, clubId, teamId };
 
-        // 3. Forceer de claims
         await admin.auth().setCustomUserClaims(uid, claims);
         const user = await admin.auth().getUser(uid);
         

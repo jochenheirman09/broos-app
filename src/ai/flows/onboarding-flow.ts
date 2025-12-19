@@ -1,6 +1,5 @@
 
 'use server';
-
 import { z } from 'zod';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import { saveOnboardingSummary } from '@/services/firestore-service';
@@ -76,5 +75,11 @@ export async function runOnboardingFlow(
         });
     }
 
-    return { ...output, isLastTopic, lastTopic: nextTopic };
+    return { 
+      ...output, 
+      response: output.response || "", 
+      isTopicComplete: output.isTopicComplete ?? false,
+      isLastTopic, 
+      lastTopic: nextTopic 
+    };
 }

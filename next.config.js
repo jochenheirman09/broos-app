@@ -1,6 +1,23 @@
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  webpack: (config, { isServer }) => {
+    // This is the fix for the 'async_hooks' and 'child_process' errors.
+    // It tells Webpack to not try to bundle these server-side modules
+    // for the client-side.
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        async_hooks: false,
+        child_process: false,
+        fs: false, // Often needed with server-side SDKs
+        net: false, // Often needed with server-side SDKs
+        tls: false, // Often needed with server-side SDKs
+      };
+    }
+
+    return config;
+  },
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if
