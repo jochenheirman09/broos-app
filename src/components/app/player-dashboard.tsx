@@ -10,18 +10,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Users, Info, Archive } from "lucide-react";
+import { ArrowRight, Users, Info, Archive, BellRing } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useDoc, useFirestore, useMemoFirebase, useAuth, useFirebaseApp } from "@/firebase";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import { WelcomeHeader } from "./welcome-header";
 import { RequestNotificationPermission } from "./request-notification-permission";
-
+import { getToken, getMessaging } from "firebase/messaging";
+import { useToast } from "@/hooks/use-toast";
 
 function ProfileIncompleteAlert() {
   return (
@@ -37,7 +38,45 @@ function ProfileIncompleteAlert() {
 }
 
 export function PlayerDashboard() {
-  const { userProfile } = useUser();
+  const { userProfile, user } = useUser();
+  const db = useFirestore();
+  const app = useFirebaseApp();
+  const { toast } = useToast();
+
+  const handleForceToken = async () => {
+    if (!user || !userProfile?.uid || !app) return;
+    console.log("Start handmatige token check...");
+    try {
+      const messaging = getMessaging(app);
+      const permission = await Notification.requestPermission();
+      console.log("Notificatie status:", permission);
+      
+      if (permission === 'granted') {
+        const currentToken = await getToken(messaging, { 
+          vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        });
+        
+        if (currentToken) {
+          console.log("Token ontvangen:", currentToken);
+          const tokenRef = doc(db, 'users', userProfile.uid, 'fcmTokens', currentToken);
+          await setDoc(tokenRef, { 
+              token: currentToken, 
+              lastUpdated: serverTimestamp(),
+              platform: 'web'
+          }, { merge: true });
+          alert("Succes! Token is opgeslagen. Check nu Firestore.");
+          toast({ title: "Token Opgeslagen", description: "De FCM token is succesvol opgeslagen." });
+        } else {
+          console.warn("Geen token ontvangen. Is de Service Worker actief en correct geconfigureerd?");
+          alert("Fout: Geen token ontvangen. Controleer de console voor meer informatie.");
+        }
+      }
+    } catch (err) {
+      console.error("Token fout:", err);
+      alert("Er is een fout opgetreden bij het ophalen van de token. Controleer de console.");
+    }
+  };
+
 
   if (!userProfile) {
     return null;
@@ -90,6 +129,22 @@ export function PlayerDashboard() {
           <PlayerUpdates status="new" />
         </CardContent>
       </Card>
+
+      {/* Tijdelijke Debug Knop */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="border-yellow-500/50">
+          <CardHeader>
+            <CardTitle className="text-yellow-600">Debug: Forceer Token</CardTitle>
+            <CardDescription>Deze knop forceert het opvragen en opslaan van de FCM token.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleForceToken} variant="outline">
+              <BellRing className="mr-2 h-4 w-4" />
+              Start Token Test
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
