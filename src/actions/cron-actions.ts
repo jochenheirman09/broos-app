@@ -4,7 +4,6 @@ import { Firestore, FieldValue } from 'firebase-admin/firestore';
 import { analyzeTeamData } from '../ai/flows/team-analysis-flow';
 import { generatePlayerUpdate } from '../ai/flows/player-update-flow';
 import { analyzeClubData } from '../ai/flows/club-analysis-flow';
-import { sendNotification } from '../ai/flows/notification-flow';
 import type { TeamAnalysisInput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary, TeamInsight } from '../ai/types';
 import type { UserProfile, Team, WellnessScore, WithId, ClubUpdate, PlayerUpdate } from '../lib/types';
 import { getFirebaseAdmin } from '../ai/genkit';
@@ -15,6 +14,7 @@ const TIME_ZONE = 'Europe/Brussels';
 /**
  * Executes the full daily analysis job.
  * This function is designed to be triggered by a cron job (e.g., via a Cloud Scheduler).
+ * It NO LONGER sends notifications directly. Notifications are handled by separate, timed functions.
  */
 export async function runAnalysisJob() {
   const { adminDb: db } = await getFirebaseAdmin();
@@ -60,7 +60,6 @@ export async function runAnalysisJob() {
             console.log(`[CRON] Found ${playersSnapshot.size} players for team ${team.name}.`);
 
             const playersWithData: { playerProfile: UserProfile; scores: WellnessScore; }[] = [];
-            const playersWithoutData: UserProfile[] = [];
             
             // 4. For each player, get their wellness score for today
             for (const playerDoc of playersSnapshot.docs) {
@@ -73,28 +72,11 @@ export async function runAnalysisJob() {
                         playerProfile,
                         scores: wellnessDoc.data() as WellnessScore
                     });
-                } else {
-                    console.log(`[CRON] No data for ${today} for player ${playerProfile.uid}`);
-                    playersWithoutData.push(playerProfile);
                 }
             }
 
-            // 5. Send reminder notifications
-            for (const player of playersWithoutData) {
-                console.log(`[CRON] Sending check-in reminder to ${player.name}`);
-                const notificationInput: NotificationInput = {
-                    userId: player.uid,
-                    title: 'Vergeet je check-in niet!',
-                    body: `Hey ${player.name.split(' ')[0]}, je buddy wacht op je om te horen hoe het gaat.`,
-                    link: '/chat'
-                };
-                // Fire and forget
-                sendNotification(notificationInput).catch(e => console.error(`[CRON] Failed to send notification to ${player.uid}`, e));
-            }
-
-
             if (playersWithData.length > 0) {
-                // 6. Run team-level analysis
+                // 5. Run team-level analysis
                 console.log(`[CRON] Running team analysis for ${team.name} with data from ${playersWithData.length} players.`);
                 const teamAnalysisInput: TeamAnalysisInput = { 
                     teamId: team.id, 
@@ -106,13 +88,13 @@ export async function runAnalysisJob() {
                 if (teamAnalysisResult && teamAnalysisResult.summary && teamAnalysisResult.insight) {
                     allTeamSummariesForClub.push({ teamName: team.name, summary: teamAnalysisResult.summary });
                     
-                    // 7. Save the staff update (team insight)
+                    // 6. Save the staff update (team insight)
                     const staffUpdateRef = db.collection('clubs').doc(clubId).collection('teams').doc(team.id).collection('staffUpdates').doc();
                     const staffUpdateData: Omit<TeamInsight, 'id'> = { ...teamAnalysisResult.insight, date: today };
                     await staffUpdateRef.set({ ...staffUpdateData, id: staffUpdateRef.id });
                     console.log(`[CRON] Saved staff update for team ${team.name}`);
 
-                    // 8. Generate and save individual player "weetjes"
+                    // 7. Generate and save individual player "weetjes"
                     for (const playerData of playersWithData) {
                         const playerUpdateInput: PlayerUpdateInput = {
                             playerName: playerData.playerProfile.name,
@@ -138,7 +120,7 @@ export async function runAnalysisJob() {
             }
         } // End of team loop
         
-        // 9. Run club-level analysis if there is data from multiple teams
+        // 8. Run club-level analysis if there is data from multiple teams
         if (allTeamSummariesForClub.length > 0) {
             console.log(`[CRON] Running club analysis for ${clubName}.`);
             const clubAnalysisInput: ClubAnalysisInput = { clubId, clubName, teamSummaries: allTeamSummariesForClub };
