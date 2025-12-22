@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -19,6 +20,7 @@ import type { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import { WelcomeHeader } from "./welcome-header";
+import { RequestNotificationPermission } from "./request-notification-permission";
 
 
 function ProfileIncompleteAlert() {
@@ -53,6 +55,8 @@ export function PlayerDashboard() {
   return (
     <div className="space-y-6">
       
+      <RequestNotificationPermission />
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Welzijnsoverzicht</CardTitle>

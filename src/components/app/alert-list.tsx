@@ -122,46 +122,46 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
 
   return (
     <AccordionItem value={player.id} className="border-t">
-        <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50">
-            <div className="flex justify-between items-center w-full">
-                <div className="flex items-center gap-4 text-left">
-                    <Avatar className="h-10 w-10">
-                        <AvatarImage src={player.photoURL} />
-                        <AvatarFallback className="bg-primary/20 text-primary font-bold">
-                            {getInitials(player.name)}
-                        </AvatarFallback>
-                    </Avatar>
-                     <div>
-                        <p className="font-bold">{player.name}</p>
-                        <p className="text-sm text-muted-foreground">{alerts.length} {alerts.length > 1 ? 'actieve alerts' : 'actieve alert'}</p>
-                    </div>
-                </div>
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={isUpdating} onClick={e => e.stopPropagation()}>
-                            {isUpdating ? <Spinner size="small"/> : <MoreVertical className="h-4 w-4" />}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-                        <DropdownMenuItem onSelect={handleChatWithPlayer}>
-                            <MessageSquare className="mr-2 h-4 w-4" />
-                            <span>Chat met {player.name.split(' ')[0]}</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => handleUpdateAllStatus('acknowledged')}>
-                            <Archive className="mr-2 h-4 w-4" />
-                            <span>Markeer alles als Behandeld</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => handleUpdateAllStatus('resolved')}>
-                            <Check className="mr-2 h-4 w-4" />
-                            <span>Markeer alles als Opgelost</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+      <div className="flex items-center justify-between p-4 hover:bg-muted/50">
+        <AccordionTrigger className="p-0 flex-grow hover:no-underline">
+          <div className="flex items-center gap-4 text-left">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={player.photoURL} />
+              <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                {getInitials(player.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-bold">{player.name}</p>
+              <p className="text-sm text-muted-foreground">{alerts.length} {alerts.length > 1 ? 'actieve alerts' : 'actieve alert'}</p>
             </div>
+          </div>
         </AccordionTrigger>
-        <AccordionContent className="p-4 pt-0 bg-muted/20">
-             {alerts.map(alert => <SingleAlertDetail key={alert.id} alert={alert} />)}
-        </AccordionContent>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" disabled={isUpdating} className="shrink-0">
+              {isUpdating ? <Spinner size="small"/> : <MoreVertical className="h-4 w-4" />}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={handleChatWithPlayer}>
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Chat met {player.name.split(' ')[0]}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => handleUpdateAllStatus('acknowledged')}>
+              <Archive className="mr-2 h-4 w-4" />
+              <span>Markeer alles als Behandeld</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => handleUpdateAllStatus('resolved')}>
+              <Check className="mr-2 h-4 w-4" />
+              <span>Markeer alles als Opgelost</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <AccordionContent className="p-4 pt-0 bg-muted/20">
+          {alerts.map(alert => <SingleAlertDetail key={alert.id} alert={alert} />)}
+      </AccordionContent>
     </AccordionItem>
   )
 }
@@ -187,6 +187,13 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
 
   useEffect(() => {
     const fetchAlertsAndPlayers = async () => {
+      console.log("[AlertList] useEffect triggered. Status:", {
+        dbExists: !!db,
+        profileExists: !!userProfile,
+        clubId: userProfile?.clubId,
+        role: userProfile?.role,
+      });
+
       if (!db || !userProfile?.clubId || !userProfile?.role) {
         setIsLoading(true);
         return;
@@ -199,14 +206,17 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
             const { clubId, teamId, role } = userProfile;
             
             const alertsCollection = collectionGroup(db, 'alerts');
-
             let alertsQuery;
+
+            console.log(`[AlertList] Building query for role: ${role}`);
+
             if (role === 'responsible') {
                 alertsQuery = query(
                     alertsCollection,
                     where('clubId', '==', clubId),
                     orderBy('createdAt', 'desc')
                 );
+                console.log(`[AlertList] Responsible query created for clubId: ${clubId}`);
             } else if (role === 'staff' && teamId) {
                alertsQuery = query(
                     alertsCollection,
@@ -214,15 +224,19 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
                     where('teamId', '==', teamId),
                     orderBy('createdAt', 'desc')
                 );
+                console.log(`[AlertList] Staff query created for clubId: ${clubId}, teamId: ${teamId}`);
             }
             
             if (!alertsQuery) {
+              console.log("[AlertList] No valid query could be constructed. Aborting fetch.");
               setAlerts([]);
               setIsLoading(false);
               return;
             }
             
+            console.log("[AlertList] Executing alerts query...");
             const alertsSnapshot = await getDocs(alertsQuery);
+            console.log(`[AlertList] Query executed. Found ${alertsSnapshot.size} total alerts.`);
             
             const allAlerts = alertsSnapshot.docs.map(doc => ({ ...doc.data() as AlertType, id: doc.id }));
 
@@ -232,11 +246,13 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
               return true; 
             });
 
+            console.log(`[AlertList] Filtered to ${filteredAlerts.length} alerts for status: '${status}'.`);
             setAlerts(limit ? filteredAlerts.slice(0, limit) : filteredAlerts);
             
             const userIdsToFetch = [...new Set(filteredAlerts.map(a => a.userId))];
             const teamIdsToFetch = [...new Set(filteredAlerts.map(a => a.teamId))];
             
+            console.log(`[AlertList] Fetching details for ${userIdsToFetch.length} users and ${teamIdsToFetch.length} teams.`);
             const playersMap = new Map<string, WithId<UserProfile>>();
             const teamsMap = new Map<string, WithId<Team>>();
 
@@ -264,6 +280,7 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
                 setTeams(teamsMap);
             }
       } catch (e: any) {
+        console.error("[AlertList] Detailed Fetch Error:", e);
         setError("Fout bij ophalen van alerts: " + e.message);
       } finally {
         setIsLoading(false);

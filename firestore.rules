@@ -14,15 +14,19 @@ service cloud.firestore {
     }
 
     function hasRole(role) {
-      return isSignedIn() && request.auth.token.role == role;
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function isResponsible() {
+      return hasRole('responsible');
     }
     
     function isStaffOrResponsible() {
-      return hasRole('staff') || hasRole('responsible');
+      return hasRole('staff') || isResponsible();
     }
     
     function isClubMember(clubId) {
-        return isSignedIn() && request.auth.token.clubId == clubId;
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
     }
 
     // --- USER-SPECIFIC DATA ---
@@ -30,11 +34,6 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow create: if isOwner(userId);
       allow update, delete: if isOwner(userId);
-
-      // Staff/responsibles can list users in their team/club.
-      allow list: if (isResponsible() && request.query.where[0][0] == 'clubId') ||
-                   (isStaff() && request.query.where[0][0] == 'teamId') ||
-                   (isSignedIn() && request.query.where[0][0] == 'uid');
 
       // Player-specific subcollections
       match /fcmTokens/{tokenId} {
@@ -69,24 +68,34 @@ service cloud.firestore {
       allow get: if isClubMember(clubId);
       allow create: if isResponsible();
       allow update: if isResponsible() && isClubMember(clubId);
+      
+      // Give 'responsible' users read/list access to everything under their club.
+      // This solves the permission errors for listing alerts, summaries, and staff updates.
+      match /{allSubpaths=**} {
+        allow list, get: if isResponsible() && isClubMember(clubId);
+      }
 
       match /teams/{teamId} {
         allow get: if isClubMember(clubId);
         allow list: if isClubMember(clubId) && isStaffOrResponsible();
         allow create, update, delete: if isResponsible() && isClubMember(clubId);
 
-        // Team-specific subcollections
+        // Specific rules for 'staff' remain in effect for individual document access.
         match /staffUpdates/{updateId} {
-          allow read: if isClubMember(clubId) && isStaffOrResponsible();
+          allow get: if isClubMember(clubId) && hasRole('staff') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
           allow write: if false;
         }
-        match /summaries/{summaryId} {
-          allow read: if isClubMember(clubId) && isStaffOrResponsible();
-          allow write: if false;
-        }
+        
         match /alerts/{alertId} {
-          allow read: if isClubMember(clubId) && isStaffOrResponsible();
-          allow write: if false; 
+          // This rule is now primarily for direct GET requests by staff.
+          // The collectionGroup query is handled by the rule below.
+          allow get: if isClubMember(clubId) && hasRole('staff') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
+          allow write: if false;
+        }
+
+        match /summaries/{summaryId} {
+          allow get: if isClubMember(clubId) && hasRole('staff') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
+          allow write: if false;
         }
       }
 
@@ -114,6 +123,14 @@ service cloud.firestore {
     }
     match /knowledge_stats/{statId} {
       allow read, write: if false; // Only backend can write
+    }
+
+    // --- COLLECTION GROUP QUERIES ---
+    // This rule specifically handles the 'alerts' collectionGroup query from the client.
+    match /{path=**}/alerts/{alertId} {
+      allow list: if isSignedIn() && 
+                   (hasRole('responsible') || hasRole('staff')) &&
+                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == resource.data.clubId;
     }
   }
 }
