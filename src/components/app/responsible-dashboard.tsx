@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useDoc, useFirestore, useMemoFirebase, useFirebaseApp } from "@/firebase";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { Club, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
@@ -21,6 +21,7 @@ import { ClubUpdates } from "./club-updates";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { useUser } from "@/context/user-context";
+import { useFirebaseApp } from "@/firebase";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { AlertList } from "./alert-list";
@@ -204,20 +205,18 @@ function ClubManagement({ clubId }: { clubId: string }) {
       </Card>
       
       {/* Tijdelijke Debug Knop */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="border-yellow-500/50">
-          <CardHeader>
-            <CardTitle className="text-yellow-600">Debug: Forceer Token</CardTitle>
-            <CardDescription>Deze knop forceert het opvragen en opslaan van de FCM token.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleForceToken} variant="outline">
-              <BellRing className="mr-2 h-4 w-4" />
-              Start Token Test
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="border-yellow-500/50">
+        <CardHeader>
+          <CardTitle className="text-yellow-600">Debug: Forceer Token</CardTitle>
+          <CardDescription>Deze knop forceert het opvragen en opslaan van de FCM token.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleForceToken} variant="outline">
+            <BellRing className="mr-2 h-4 w-4" />
+            Start Token Test
+          </Button>
+        </CardContent>
+      </Card>
     </>
   );
 }

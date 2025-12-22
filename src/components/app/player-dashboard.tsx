@@ -16,7 +16,7 @@ import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
 import { useDoc, useFirestore, useMemoFirebase, useAuth, useFirebaseApp } from "@/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import type { Club, Team } from "@/lib/types";
+import type { Club, Team, Chat } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import { WelcomeHeader } from "./welcome-header";
@@ -131,20 +131,18 @@ export function PlayerDashboard() {
       </Card>
 
       {/* Tijdelijke Debug Knop */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="border-yellow-500/50">
-          <CardHeader>
-            <CardTitle className="text-yellow-600">Debug: Forceer Token</CardTitle>
-            <CardDescription>Deze knop forceert het opvragen en opslaan van de FCM token.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={handleForceToken} variant="outline">
-              <BellRing className="mr-2 h-4 w-4" />
-              Start Token Test
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="border-yellow-500/50">
+        <CardHeader>
+          <CardTitle className="text-yellow-600">Debug: Forceer Token</CardTitle>
+          <CardDescription>Deze knop forceert het opvragen en opslaan van de FCM token.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleForceToken} variant="outline">
+            <BellRing className="mr-2 h-4 w-4" />
+            Start Token Test
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
