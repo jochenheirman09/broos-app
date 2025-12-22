@@ -8,29 +8,41 @@ import { useUser } from '@/context/user-context';
 import { useEffect } from 'react';
 
 
-// This function can be called from a client component.
+/**
+ * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
+ * It can be used to either actively prompt the user for permission or to
+ * silently refresh the token if permission is already granted.
+ */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { user } = useUser();
     const db = getFirestore();
 
-    const requestPermission = async () => {
+    const requestPermission = async (silentRefreshOnly = false) => {
         if (!app || !user || !("Notification" in window)) {
             console.log("Notifications not supported or user not logged in.");
             return;
         }
         
-        console.log('Requesting permission...');
-        const permission = await Notification.requestPermission();
+        let currentPermission = Notification.permission;
         
-        if (permission === 'granted') {
-            console.log('Notification permission granted.');
-            
-            // For client-side code, Next.js makes NEXT_PUBLIC_ variables directly available on process.env
-            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+        // If we only want to refresh silently, and permission is not 'granted', do nothing.
+        if (silentRefreshOnly && currentPermission !== 'granted') {
+             console.log('[FCM] Silent refresh skipped: permission not granted.');
+             return;
+        }
 
+        if (!silentRefreshOnly) {
+            console.log('[FCM] Requesting notification permission...');
+            currentPermission = await Notification.requestPermission();
+        }
+        
+        if (currentPermission === 'granted') {
+            console.log('[FCM] Notification permission is granted. Getting/refreshing token...');
+            
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
             if (!vapidKey) {
-                console.error("VAPID key not available. Make sure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set in your .env file.");
+                console.error("[FCM] VAPID key not available. Make sure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.");
                 return;
             }
 
@@ -39,21 +51,23 @@ export const useRequestNotificationPermission = () => {
                 const currentToken = await getToken(messaging, { vapidKey });
 
                 if (currentToken) {
-                    console.log('FCM Token:', currentToken);
-                    // Save the token to Firestore
+                    console.log('[FCM] Token retrieved successfully:', currentToken);
                     const tokenRef = doc(db, 'users', user.uid, 'fcmTokens', currentToken);
+                    // Use set with merge to create or update the timestamp.
                     await setDoc(tokenRef, {
                         token: currentToken,
-                        createdAt: serverTimestamp()
+                        lastUpdated: serverTimestamp(),
+                        platform: 'web',
                     }, { merge: true });
+                    console.log('[FCM] Token saved to Firestore subcollection.');
                 } else {
-                    console.log('No registration token available. Request permission to generate one.');
+                    console.log('[FCM] No registration token available. Request permission to generate one.');
                 }
             } catch (err) {
-                console.error('An error occurred while retrieving token. ', err);
+                console.error('[FCM] An error occurred while retrieving or saving token.', err);
             }
         } else {
-            console.log('Unable to get permission to notify.');
+            console.log('[FCM] Unable to get permission to notify.');
         }
     };
     

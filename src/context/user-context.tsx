@@ -16,6 +16,7 @@ import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
+import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
 interface UserContextType {
   user: FirebaseUser | null;
@@ -52,6 +53,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
 
+  const { requestPermission: refreshToken } = useRequestNotificationPermission();
+
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
     [user, firestore]
@@ -84,6 +87,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       setClaimsReady(true);
     }
   }, [user, isAuthLoading]);
+
+  // Effect to silently update the FCM token on app load if permission is granted.
+  useEffect(() => {
+    if (userProfile?.uid) {
+      console.log('[UserProvider] Attempting to silently update FCM token.');
+      // The requestPermission function now handles both requesting and refreshing.
+      refreshToken(true); // Pass `true` to indicate a silent refresh.
+    }
+  }, [userProfile?.uid, refreshToken]);
+
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady || !!profileError));
 
