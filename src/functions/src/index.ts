@@ -93,7 +93,6 @@ export const onAlertCreated = functions.firestore
         const alertData = snapshot.data();
         if (!alertData) return null;
 
-        // VERBETERD: Alleen clubId en teamId komen uit het pad
         const { clubId, teamId } = context.params;
 
         try {
@@ -120,7 +119,6 @@ export const onAlertCreated = functions.firestore
             await processSnapshot(responsibleSnap);
            
             const uniqueTokens = Array.from(tokenSet);
-
 
             if (uniqueTokens.length > 0) {
                 const message = {

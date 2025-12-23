@@ -110,7 +110,13 @@ export function WeekSchedule({ refreshKey }: { refreshKey?: number }) {
             activityDetails[teamActivity as keyof typeof activityDetails];
 
           const individualTrainingsOnDay = (individualTrainings || []).filter(
-            (t) => isSameDay(new Date(t.date), date)
+            (t) => {
+              // FIX: When creating a Date from a "YYYY-MM-DD" string, it's interpreted as UTC midnight.
+              // We need to parse it carefully to avoid timezone shift issues.
+              // Appending 'T00:00:00' makes it parse in the local timezone.
+              const trainingDate = new Date(`${t.date}T00:00:00`);
+              return isSameDay(trainingDate, date);
+            }
           );
 
           return (

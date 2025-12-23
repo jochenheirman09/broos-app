@@ -25,7 +25,7 @@ export default function AlertsPage() {
                 Actieve Alerts
               </CardTitle>
               <CardDescription>
-                Een overzicht van de meest recente zorgwekkende signalen die aandacht vereisen.
+                Een overzicht van zorgwekkende signalen die aandacht vereisen. Alerts blijven hier staan totdat ze worden behandeld of afgesloten.
               </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">

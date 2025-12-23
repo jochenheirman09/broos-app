@@ -11,6 +11,7 @@ import { doc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
+import { Toaster } from "@/components/ui/toaster";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading: isAuthLoading } = useUser();
@@ -88,13 +89,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   // Render the correct layout based on the user's role.
   if (userProfile.role === "player") {
-    return <PlayerLayout>{children}</PlayerLayout>;
+    return (
+        <>
+            <PlayerLayout>{children}</PlayerLayout>
+            <Toaster />
+        </>
+    );
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
       <main className="flex-1 p-4">{children}</main>
+      <Toaster />
     </div>
   );
 }

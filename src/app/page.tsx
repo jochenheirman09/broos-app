@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -50,7 +51,7 @@ export default function RoleSelectionPage() {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center justify-center gap-4">
-          <Logo size="large" />
+          <Logo size="large" showBackground={true} />
           <Wordmark size="large">Broos 2.0</Wordmark>
           <Spinner size="medium" className="mt-4" />
         </div>
@@ -65,7 +66,7 @@ export default function RoleSelectionPage() {
       </div>
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center justify-center mb-8 gap-2">
-          <Logo size="large" />
+          <Logo size="large" showBackground={true} />
           <Wordmark size="large">Broos 2.0</Wordmark>
         </div>
         <Card>
