@@ -109,61 +109,80 @@ export async function createOrGetChat(
 
 /**
  * Verstuurt een P2P-bericht en triggert notificaties naar andere deelnemers.
+ * Maakt gebruik van een Firestore-transactie om dubbele meldingen te voorkomen.
  */
 export async function sendP2PMessage(chatId: string, senderId: string, content: string) {
     if (!chatId || !senderId || !content) {
         throw new Error("Chat ID, sender ID, and content are required.");
     }
-    const { adminDb: db } = await getFirebaseAdmin();
-    const batch = db.batch();
-
-    // 1. Save the new message
-    const messagesRef = db.collection('p2p_chats').doc(chatId).collection('messages');
-    const newMessageRef = messagesRef.doc();
-    batch.set(newMessageRef, {
-        senderId,
-        content,
-        timestamp: FieldValue.serverTimestamp(),
-    });
-
-    // 2. Update last message info on the root chat doc and all denormalized copies
-    const updateData = {
-        lastMessage: content,
-        lastMessageTimestamp: FieldValue.serverTimestamp(),
-    };
-    const chatRef = db.collection('p2p_chats').doc(chatId);
-    batch.update(chatRef, updateData);
-
-    const chatSnapshot = await chatRef.get();
-    const chatData = chatSnapshot.data() as Conversation | undefined;
-    const participants = chatData?.participants;
-
-    if (participants && Array.isArray(participants)) {
-        for (const userId of participants) {
-            const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
-            batch.set(myChatRef, updateData, { merge: true });
-        }
-    }
     
-    // Commit the message and all updates
-    await batch.commit();
+    const { adminDb: db } = await getFirebaseAdmin();
+    const chatRef = db.collection('p2p_chats').doc(chatId);
+    const newMessageRef = chatRef.collection('messages').doc();
 
-    // 3. Send notifications (after message is committed)
-    if (participants && chatData) {
-        const senderProfile = chatData.participantProfiles?.[senderId];
-        const senderName = senderProfile?.name || "Iemand";
-        const title = chatData.isGroupChat ? `${senderName} in ${chatData.name}` : senderName;
-        
-        for (const userId of participants) {
-            // Don't send a notification to the sender
-            if (userId === senderId) continue;
+    try {
+        await db.runTransaction(async (transaction) => {
+            // 1. Check if the message has already been processed (idempotency check)
+            const snap = await transaction.get(newMessageRef);
+            if (snap.exists) {
+                console.log(`[P2P Chat Action] Transaction Aborted: Message ${newMessageRef.id} already exists.`);
+                return; // Abort transaction
+            }
 
-            sendNotification({
-                userId: userId,
-                title: title,
-                body: content,
-                link: `/p2p-chat/${chatId}`
-            }).catch(e => console.error(`Failed to send P2P notification to ${userId}:`, e));
+            // 2. Get current chat data within the transaction for consistency
+            const chatSnapshot = await transaction.get(chatRef);
+            const chatData = chatSnapshot.data() as Conversation | undefined;
+            if (!chatData) {
+                throw new Error("Chat document not found inside transaction.");
+            }
+
+            // 3. Queue up all Firestore writes
+            const messageData = {
+                senderId,
+                content,
+                timestamp: FieldValue.serverTimestamp(),
+                notificationStatus: 'pending' // Mark for notification
+            };
+            transaction.set(newMessageRef, messageData);
+
+            const lastMessageUpdate = {
+                lastMessage: content,
+                lastMessageTimestamp: FieldValue.serverTimestamp(),
+            };
+            transaction.update(chatRef, lastMessageUpdate);
+
+            chatData.participants.forEach(userId => {
+                const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
+                transaction.set(myChatRef, lastMessageUpdate, { merge: true });
+            });
+            
+            // Mark the message as 'sent' immediately to prevent re-sending
+            transaction.update(newMessageRef, { notificationStatus: 'sent' });
+        });
+
+        console.log(`[P2P Chat Action] Transaction for message ${newMessageRef.id} committed successfully.`);
+
+        // 4. Send notifications AFTER the transaction is successfully committed.
+        const finalChatSnapshot = await chatRef.get();
+        const finalChatData = finalChatSnapshot.data() as Conversation;
+
+        if (finalChatData?.participants) {
+            const senderProfile = finalChatData.participantProfiles?.[senderId];
+            const senderName = senderProfile?.name || "Iemand";
+            const title = finalChatData.isGroupChat ? `${senderName} in ${finalChatData.name}` : senderName;
+            
+            for (const userId of finalChatData.participants) {
+                if (userId === senderId) continue;
+                sendNotification({
+                    userId,
+                    title,
+                    body: content,
+                    link: `/p2p-chat/${chatId}`
+                }).catch(e => console.error(`Failed to send P2P notification to ${userId}:`, e));
+            }
         }
+    } catch (error) {
+        console.error(`[P2P Chat Action] Transaction failed for chat ${chatId}:`, error);
+        throw error;
     }
 }

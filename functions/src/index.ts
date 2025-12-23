@@ -44,6 +44,10 @@ export const morningSummary = onSchedule({
                 notification: {
                     title: role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten",
                     body: "Er staan nieuwe updates voor je klaar in de Broos app."
+                },
+                // Data payload for navigation
+                data: {
+                    link: '/dashboard'
                 }
             };
             
@@ -74,6 +78,10 @@ export const dailyCheckInReminder = onSchedule({
                     notification: {
                         title: "Check-in met Broos!",
                         body: `Hey ${playerDoc.data().name || 'buddy'}, je buddy wacht op je!`
+                    },
+                    // Data payload for navigation
+                    data: {
+                        link: '/chat'
                     }
                 });
             }
@@ -102,6 +110,7 @@ export const onAlertCreated = functions.firestore
             const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
             
             const tokenSet = new Set<string>();
+            const userTokenMap = new Map<string, string>(); // Maps token to userId for cleanup
             
             const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
                  for (const doc of snap.docs) {
@@ -109,6 +118,7 @@ export const onAlertCreated = functions.firestore
                     tokens.forEach(t => {
                         if (t && t.trim() !== "") {
                             tokenSet.add(t);
+                            userTokenMap.set(t, doc.id); // Store which user this token belongs to
                         }
                     });
                 }
@@ -128,7 +138,7 @@ export const onAlertCreated = functions.firestore
                         body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
                     },
                     data: {
-                        click_action: "FLUTTER_NOTIFICATION_CLICK",
+                        link: "/alerts",
                         type: "ALERT",
                         alertId: context.params.alertId
                     }
@@ -136,18 +146,19 @@ export const onAlertCreated = functions.firestore
                 const response = await admin.messaging().sendEachForMulticast(message);
                 console.log(`✅ Alert verstuurd naar ${response.successCount} unieke apparaten.`);
 
-                // Bonus: Clean up invalid tokens
+                // Cleanup invalid tokens
+                const tokensToRemove: Promise<any>[] = [];
                 response.responses.forEach((resp, idx) => {
-                    if (!resp.success && resp.error) {
-                        const errorCode = resp.error.code;
-                        if (errorCode === 'messaging/registration-token-not-registered' || 
-                            errorCode === 'messaging/invalid-registration-token') {
-                            const invalidToken = uniqueTokens[idx];
-                            console.log(`🧹 Verlopen token gedetecteerd: ${invalidToken}. Deze moet worden verwijderd.`);
-                            // Optional: Add logic here to delete the token from Firestore.
+                    if (!resp.success && resp.error?.code === 'messaging/registration-token-not-registered') {
+                        const invalidToken = uniqueTokens[idx];
+                        const userId = userTokenMap.get(invalidToken);
+                        if (userId) {
+                            console.log(`🧹 Verlopen token ${invalidToken} voor gebruiker ${userId} wordt verwijderd.`);
+                            tokensToRemove.push(admin.firestore().collection('users').doc(userId).collection('fcmTokens').doc(invalidToken).delete());
                         }
                     }
                 });
+                await Promise.all(tokensToRemove);
             }
             return null;
         } catch (error) {
