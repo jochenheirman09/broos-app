@@ -76,7 +76,6 @@ export async function runOnboardingFlow(
     }
 
     return { 
-      ...output, 
       response: output.response || "", 
       isTopicComplete: output.isTopicComplete ?? false,
       isLastTopic, 

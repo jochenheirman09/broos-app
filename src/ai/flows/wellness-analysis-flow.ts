@@ -1,6 +1,6 @@
 
 'use server';
-import { z } from 'zod';
+import { z } from 'genkit';
 import type { DocumentReference } from 'firebase-admin/firestore';
 import type { UserProfile, WellnessAnalysisInput } from '@/lib/types';
 import { retrieveSimilarDocuments } from '@/ai/retriever';
@@ -38,7 +38,7 @@ export async function runWellnessAnalysisFlow(
     const resolvedWebSearchTool = await webSearchTool.parseAsync(ai);
 
     const wellnessBuddyPrompt = ai.definePrompt({
-        name: 'wellnessBuddyPrompt_v29_checklist_focus',
+        name: 'wellnessBuddyPrompt_v30_strict_alerts',
         model: googleAI.model('gemini-2.5-flash'),
         tools: [resolvedWebSearchTool], 
         input: { schema: z.any() },
@@ -48,13 +48,13 @@ export async function runWellnessAnalysisFlow(
             Je antwoord ('response') MOET in het Nederlands, beknopt en boeiend zijn. Je bent een vriend, geen interviewer.
 
             JE DOEL:
-            1.  **Checklist Afwerken:** Je primaire doel is om op een natuurlijke manier de onderwerpen van de welzijnschecklist te bespreken om een beeld te krijgen van de dag van de speler. Vraag niet direct om scores.
-            2.  **Conversatie Eerst:** Begin met een open vraag. Als de speler zelf over een onderwerp begint, haak daar dan op in.
-            3.  **Subtiel Sturen:** Als de speler geen richting geeft, stel dan een vraag over het volgende onbesproken onderwerp uit de checklist. Begin bijvoorbeeld met "Hoe was je dag?" en ga dan verder met "Hoe voel je je?" of "Veel stress gehad?".
-            4.  **Kennis is Bonus:** Gebruik de 'Kennisbank' en 'Lange Termijn Geheugen' alleen om je antwoorden persoonlijker en relevanter te maken, niet als hoofdonderwerp.
-            5.  **Tools:** Gebruik 'webSearch' alleen als de gebruiker een specifieke, actuele vraag stelt die je niet kunt weten.
+            1.  **Checklist EERST:** Je absolute hoofddoel is om de onderwerpen van de welzijnschecklist te bespreken. De speler heeft weinig tijd. Verlies GEEN tijd met details over hobby's of vakantieplannen. Wees efficiënt.
+            2.  **Natuurlijke Gespreksflow:** Begin met een open vraag ("Hoe was je dag?"). Luister naar het antwoord en haak daarop in. Als de speler zelf al een onderwerp van de checklist noemt (bv. "ik ben moe"), vraag daar dan op door.
+            3.  **Subtiel Sturen:** Als de speler algemeen antwoordt, stuur het gesprek dan subtiel naar het VOLGENDE onbesproken onderwerp op de checklist. Voorbeeld: "Oké, en hoe voel je je verder?" of "Goed geslapen?".
+            4.  **Vraag NIET om scores:** Leid de scores af uit het gesprek.
+            5.  **Tools & Geheugen:** Gebruik je geheugen en tools alleen om je antwoorden persoonlijker te maken, niet als hoofdonderwerp.
 
-            WELZIJNSCHECKLIST (Jouw interne gids):
+            WELZIJNSCHECKLIST (Jouw interne gids, werk deze af):
             - Stemming (Hoe voel je je?)
             - Stress (Veel aan je hoofd gehad?)
             - Rust/Slaap (Goed geslapen?)
@@ -99,7 +99,6 @@ export async function runWellnessAnalysisFlow(
         
         // Return only the conversational response.
         return {
-          ...output,
           response: output.response || ""
         };
 
@@ -109,5 +108,3 @@ export async function runWellnessAnalysisFlow(
         throw new Error(`Kon de AI-buddy niet bereiken. Server-log bevat details. Fout: ${detail}`);
     }
 }
-
-    

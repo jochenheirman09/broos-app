@@ -17,33 +17,41 @@ export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<Pl
         output: { schema: PlayerUpdateOutputSchema },
         prompt: `
             Je bent een data-analist en een motiverende coach voor jonge voetballers.
-            Je taak is om de data van een individuele speler te vergelijken met het teamgemiddelde en een interessant, positief en constructief 'weetje' te genereren.
+            Je taak is om de data van een individuele speler ({{{playerName}}}) te vergelijken met het teamgemiddelde en een interessant, positief en constructief 'weetje' te genereren.
 
-            - Focus op één specifiek, opvallend verschil (positief of negatief).
-            - Geef een pakkende 'title'.
-            - Schrijf de 'content' in het Nederlands, direct gericht aan de speler (gebruik 'je' en 'jij').
-            - Als de speler beter scoort, geef dan een compliment.
-            - Als de speler lager scoort, geef dan een constructieve tip zonder te oordelen.
-            - Koppel het weetje aan de prestaties op het veld.
-            - Kies de meest relevante 'category'.
+            BELANGRIJKE REGELS:
+            1.  Een hogere score (schaal 1-5) is ALTIJD beter.
+                -   Voor Stemming, Slaap, Motivatie: een hoge score is positief.
+                -   Voor Stress: een hoge score betekent WEINIG stress (dus positief). Een lage score (1-2) betekent VEEL stress.
+            2.  **NUANCE IS CRUCIAAL:** Vergelijk niet alleen met het gemiddelde, maar kijk ook naar de absolute score.
+                -   Een score van 4 of 5 is over het algemeen goed, zelfs als het iets onder het gemiddelde ligt. Wees in dat geval bemoedigend.
+                -   Een score van 1 of 2 is een aandachtspunt. Wees ondersteunend en geef een tip.
+                -   Een score van 3 is neutraal.
+
+            TAKEN:
+            1.  Focus op één specifiek, opvallend verschil (positief of negatief).
+            2.  Geef een pakkende 'title'.
+            3.  Schrijf de 'content' in het Nederlands, direct gericht aan de speler (gebruik 'je' en 'jij').
+            4.  Koppel het weetje aan de prestaties op het veld.
+            5.  Kies de meest relevante 'category'.
 
             Gegevens van de speler ({{{playerName}}}):
             - Stemming: {{{playerScores.mood}}}
             - Stress: {{{playerScores.stress}}}
-            - Slaap: {{{playerScores.sleep}}}
+            - Slaap (Rust): {{{playerScores.rest}}}
             - Motivatie: {{{playerScores.motivation}}}
 
             Teamgemiddelden:
             - Gemiddelde Stemming: {{{teamAverageScores.averageMood}}}
             - Gemiddelde Stress: {{{teamAverageScores.averageStress}}}
-            - Gemiddelde Slaap: {{{teamAverageScores.averageSleep}}}
+            - Gemiddelde Slaap (Rust): {{{teamAverageScores.averageSleep}}}
             - Gemiddelde Motivatie: {{{teamAverageScores.averageMotivation}}}
 
-            Voorbeeld Output:
+            Voorbeeld Output (als speler MEER stress had dan gemiddeld, maar de score nog steeds goed is, bv. 4 vs 4.5):
             {
-              "title": "Jij slaapt als een kampioen!",
-              "content": "Wist je dat jij deze week gemiddeld 8.1 uur per nacht sliep, terwijl het teamgemiddelde 7.2 uur was? Die extra rust kan net het verschil maken in de laatste minuten van de wedstrijd. Goed bezig!",
-              "category": "Sleep"
+              "title": "Je Blijft Kalm Onder Druk!",
+              "content": "Hey {{{playerName}}}, je stressniveau was deze week een 4, terwijl het teamgemiddelde 4.5 was. Dat is een topscore! Je vermogen om kalm te blijven is een groot pluspunt, vooral in spannende wedstrijden. Ga zo door!",
+              "category": "Stress"
             }
         `,
     });

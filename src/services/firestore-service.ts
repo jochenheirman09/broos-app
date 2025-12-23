@@ -119,7 +119,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
     });
 
     const analysisPrompt = ai.definePrompt({
-        name: 'chatDataExtractorPrompt_v3_topic',
+        name: 'chatDataExtractorPrompt_v4_strict_alerts',
         model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.object({ chatHistory: z.string() }) },
         output: { schema: AnalysisOutputSchema },
@@ -127,7 +127,11 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
             Je bent een data-analist. Analyseer het volgende gesprek en extraheer de data.
             - **Samenvatting:** Geef een korte samenvatting van het hele gesprek.
             - **Welzijnsscores:** Leid scores (1-5) en redenen af voor de 8 welzijnsthema's. VRAAG NOOIT OM EEN SCORE. Een hoog stress-cijfer betekent WEINIG stress.
-            - **Alerts:** Als er zorgwekkende signalen zijn, vul het 'alert' object. Bepaal het 'topic' van het gespreksonderdeel waar het signaal werd gedetecteerd (bv. 'School', 'Training', 'Thuis').
+            - **Alerts (STRIKT):** Genereer ALLEEN een alert bij DUIDELIJKE rode vlaggen. Een slechte dag, een lage score, of "het ging niet goed" is GEEN alert. Zoek naar expliciete vermeldingen van:
+                - Mentale problemen (bv. "ik zie het niet meer zitten", "voel me waardeloos", "het hoeft voor mij niet meer"). AlertType: 'Mental Health'.
+                - Agressie (bv. "ik werd zo boos dat ik iets kapot heb gemaakt", "ik wil vechten"). AlertType: 'Aggression'.
+                - Middelengebruik (bv. "ik heb gedronken voor de wedstrijd", "ik gebruik iets om beter te presteren"). AlertType: 'Substance Abuse'.
+                - Extreme Negativiteit (bv. een aanhoudende, hopeloze toon door het hele gesprek). AlertType: 'Extreme Negativity'.
             - **Wedstrijd:** Als er over een wedstrijd is gesproken, vul het 'gameUpdate' object.
 
             Gespreksgeschiedenis:

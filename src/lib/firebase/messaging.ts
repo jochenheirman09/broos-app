@@ -27,7 +27,7 @@ export const useRequestNotificationPermission = () => {
             console.log("[FCM] Silent refresh skipped: User not logged in.");
             return;
         }
-        if (!("Notification" in window)) {
+        if (!("Notification" in window) || !("serviceWorker" in navigator)) {
             console.log("[FCM] Notifications not supported by this browser.");
             return;
         }
@@ -91,16 +91,17 @@ export const ForegroundMessageListener = () => {
     const app = useFirebaseApp();
     
     useEffect(() => {
-        if (app && typeof window !== 'undefined') {
+        if (app && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
             try {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
-                    console.log('Message received. ', payload);
+                    console.log('Foreground message received. ', payload);
                     // You can show a custom in-app notification here
                     // For now, we'll just log it.
                     new Notification(payload.notification?.title || 'New Message', {
                         body: payload.notification?.body,
-                        icon: payload.notification?.icon
+                        icon: payload.notification?.icon,
+                        data: payload.data
                     });
                 });
 

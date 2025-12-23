@@ -12,6 +12,7 @@ import type { UserProfile } from "@/lib/types";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
 import { Toaster } from "@/components/ui/toaster";
+import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading: isAuthLoading } = useUser();
@@ -91,7 +92,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (userProfile.role === "player") {
     return (
         <>
-            <PlayerLayout>{children}</PlayerLayout>
+            <PlayerLayout>
+              <div className="p-4">
+                  <RequestNotificationPermission />
+              </div>
+              {children}
+            </PlayerLayout>
             <Toaster />
         </>
     );
@@ -100,7 +106,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <main className="flex-1 p-4">{children}</main>
+      <main className="flex-1 p-4">
+          <div className="container mx-auto">
+            <RequestNotificationPermission />
+          </div>
+          {children}
+      </main>
       <Toaster />
     </div>
   );

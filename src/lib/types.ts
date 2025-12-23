@@ -136,6 +136,7 @@ export interface P2PChatMessage {
     senderId: string;
     content: string;
     timestamp: any; // Firestore ServerTimestamp
+    notificationStatus?: 'pending' | 'sent';
 }
 
 export type WithId<T> = T & { id: string };
@@ -152,6 +153,7 @@ export interface Alert {
   status: 'new' | 'acknowledged' | 'resolved';
   shareWithStaff?: boolean; 
   createdAt: any; // Firestore ServerTimestamp
+  notificationStatus?: 'pending' | 'sent'; // For idempotent notifications
 }
 
 export interface PlayerUpdate {

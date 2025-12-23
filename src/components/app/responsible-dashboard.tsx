@@ -43,40 +43,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const handleForceToken = async () => {
-    if (!user || !userProfile?.uid || !app) return;
-    console.log("Start handmatige token check...");
-    try {
-      const messaging = getMessaging(app);
-      const permission = await Notification.requestPermission();
-      console.log("Notificatie status:", permission);
-      
-      if (permission === 'granted') {
-        const currentToken = await getToken(messaging, { 
-          vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
-        });
-        
-        if (currentToken) {
-          console.log("Token ontvangen:", currentToken);
-          const tokenRef = doc(db, 'users', userProfile.uid, 'fcmTokens', currentToken);
-          await setDoc(tokenRef, { 
-              token: currentToken, 
-              lastUpdated: serverTimestamp(),
-              platform: 'web'
-          }, { merge: true });
-          alert("Succes! Token is opgeslagen. Check nu Firestore.");
-          toast({ title: "Token Opgeslagen", description: "De FCM token is succesvol opgeslagen." });
-        } else {
-          console.warn("Geen token ontvangen. Is de Service Worker actief en correct geconfigureerd?");
-          alert("Fout: Geen token ontvangen. Controleer de console voor meer informatie.");
-        }
-      }
-    } catch (err) {
-      console.error("Token fout:", err);
-      alert("Er is een fout opgetreden bij het ophalen van de token. Controleer de console.");
-    }
-  };
-
   const claimsReady = !!(userProfile && userProfile.role && userProfile.clubId);
 
   return (
@@ -204,19 +170,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
       
-      {/* Tijdelijke Debug Knop */}
-      <Card className="border-yellow-500/50">
-        <CardHeader>
-          <CardTitle className="text-yellow-600">Debug: Forceer Token</CardTitle>
-          <CardDescription>Deze knop forceert het opvragen en opslaan van de FCM token.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={handleForceToken} variant="outline">
-            <BellRing className="mr-2 h-4 w-4" />
-            Start Token Test
-          </Button>
-        </CardContent>
-      </Card>
     </>
   );
 }
