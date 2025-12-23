@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo, useRef, useEffect } from 'react';
@@ -153,7 +154,7 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     <div className="container mx-auto py-8">
       <Card className="h-[calc(100vh-10rem)] flex flex-col">
         <CardHeader className="flex-row items-center gap-4">
-          <Link href={userProfile?.role === 'player' ? '/p2p-chat' : '/dashboard'} passHref>
+          <Link href="/p2p-chat" passHref>
              <Button variant="ghost" size="icon" className="h-8 w-8">
                 <ArrowLeft />
              </Button>

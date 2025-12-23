@@ -93,11 +93,9 @@ export const onAlertCreated = functions.firestore
         const alertData = snapshot.data();
         if (!alertData) return null;
 
-        // VERBETERD: Alleen clubId en teamId komen uit het pad
         const { clubId, teamId } = context.params;
 
         try {
-            // This query now also finds 'responsible' users who belong to the club but might not have a specific teamId
             const staffQuery = admin.firestore().collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
             const responsibleQuery = admin.firestore().collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
 
