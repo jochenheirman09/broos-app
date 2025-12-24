@@ -1,4 +1,6 @@
 
+"use client";
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
@@ -6,6 +8,7 @@ import { UserProvider } from '@/context/user-context';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from "@/components/ui/toaster";
 import { ForegroundMessageListener } from '@/lib/firebase/messaging';
+import { useEffect } from 'react';
 
 export const metadata: Metadata = {
   title: 'Broos 2.0',
@@ -23,6 +26,35 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.workbox !== undefined) {
+      const wb = window.workbox;
+      
+      // A common UX pattern here is to show a toast when a new version is available.
+      // For simplicity, we'll just reload the page automatically.
+      const promptNewVersionAvailable = () => {
+         // Immediately reload the page to show the new version.
+         window.location.reload();
+      };
+
+      wb.addEventListener('controlling', () => {
+         // This event fires when the new service worker has taken control.
+         promptNewVersionAvailable();
+      });
+
+      // Add an event listener to solve the waiting-for-service-worker-to-activate issue.
+      wb.addEventListener('waiting', () => {
+        // `self.skipWaiting()` is called in `firebase-messaging-sw.js`.
+        // This listener ensures that we refresh the page once the new SW is waiting.
+        wb.messageSkipWaiting();
+      });
+      
+      // Register the service worker.
+      wb.register();
+    }
+  }, []);
+
   return (
     <html lang="nl" className="h-full" suppressHydrationWarning>
       <head>
