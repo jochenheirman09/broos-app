@@ -8,7 +8,7 @@ import { FieldValue } from "firebase-admin/firestore";
  * A simple keyword-based retriever for the knowledge base.
  * In a real-world RAG implementation, this would be replaced by a
  * vector search against an embedding index.
- * It now also logs the usage of the retrieved documents.
+ * It now also logs the usage of the retrieved documents and includes a guard clause.
  *
  * @param userMessage The user's message to search for.
  * @param clubId The club to which the knowledge belongs (for future multi-tenancy).
@@ -18,16 +18,20 @@ export async function retrieveSimilarDocuments(
   userMessage: string,
   clubId: string
 ): Promise<KnowledgeDocument[]> {
-  console.log(`[Retriever] Searching for documents related to: "${userMessage}"`);
-  const { adminDb } = await getFirebaseAdmin();
+  const trimmedMessage = userMessage.trim().toLowerCase();
 
-  if (!userMessage.trim()) {
+  // Guard Clause: Don't run the retriever for very short or simple messages.
+  if (trimmedMessage.length < 4 || ["ja", "nee", "ok", "oke", "goed", "dank u", "oké dank u"].includes(trimmedMessage)) {
+    console.log(`[Retriever] Skipping search for simple message: "${userMessage}"`);
     return [];
   }
 
+  console.log(`[Retriever] Searching for documents related to: "${userMessage}"`);
+  const { adminDb } = await getFirebaseAdmin();
+
   // Simple keyword extraction: split message into unique, lowercased words.
   const keywords = [
-    ...new Set(userMessage.toLowerCase().match(/\b(\w{3,})\b/g) || []),
+    ...new Set(trimmedMessage.match(/\b(\w{3,})\b/g) || []),
   ];
 
   if (keywords.length === 0) {
@@ -39,6 +43,7 @@ export async function retrieveSimilarDocuments(
 
   try {
     const knowledgeBaseRef = adminDb.collection("knowledge_base");
+    // This query is simplified. For multi-tenancy, you'd add: .where('clubId', '==', clubId)
     const snapshot = await knowledgeBaseRef.where('status', '==', 'completed').get();
 
     if (snapshot.empty) {

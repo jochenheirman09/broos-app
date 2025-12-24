@@ -88,10 +88,13 @@ export async function createOrGetChat(
       const existingChatData = doc.data() as Conversation;
       const updatedChatData: MyChat = { ...existingChatData, participantProfiles, id: chatId };
 
+      // Ensure participantProfiles are updated in the main chat document
       batch.set(chatRef, { participantProfiles }, { merge: true });
 
+      // And also denormalize to each participant's `myChats` subcollection
       for (const userId of existingChatData.participants) {
         const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
+        // Use set with merge to create/update the denormalized chat document
         batch.set(myChatRef, updatedChatData, { merge: true });
       }
     }
@@ -108,8 +111,9 @@ export async function createOrGetChat(
 }
 
 /**
- * Verstuurt een P2P-bericht en triggert notificaties naar andere deelnemers.
- * Maakt gebruik van een Firestore-transactie om dubbele meldingen te voorkomen.
+ * Sends a P2P message and triggers notifications to other participants.
+ * Uses a Firestore transaction to ensure idempotency, preventing duplicate notifications
+ * in a dual-server environment.
  */
 export async function sendP2PMessage(chatId: string, senderId: string, content: string) {
     if (!chatId || !senderId || !content) {
@@ -122,26 +126,26 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
 
     try {
         await db.runTransaction(async (transaction) => {
-            // 1. Check if the message has already been processed (idempotency check)
+            // 1. Idempotency Check: See if this message has already been processed.
             const snap = await transaction.get(newMessageRef);
-            if (snap.exists) {
-                console.log(`[P2P Chat Action] Transaction Aborted: Message ${newMessageRef.id} already exists.`);
-                return; // Abort transaction
+            if (snap.exists && snap.data()?.notificationStatus === 'sent') {
+                console.log(`[P2P Chat Action] Transaction Aborted: Message ${newMessageRef.id} already processed.`);
+                return; // Abort transaction, we've done this already.
             }
 
-            // 2. Get current chat data within the transaction for consistency
+            // 2. Get current chat data for consistency.
             const chatSnapshot = await transaction.get(chatRef);
             const chatData = chatSnapshot.data() as Conversation | undefined;
             if (!chatData) {
                 throw new Error("Chat document not found inside transaction.");
             }
 
-            // 3. Queue up all Firestore writes
+            // 3. Queue up all Firestore writes.
             const messageData = {
                 senderId,
                 content,
                 timestamp: FieldValue.serverTimestamp(),
-                notificationStatus: 'pending' // Mark for notification
+                notificationStatus: 'sent' // Mark for notification, and as processed.
             };
             transaction.set(newMessageRef, messageData);
 
@@ -151,18 +155,16 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
             };
             transaction.update(chatRef, lastMessageUpdate);
 
+            // 4. Denormalize the last message update to each participant's `myChats` collection.
             chatData.participants.forEach(userId => {
                 const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
                 transaction.set(myChatRef, lastMessageUpdate, { merge: true });
             });
-            
-            // Mark the message as 'sent' immediately to prevent re-sending
-            transaction.update(newMessageRef, { notificationStatus: 'sent' });
         });
 
         console.log(`[P2P Chat Action] Transaction for message ${newMessageRef.id} committed successfully.`);
 
-        // 4. Send notifications AFTER the transaction is successfully committed.
+        // 5. Send notifications AFTER the transaction is successfully committed.
         const finalChatSnapshot = await chatRef.get();
         const finalChatData = finalChatSnapshot.data() as Conversation;
 
@@ -173,6 +175,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
             
             for (const userId of finalChatData.participants) {
                 if (userId === senderId) continue;
+                // Fire-and-forget notifications.
                 sendNotification({
                     userId,
                     title,

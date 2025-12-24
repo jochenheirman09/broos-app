@@ -40,6 +40,7 @@ export const useRequestNotificationPermission = () => {
              return;
         }
 
+        // If not silent, we actively ask the user.
         if (!silentRefreshOnly) {
             console.log('[FCM] Actively requesting notification permission...');
             currentPermission = await Notification.requestPermission();
@@ -58,20 +59,25 @@ export const useRequestNotificationPermission = () => {
 
             try {
                 const messaging = getMessaging(app);
+                // This will either get the existing valid token or request a new one.
                 const currentToken = await getToken(messaging, { vapidKey });
 
                 if (currentToken) {
                     console.log('[FCM] Token retrieved successfully:', currentToken);
+                    // The path to the user's specific token document in the subcollection.
                     const tokenRef = doc(db, 'users', user.uid, 'fcmTokens', currentToken);
                     
                     console.log(`[FCM] Preparing to save token to Firestore at path: ${tokenRef.path}`);
+                    // Save or update the token with a server timestamp. This ensures it's always fresh.
                     await setDoc(tokenRef, {
                         token: currentToken,
                         lastUpdated: serverTimestamp(),
-                        platform: 'web',
+                        platform: 'web', // You can add other platform info if needed
                     }, { merge: true });
                     console.log('[FCM] SUCCESS: Token saved to Firestore subcollection.');
                 } else {
+                    // This can happen if permission was just granted and the service worker isn't active yet,
+                    // or if there's an issue with the service worker registration.
                     console.warn('[FCM] No registration token available. This can happen if the service worker is not correctly registered or if permission was just granted and the page needs a refresh.');
                 }
             } catch (err) {
@@ -96,12 +102,12 @@ export const ForegroundMessageListener = () => {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
                     console.log('Foreground message received. ', payload);
-                    // You can show a custom in-app notification here
-                    // For now, we'll just log it.
+                    // Show a custom in-app notification.
+                    // The service worker handles notifications when the app is in the background.
                     new Notification(payload.notification?.title || 'New Message', {
                         body: payload.notification?.body,
                         icon: payload.notification?.icon,
-                        data: payload.data
+                        data: payload.data // Pass along data for click actions
                     });
                 });
 
