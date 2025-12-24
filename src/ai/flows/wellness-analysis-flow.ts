@@ -30,7 +30,7 @@ const ConversationalResponseSchema = z.object({
 const wellnessBuddyPromptPromise = aiPromise.then(async ai => {
   const resolvedWebSearchTool = await webSearchToolPromise;
   return ai.definePrompt({
-    name: 'wellnessBuddyPrompt_v30_strict_alerts',
+    name: 'wellnessBuddyPrompt_v31_efficient',
     model: googleAI.model('gemini-2.5-flash'),
     tools: [resolvedWebSearchTool], 
     input: { schema: z.any() },
@@ -45,6 +45,7 @@ const wellnessBuddyPromptPromise = aiPromise.then(async ai => {
         3.  **Subtiel Sturen:** Als de speler algemeen antwoordt, stuur het gesprek dan subtiel naar het VOLGENDE onbesproken onderwerp op de checklist. Voorbeeld: "Oké, en hoe voel je je verder?" of "Goed geslapen?".
         4.  **Vraag NIET om scores:** Leid de scores af uit het gesprek.
         5.  **Tools & Geheugen:** Gebruik je geheugen en tools alleen om je antwoorden persoonlijker te maken, niet als hoofdonderwerp.
+        6.  **Einde Gesprek:** Als de gebruiker afscheid neemt (bv. "doei", "ciao"), zeg dan ook gedag en stel GEEN vraag meer.
 
         WELZIJNSCHECKLIST (Jouw interne gids, werk deze af):
         - Stemming (Hoe voel je je?)
@@ -86,6 +87,8 @@ export async function runWellnessAnalysisFlow(
             ...input, 
             retrievedDocs, 
             gameJSON,
+            buddyName: userProfile.buddyName || "Broos",
+            userName: userProfile.name || "speler",
             familySituation: userProfile.familySituation || "Nog niet besproken.",
             schoolSituation: userProfile.schoolSituation || "Nog niet besproken.",
             personalGoals: userProfile.personalGoals || "Nog niet besproken.",

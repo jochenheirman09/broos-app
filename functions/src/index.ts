@@ -3,6 +3,7 @@ import * as functions from 'firebase-functions/v1';
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import type { Alert } from '../../src/lib/types';
 
 // TIJDELIJK: Comment de import uit die buiten de folder gaat
 // import { runAnalysisJob } from "../../src/actions/cron-actions";
@@ -45,7 +46,6 @@ export const morningSummary = onSchedule({
                     title: role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten",
                     body: "Er staan nieuwe updates voor je klaar in de Broos app."
                 },
-                // Data payload for navigation
                 data: {
                     link: '/dashboard'
                 }
@@ -79,7 +79,6 @@ export const dailyCheckInReminder = onSchedule({
                         title: "Check-in met Broos!",
                         body: `Hey ${playerDoc.data().name || 'buddy'}, je buddy wacht op je!`
                     },
-                    // Data payload for navigation
                     data: {
                         link: '/chat'
                     }
@@ -93,77 +92,94 @@ export const dailyCheckInReminder = onSchedule({
 
 
 /**
- * 4. ON ALERT CREATED (v1) - Real-time
+ * 4. ON ALERT CREATED (v1) - Real-time and Idempotent
+ * This function now uses a transaction to ensure a notification is sent only once.
  */
 export const onAlertCreated = functions.firestore
     .document('clubs/{clubId}/teams/{teamId}/alerts/{alertId}')
     .onCreate(async (snapshot, context) => {
-        const alertData = snapshot.data();
-        if (!alertData) return null;
-
-        const { clubId, teamId } = context.params;
+        const alertRef = snapshot.ref;
+        const db = admin.firestore();
 
         try {
-            const staffQuery = admin.firestore().collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
-            const responsibleQuery = admin.firestore().collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
+            await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(alertRef);
+                if (!doc.exists) {
+                    throw "Document does not exist!";
+                }
 
-            const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
-            
-            const tokenSet = new Set<string>();
-            const userTokenMap = new Map<string, string>(); // Maps token to userId for cleanup
-            
-            const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
-                 for (const doc of snap.docs) {
-                    const tokens = await getTokensForUser(doc.id);
-                    tokens.forEach(t => {
-                        if (t && t.trim() !== "") {
-                            tokenSet.add(t);
-                            userTokenMap.set(t, doc.id); // Store which user this token belongs to
+                const alertData = doc.data() as Alert;
+                
+                // Idempotency Check: If a notification has already been sent, abort.
+                if (alertData.notificationStatus === 'sent') {
+                    console.log(`[onAlertCreated] Notification for alert ${alertRef.id} already sent. Aborting.`);
+                    return;
+                }
+
+                const { clubId, teamId } = context.params;
+
+                const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
+                const responsibleQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
+
+                const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
+                
+                const tokenSet = new Set<string>();
+                const userTokenMap = new Map<string, string>();
+                
+                const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
+                     for (const userDoc of snap.docs) {
+                        const tokens = await getTokensForUser(userDoc.id);
+                        tokens.forEach(t => {
+                            if (t && t.trim() !== "") {
+                                tokenSet.add(t);
+                                userTokenMap.set(t, userDoc.id);
+                            }
+                        });
+                    }
+                }
+                
+                await processSnapshot(staffSnap);
+                await processSnapshot(responsibleSnap);
+               
+                const uniqueTokens = Array.from(tokenSet);
+
+                if (uniqueTokens.length > 0) {
+                    const message = {
+                        tokens: uniqueTokens,
+                        notification: {
+                            title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
+                            body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
+                        },
+                        data: {
+                            link: "/alerts",
+                            type: "ALERT",
+                            alertId: context.params.alertId
+                        }
+                    };
+                    const response = await admin.messaging().sendEachForMulticast(message);
+                    console.log(`[onAlertCreated] ✅ Alert sent to ${response.successCount} unique devices.`);
+
+                    // Cleanup invalid tokens
+                    const tokensToRemove: Promise<any>[] = [];
+                    response.responses.forEach((resp, idx) => {
+                        if (!resp.success && resp.error?.code === 'messaging/registration-token-not-registered') {
+                            const invalidToken = uniqueTokens[idx];
+                            const userId = userTokenMap.get(invalidToken);
+                            if (userId) {
+                                console.log(`[onAlertCreated] 🧹 Stale token ${invalidToken} for user ${userId} will be removed.`);
+                                tokensToRemove.push(db.collection('users').doc(userId).collection('fcmTokens').doc(invalidToken).delete());
+                            }
                         }
                     });
+                    await Promise.all(tokensToRemove);
                 }
-            }
-            
-            await processSnapshot(staffSnap);
-            await processSnapshot(responsibleSnap);
-           
-            const uniqueTokens = Array.from(tokenSet);
-
-
-            if (uniqueTokens.length > 0) {
-                const message = {
-                    tokens: uniqueTokens,
-                    notification: {
-                        title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
-                        body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
-                    },
-                    data: {
-                        link: "/alerts",
-                        type: "ALERT",
-                        alertId: context.params.alertId
-                    }
-                };
-                const response = await admin.messaging().sendEachForMulticast(message);
-                console.log(`✅ Alert verstuurd naar ${response.successCount} unieke apparaten.`);
-
-                // Cleanup invalid tokens
-                const tokensToRemove: Promise<any>[] = [];
-                response.responses.forEach((resp, idx) => {
-                    if (!resp.success && resp.error?.code === 'messaging/registration-token-not-registered') {
-                        const invalidToken = uniqueTokens[idx];
-                        const userId = userTokenMap.get(invalidToken);
-                        if (userId) {
-                            console.log(`🧹 Verlopen token ${invalidToken} voor gebruiker ${userId} wordt verwijderd.`);
-                            tokensToRemove.push(admin.firestore().collection('users').doc(userId).collection('fcmTokens').doc(invalidToken).delete());
-                        }
-                    }
-                });
-                await Promise.all(tokensToRemove);
-            }
-            return null;
+                
+                // Mark as sent within the transaction to prevent re-sending.
+                transaction.update(alertRef, { notificationStatus: 'sent' });
+            });
+            console.log(`[onAlertCreated] Transaction for alert ${alertRef.id} completed successfully.`);
         } catch (error) {
-            console.error("❌ Alert Notification Error", error);
-            return null;
+            console.error(`[onAlertCreated] ❌ Transaction failed for alert ${alertRef.id}:`, error);
         }
     });
 
