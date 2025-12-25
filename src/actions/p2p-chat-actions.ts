@@ -115,21 +115,22 @@ export async function createOrGetChat(
  * Uses a Firestore transaction to ensure idempotency, preventing duplicate notifications
  * in a dual-server environment.
  */
-export async function sendP2PMessage(chatId: string, senderId: string, content: string) {
-    if (!chatId || !senderId || !content) {
-        throw new Error("Chat ID, sender ID, and content are required.");
+export async function sendP2PMessage(chatId: string, senderId: string, content: string, messageId: string) {
+    if (!chatId || !senderId || !content || !messageId) {
+        throw new Error("Chat ID, sender ID, content, and a unique message ID are required.");
     }
     
     const { adminDb: db } = await getFirebaseAdmin();
     const chatRef = db.collection('p2p_chats').doc(chatId);
-    const newMessageRef = chatRef.collection('messages').doc();
+    // Use the client-provided unique ID for the new message document.
+    const newMessageRef = chatRef.collection('messages').doc(messageId);
 
     try {
         await db.runTransaction(async (transaction) => {
             // 1. Idempotency Check: See if this message has already been processed.
-            const snap = await transaction.get(newMessageRef);
-            if (snap.exists && snap.data()?.notificationStatus === 'sent') {
-                console.log(`[P2P Chat Action] Transaction Aborted: Message ${newMessageRef.id} already processed.`);
+            const doc = await transaction.get(newMessageRef);
+            if (doc.exists) {
+                console.log(`[P2P Chat Action] Transaction Aborted: Message ${messageId} already exists.`);
                 return; // Abort transaction, we've done this already.
             }
 
@@ -142,6 +143,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
 
             // 3. Queue up all Firestore writes.
             const messageData = {
+                id: messageId, // Store the ID within the document as well
                 senderId,
                 content,
                 timestamp: FieldValue.serverTimestamp(),
@@ -162,7 +164,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
             });
         });
 
-        console.log(`[P2P Chat Action] Transaction for message ${newMessageRef.id} committed successfully.`);
+        console.log(`[P2P Chat Action] Transaction for message ${messageId} committed successfully.`);
 
         // 5. Send notifications AFTER the transaction is successfully committed.
         const finalChatSnapshot = await chatRef.get();

@@ -28,6 +28,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { sendP2PMessage } from '@/actions/p2p-chat-actions';
 import { useForm } from "react-hook-form";
+import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
 interface ChatInput {
     content: string;
@@ -107,9 +108,12 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     
     // Optimistically clear the input
     form.reset();
+    
+    // Generate a unique ID for the message on the client.
+    const messageId = uuidv4();
 
     // Fire-and-forget the server action. UI updates will come via the listener.
-    sendP2PMessage(chatId, user.uid, data.content).catch(err => {
+    sendP2PMessage(chatId, user.uid, data.content, messageId).catch(err => {
       console.error("Failed to send message:", err);
       // Optionally, revert the input field and show a toast
       form.setValue('content', data.content);
