@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useCallback } from 'react';
 import { useUser } from '@/context/user-context';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/card';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { sendP2PMessage } from '@/actions/p2p-chat-actions';
+import { sendP2PMessage, markChatAsRead } from '@/actions/p2p-chat-actions';
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
@@ -81,7 +81,7 @@ interface P2PChatInterfaceProps {
 }
 
 export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
-  const { user, userProfile } = useUser();
+  const { user } = useUser();
   const db = useFirestore();
   const viewportRef = useRef<HTMLDivElement>(null);
   
@@ -96,12 +96,25 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     );
   }, [chatId, db]);
   const { data: messages } = useCollection<P2PChatMessage>(messagesQuery);
+  
+  const handleMarkAsRead = useCallback(() => {
+    if (user && chatId) {
+        // Fire-and-forget: we don't need to wait for this to complete.
+        markChatAsRead(user.uid, chatId).catch(err => {
+            console.error("Failed to mark chat as read in background:", err);
+        });
+    }
+  }, [user, chatId]);
 
   useEffect(() => {
+    // Scroll to bottom when new messages arrive.
     if (viewportRef.current) {
       viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+    // Mark as read when messages are loaded or change.
+    handleMarkAsRead();
+  }, [messages, handleMarkAsRead]);
+
 
   const handleSendMessage = async (data: ChatInput) => {
     if (!data.content.trim() || !user || !chatData) return;

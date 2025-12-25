@@ -66,6 +66,9 @@ export async function createOrGetChat(
 
     if (!doc.exists) {
       console.log(`[P2P Chat Action] Creating new chat: ${chatId}`);
+      
+      const unreadCounts = Object.fromEntries(uniqueParticipantIds.map(id => [id, 0]));
+
       const chatData: Conversation = {
         id: chatId,
         participants: uniqueParticipantIds,
@@ -73,6 +76,7 @@ export async function createOrGetChat(
         participantProfiles, 
         lastMessage: isGroupChat ? `Groepschat "${groupName}" aangemaakt.` : "Gesprek is gestart.",
         lastMessageTimestamp: FieldValue.serverTimestamp(),
+        unreadCounts,
         ...(isGroupChat && { name: groupName! })
       };
       
@@ -111,9 +115,8 @@ export async function createOrGetChat(
 }
 
 /**
- * Sends a P2P message and triggers notifications to other participants.
- * Uses a Firestore transaction to ensure idempotency, preventing duplicate notifications
- * in a dual-server environment.
+ * Sends a P2P message, updates last message details, increments unread counts for other participants,
+ * and triggers notifications. Uses a transaction to ensure idempotency.
  */
 export async function sendP2PMessage(chatId: string, senderId: string, content: string, messageId: string) {
     if (!chatId || !senderId || !content || !messageId) {
@@ -122,42 +125,48 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
     
     const { adminDb: db } = await getFirebaseAdmin();
     const chatRef = db.collection('p2p_chats').doc(chatId);
-    // Use the client-provided unique ID for the new message document.
     const newMessageRef = chatRef.collection('messages').doc(messageId);
 
     try {
         await db.runTransaction(async (transaction) => {
-            // 1. Idempotency Check: See if this message has already been processed.
             const doc = await transaction.get(newMessageRef);
             if (doc.exists) {
-                console.log(`[P2P Chat Action] Transaction Aborted: Message ${messageId} already exists.`);
-                return; // Abort transaction, we've done this already.
+                console.log(`[P2P Chat Action] Transaction Aborted: Message ${messageId} already processed.`);
+                return;
             }
 
-            // 2. Get current chat data for consistency.
             const chatSnapshot = await transaction.get(chatRef);
             const chatData = chatSnapshot.data() as Conversation | undefined;
             if (!chatData) {
                 throw new Error("Chat document not found inside transaction.");
             }
 
-            // 3. Queue up all Firestore writes.
+            // 1. Create the new message
             const messageData = {
-                id: messageId, // Store the ID within the document as well
+                id: messageId,
                 senderId,
                 content,
                 timestamp: FieldValue.serverTimestamp(),
-                notificationStatus: 'sent' // Mark for notification, and as processed.
+                notificationStatus: 'sent'
             };
             transaction.set(newMessageRef, messageData);
 
-            const lastMessageUpdate = {
+            // 2. Update the main chat document with last message details and unread counts
+            const lastMessageUpdate: { [key: string]: any } = {
                 lastMessage: content,
                 lastMessageTimestamp: FieldValue.serverTimestamp(),
             };
+            
+            // Increment unread count for all other participants
+            chatData.participants.forEach(userId => {
+                if (userId !== senderId) {
+                    lastMessageUpdate[`unreadCounts.${userId}`] = FieldValue.increment(1);
+                }
+            });
+            
             transaction.update(chatRef, lastMessageUpdate);
 
-            // 4. Denormalize the last message update to each participant's `myChats` collection.
+            // 3. Denormalize last message and unread counts to each participant's `myChats` subcollection
             chatData.participants.forEach(userId => {
                 const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
                 transaction.set(myChatRef, lastMessageUpdate, { merge: true });
@@ -166,7 +175,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
 
         console.log(`[P2P Chat Action] Transaction for message ${messageId} committed successfully.`);
 
-        // 5. Send notifications AFTER the transaction is successfully committed.
+        // 4. Send notifications after the transaction is complete
         const finalChatSnapshot = await chatRef.get();
         const finalChatData = finalChatSnapshot.data() as Conversation;
 
@@ -177,7 +186,6 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
             
             for (const userId of finalChatData.participants) {
                 if (userId === senderId) continue;
-                // Fire-and-forget notifications.
                 sendNotification({
                     userId,
                     title,
@@ -189,5 +197,38 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
     } catch (error) {
         console.error(`[P2P Chat Action] Transaction failed for chat ${chatId}:`, error);
         throw error;
+    }
+}
+
+
+/**
+ * Resets the unread count for a specific user in a specific chat.
+ */
+export async function markChatAsRead(userId: string, chatId: string): Promise<void> {
+    if (!userId || !chatId) {
+        console.error("[markChatAsRead] User ID and Chat ID are required.");
+        return;
+    }
+    
+    console.log(`[P2P Chat Action] Marking chat ${chatId} as read for user ${userId}`);
+    const { adminDb: db } = await getFirebaseAdmin();
+    const batch = db.batch();
+
+    const mainChatRef = db.collection('p2p_chats').doc(chatId);
+    const userChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
+    
+    const updateData = {
+        [`unreadCounts.${userId}`]: 0
+    };
+
+    // Update both the main document and the denormalized user document
+    batch.set(mainChatRef, updateData, { merge: true });
+    batch.set(userChatRef, updateData, { merge: true });
+    
+    try {
+        await batch.commit();
+        console.log(`[P2P Chat Action] Successfully reset unread count for user ${userId} in chat ${chatId}.`);
+    } catch (error) {
+        console.error(`[P2P Chat Action] Failed to mark chat as read:`, error);
     }
 }

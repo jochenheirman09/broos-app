@@ -124,6 +124,7 @@ export interface Conversation {
     participantProfiles?: { [key: string]: { name: string; photoURL?: string } };
     lastMessage: string;
     lastMessageTimestamp: any;
+    unreadCounts?: { [key: string]: number };
 }
 
 export interface MyChat extends Conversation {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -15,6 +16,7 @@ import { nl } from "date-fns/locale";
 
 function ExistingChatItem({ chat }: { chat: WithId<MyChat> }) {
   const { user } = useUser();
+  const unreadCount = (user && chat.unreadCounts?.[user.uid]) || 0;
 
   const getInitials = (name: string = '') => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase();
@@ -50,7 +52,14 @@ function ExistingChatItem({ chat }: { chat: WithId<MyChat> }) {
              <p className="font-bold truncate">{title}</p>
              <p className="text-xs text-muted-foreground shrink-0 ml-2">{timeAgo}</p>
           </div>
-          <p className="text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
+          <div className="flex justify-between items-center mt-1">
+            <p className="text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
+            {unreadCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {unreadCount}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </Link>

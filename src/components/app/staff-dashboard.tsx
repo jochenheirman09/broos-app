@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { StaffUpdates } from "./staff-updates";
@@ -11,15 +12,45 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
-import { AlertTriangle, Users, Archive } from "lucide-react";
+import { AlertTriangle, Users, Archive, MessageSquare } from "lucide-react";
 import { AlertList } from "./alert-list";
 import Link from "next/link";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
+import { useMemo } from "react";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query } from "firebase/firestore";
+import type { MyChat } from "@/lib/types";
 
+function UnreadChatBadge({ userId }: { userId: string }) {
+    const db = useFirestore();
+
+    const myChatsQuery = useMemoFirebase(() => {
+        return query(collection(db, "users", userId, "myChats"));
+    }, [userId, db]);
+
+    const { data: myChats, isLoading } = useCollection<MyChat>(myChatsQuery);
+    
+    const totalUnreadCount = useMemo(() => {
+        if (isLoading || !myChats) return 0;
+        return myChats.reduce((total, chat) => {
+            const count = chat.unreadCounts?.[userId] || 0;
+            return total + count;
+        }, 0);
+    }, [myChats, userId, isLoading]);
+
+    if (isLoading || totalUnreadCount === 0) return null;
+
+    return (
+        <span className="relative flex h-3 w-3 ml-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+        </span>
+    );
+}
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
-  const { userProfile, loading } = useUser();
+  const { user, userProfile, loading } = useUser();
   const teamId = userProfile?.teamId;
 
   if (loading) {
@@ -110,7 +141,11 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
         </CardHeader>
         <CardContent>
             <Link href="/p2p-chat" passHref>
-                <Button>Open Team Chat</Button>
+                <Button>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Open Team Chat
+                    {user && <UnreadChatBadge userId={user.uid} />}
+                </Button>
             </Link>
         </CardContent>
       </Card>

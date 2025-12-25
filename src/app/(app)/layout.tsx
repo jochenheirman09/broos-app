@@ -107,8 +107,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <main className="flex-1 p-4">
-          <div className="container mx-auto">
+      <main className="flex-1">
+          <div className="container mx-auto py-8">
             <RequestNotificationPermission />
           </div>
           {children}

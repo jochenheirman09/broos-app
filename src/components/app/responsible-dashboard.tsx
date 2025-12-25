@@ -1,9 +1,10 @@
 
+
 "use client";
 
-import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import type { Club, Team } from "@/lib/types";
+import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
+import { doc, collection, query } from "firebase/firestore";
+import type { Club, Team, MyChat } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import {
   Card,
@@ -12,11 +13,11 @@ import {
   CardTitle,
   CardDescription,
 } from "../ui/card";
-import { Building, BookOpen, Users, AlertTriangle, Archive, BellRing } from "lucide-react";
+import { Building, BookOpen, Users, AlertTriangle, Archive, BellRing, MessageSquare } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { ClubUpdates } from "./club-updates";
 import { Button } from "../ui/button";
 import Link from "next/link";
@@ -30,7 +31,35 @@ import { ClubLogoManager } from "./club-logo-manager";
 import { WelcomeHeader } from "./welcome-header";
 import { getToken, getMessaging } from "firebase/messaging";
 import { useToast } from "@/hooks/use-toast";
+import { RequestNotificationPermission } from "./request-notification-permission";
 
+
+function UnreadChatBadge({ userId }: { userId: string }) {
+    const db = useFirestore();
+
+    const myChatsQuery = useMemoFirebase(() => {
+        return query(collection(db, "users", userId, "myChats"));
+    }, [userId, db]);
+
+    const { data: myChats, isLoading } = useCollection<MyChat>(myChatsQuery);
+    
+    const totalUnreadCount = useMemo(() => {
+        if (isLoading || !myChats) return 0;
+        return myChats.reduce((total, chat) => {
+            const count = chat.unreadCounts?.[userId] || 0;
+            return total + count;
+        }, 0);
+    }, [myChats, userId, isLoading]);
+
+    if (isLoading || totalUnreadCount === 0) return null;
+
+    return (
+        <span className="relative flex h-3 w-3 ml-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+        </span>
+    );
+}
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const { userProfile, user } = useUser();
@@ -119,17 +148,24 @@ function ClubManagement({ clubId }: { clubId: string }) {
           )}
         </CardContent>
       </Card>
-
+      
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center text-2xl">
+            <CardTitle className="flex items-center">
                 <Users className="h-6 w-6 mr-3" />
                 Team Chat
             </CardTitle>
+            <CardDescription>
+                Start een privégesprek of groepsgesprek.
+            </CardDescription>
         </CardHeader>
         <CardContent>
             <Link href="/p2p-chat" passHref>
-                <Button>Open Team Chat</Button>
+                <Button>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Open Team Chat
+                    {user && <UnreadChatBadge userId={user.uid} />}
+                </Button>
             </Link>
         </CardContent>
       </Card>
