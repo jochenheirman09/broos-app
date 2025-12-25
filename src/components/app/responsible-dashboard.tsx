@@ -32,6 +32,7 @@ import { WelcomeHeader } from "./welcome-header";
 import { getToken, getMessaging } from "firebase/messaging";
 import { useToast } from "@/hooks/use-toast";
 import { RequestNotificationPermission } from "./request-notification-permission";
+import { NotificationTroubleshooter } from "./notification-troubleshooter";
 
 
 function UnreadChatBadge({ userId }: { userId: string }) {
@@ -205,7 +206,8 @@ function ClubManagement({ clubId }: { clubId: string }) {
             <KnowledgeBaseManager />
         </CardContent>
       </Card>
-      
+
+      <NotificationTroubleshooter />
     </>
   );
 }

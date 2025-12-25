@@ -21,6 +21,7 @@ import { useMemo } from "react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { MyChat } from "@/lib/types";
+import { NotificationTroubleshooter } from "./notification-troubleshooter";
 
 function UnreadChatBadge({ userId }: { userId: string }) {
     const db = useFirestore();
@@ -149,6 +150,8 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
             </Link>
         </CardContent>
       </Card>
+      
+      <NotificationTroubleshooter />
     </div>
   );
 }

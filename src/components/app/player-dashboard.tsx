@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -20,6 +19,7 @@ import { WelcomeHeader } from "./welcome-header";
 import { AddTrainingDialog } from "./add-training-dialog";
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
+import { NotificationTroubleshooter } from "./notification-troubleshooter";
 
 
 function ProfileIncompleteAlert() {
@@ -96,6 +96,8 @@ export function PlayerDashboard() {
             <PlayerUpdates status="new" />
           </CardContent>
         </Card>
+
+        <NotificationTroubleshooter />
       </div>
       
        <div className="fixed bottom-24 right-4 z-50">
