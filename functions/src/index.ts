@@ -1,4 +1,5 @@
 
+'use server';
 import * as functions from 'firebase-functions/v1';
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from 'firebase-admin';
@@ -48,6 +49,11 @@ export const morningSummary = onSchedule({
                 },
                 data: {
                     link: '/dashboard'
+                },
+                webpush: {
+                    fcmOptions: {
+                        link: '/dashboard'
+                    }
                 }
             };
             
@@ -81,6 +87,11 @@ export const dailyCheckInReminder = onSchedule({
                     },
                     data: {
                         link: '/chat'
+                    },
+                    webpush: {
+                        fcmOptions: {
+                            link: '/chat'
+                        }
                     }
                 });
             }
@@ -151,9 +162,17 @@ export const onAlertCreated = functions.firestore
                             body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
                         },
                         data: {
-                            link: "/alerts",
+                            link: "/alerts", // Ensures click action works
                             type: "ALERT",
                             alertId: context.params.alertId
+                        },
+                         webpush: { // Add webpush config for PWA
+                            notification: {
+                                badge: "1"
+                            },
+                            fcmOptions: {
+                                link: "/alerts"
+                            }
                         }
                     };
                     const response = await admin.messaging().sendEachForMulticast(message);
@@ -184,10 +203,13 @@ export const onAlertCreated = functions.firestore
     });
 
 /**
- * HELPER: Tokens ophalen
+ * HELPER: Fetches all valid FCM tokens for a user from their subcollection.
  */
 async function getTokensForUser(userId: string): Promise<string[]> {
     const snap = await admin.firestore().collection('users').doc(userId).collection('fcmTokens').get();
+    if (snap.empty) {
+        return [];
+    }
     return snap.docs.map(doc => doc.id);
 }
 
@@ -247,3 +269,6 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
+
+
+    

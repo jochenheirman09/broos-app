@@ -1,8 +1,15 @@
 {
   "projects": {
-    "default": "studio-5690519872-e0869",
-    "prod": "studio-5690519872-e0869"
+    "default": "studio-5690519872-e0869"
   },
-  "targets": {},
+  "targets": {
+    "studio-5690519872-e0869": {
+      "hosting": {
+        "broos-2-0": [
+          "broos-app--studio-5690519872-e0869"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

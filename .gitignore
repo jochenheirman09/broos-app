@@ -47,3 +47,6 @@ firestore-debug.log
 # SECRETS (VOEG HIER UW SERVICE KEY TOE)
 serviceAccountKey.json
 setClaims.js
+
+# firebase build artifacts
+.firebase/
