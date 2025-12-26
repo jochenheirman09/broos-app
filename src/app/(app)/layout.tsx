@@ -13,10 +13,9 @@ import type { UserProfile } from "@/lib/types";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
 import { Toaster } from "@/components/ui/toaster";
-import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isUserLoading: isAuthLoading } = useUser();
+  const { user, loading: isAuthLoading } = useUser();
   const router = useRouter();
   const firestore = useFirestore();
 
@@ -94,9 +93,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
         <>
             <PlayerLayout>
-              <div className="p-4">
-                  <RequestNotificationPermission />
-              </div>
               {children}
             </PlayerLayout>
             <Toaster />
@@ -108,9 +104,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
       <main className="flex-1">
-          <div className="container mx-auto py-8">
-            <RequestNotificationPermission />
-          </div>
           {children}
       </main>
       <Toaster />

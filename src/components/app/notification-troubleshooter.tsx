@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -8,87 +9,46 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
-import { useFirebaseApp, useFirestore } from "@/firebase";
-import { getMessaging, getToken } from "firebase/messaging";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useState } from "react";
 import { Spinner } from "../ui/spinner";
-import { BellRing, Wand } from "lucide-react";
+import { Wand } from "lucide-react";
+import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
 export function NotificationTroubleshooter() {
-  const { userProfile } = useUser();
-  const db = useFirestore();
-  const app = useFirebaseApp();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const { requestPermission } = useRequestNotificationPermission();
 
   const handleManualTokenRefresh = async () => {
-    if (!userProfile?.uid) {
-      toast({
-        variant: "destructive",
-        title: "Fout",
-        description: "Je bent niet ingelogd.",
-      });
-      return;
-    }
-    
     setIsLoading(true);
+    
+    // The requestPermission function now contains all the logic,
+    // including timeouts and error handling. We pass `false` to
+    // ensure it actively prompts the user if needed.
+    const finalPermission = await requestPermission(false);
 
-    try {
-      // 1. Vraag permissie expliciet (cruciaal voor nieuwe tokens)
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        toast({
-          variant: "destructive",
-          title: "Geen Toestemming",
-          description: "Geef toestemming voor meldingen in je browser-instellingen."
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // 2. Ensure Service Worker is ready
-      if (!('serviceWorker' in navigator)) {
-        throw new Error("Service Workers worden niet ondersteund door deze browser.");
-      }
-      const registration = await navigator.serviceWorker.ready;
-      
-      // 3. Get fresh token
-      const messaging = getMessaging(app);
-      const currentToken = await getToken(messaging, { 
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-        serviceWorkerRegistration: registration 
-      });
-
-      if (currentToken) {
-        // 4. Save to the subcollection
-        const tokenRef = doc(db, 'users', userProfile.uid, 'fcmTokens', currentToken);
-        await setDoc(tokenRef, {
-          token: currentToken,
-          lastUpdated: serverTimestamp(),
-          platform: 'web',
-          manualRefresh: true
-        }, { merge: true });
-        
-        toast({
+    // Provide feedback to the user based on the outcome.
+    if (finalPermission === 'granted') {
+       toast({
           title: "Token Vernieuwd!",
           description: "Je apparaat is opnieuw geregistreerd voor push-meldingen."
         });
-      } else {
-        throw new Error("Geen token gegenereerd. Probeer de sitegegevens te wissen en opnieuw te installeren.");
-      }
-    } catch (error: any) {
-      console.error("Manual refresh failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Vernieuwen Mislukt",
-        description: error.message || "Er is een onbekende fout opgetreden."
-      });
-    } finally {
-        setIsLoading(false);
+    } else if (finalPermission === 'denied') {
+        toast({
+            variant: "destructive",
+            title: "Toestemming Geblokkeerd",
+            description: "Je moet meldingen voor deze site handmatig inschakelen in je browser-instellingen."
+        });
+    } else if (finalPermission === 'timeout') {
+         toast({
+            variant: "destructive",
+            title: "Timeout",
+            description: "De service worker reageerde niet op tijd. Probeer de app te herladen."
+        });
     }
+    
+    setIsLoading(false);
   };
 
   return (

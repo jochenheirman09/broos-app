@@ -15,7 +15,6 @@ import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
-import { WelcomeHeader } from "./welcome-header";
 import { AddTrainingDialog } from "./add-training-dialog";
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
@@ -52,10 +51,7 @@ export function PlayerDashboard() {
 
   if (!userProfile.birthDate || !userProfile.teamId) {
     return (
-      <div className="space-y-6">
-        <WelcomeHeader />
         <ProfileIncompleteAlert />
-      </div>
     );
   }
   

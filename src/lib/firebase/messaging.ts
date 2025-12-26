@@ -7,10 +7,9 @@ import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import { useEffect } from 'react';
 
-
 /**
  * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
- * It can be used to either actively prompt the user for permission or to
+ * It can be used to actively prompt the user for permission or to
  * silently refresh the token if permission is already granted.
  * @returns An object with a `requestPermission` function.
  */
@@ -19,60 +18,82 @@ export const useRequestNotificationPermission = () => {
     const { user } = useUser();
     const db = getFirestore();
 
-    const requestPermission = async (silentRefreshOnly = false): Promise<NotificationPermission | undefined> => {
+    const requestPermission = async (silentRefreshOnly = false): Promise<NotificationPermission | 'unsupported' | 'timeout' | undefined> => {
+        const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Silent: ${silentRefreshOnly} |`;
+        
         if (!app || !user) {
-            console.log("[FCM] Request skipped: Firebase App not ready or user not logged in.");
+            console.log(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
             return;
         }
         if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-            console.log("[FCM] Notifications not supported by this browser.");
-            return 'denied';
+            console.log(`${logPrefix} Notifications not supported by this browser.`);
+            return 'unsupported';
         }
         
         let currentPermission = Notification.permission;
+        console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
         if (silentRefreshOnly && currentPermission !== 'granted') {
-             console.log('[FCM] Silent refresh skipped: permission is not "granted".');
+             console.log(`${logPrefix} Silent refresh skipped: permission is not 'granted'.`);
              return currentPermission;
         }
 
         if (!silentRefreshOnly && currentPermission === 'default') {
-            console.log('[FCM] Actively requesting notification permission...');
+            console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
-            console.log(`[FCM] Permission request result: ${currentPermission}`);
+            console.log(`${logPrefix} Permission request result: '${currentPermission}'.`);
         }
         
         if (currentPermission === 'granted') {
-            console.log('[FCM] Permission is granted. Proceeding to get/refresh token...');
+            console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
             
             const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
             if (!vapidKey) {
-                console.error("[FCM] CRITICAL: VAPID key is not available. Make sure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.");
+                console.error(`${logPrefix} CRITICAL: VAPID key is not available.`);
                 return currentPermission;
             }
 
             try {
+                console.log(`${logPrefix} Waiting for service worker to be ready...`);
+                const swRegistration = await Promise.race([
+                    navigator.serviceWorker.ready,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker not ready after 5 seconds.')), 5000))
+                ]);
+                console.log(`${logPrefix} Service worker is ready.`);
+
                 const messaging = getMessaging(app);
-                const currentToken = await getToken(messaging, { vapidKey });
+                
+                console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
+                const currentToken = await getToken(messaging, { 
+                    vapidKey,
+                    serviceWorkerRegistration: swRegistration as ServiceWorkerRegistration
+                });
 
                 if (currentToken) {
-                    console.log('[FCM] Token retrieved successfully:', currentToken);
+                    console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 10)}...`);
                     const tokenRef = doc(db, 'users', user.uid, 'fcmTokens', currentToken);
                     
+                    console.log(`${logPrefix} Saving token to Firestore at path: ${tokenRef.path}`);
                     await setDoc(tokenRef, {
                         token: currentToken,
                         lastUpdated: serverTimestamp(),
                         platform: 'web',
                     }, { merge: true });
-                    console.log('[FCM] SUCCESS: Token saved to Firestore subcollection.');
+                    console.log(`${logPrefix} SUCCESS: Token saved to Firestore.`);
                 } else {
-                    console.warn('[FCM] No registration token available. This can happen if the service worker is not active.');
+                    console.warn(`${logPrefix} No registration token available. This can happen if the service worker is not active or registration fails.`);
+                    throw new Error('Kon geen registratietoken genereren.');
                 }
-            } catch (err) {
-                console.error('[FCM] CRITICAL ERROR: An error occurred while retrieving or saving the token.', err);
+            } catch (err: any) {
+                console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
+                if (err.message.includes('timeout')) {
+                    return 'timeout';
+                }
+                // Re-throw other errors to be handled by the caller
+                throw err;
             }
         } else {
-            console.log('[FCM] Permission to notify was not granted.');
+            console.log(`${logPrefix} Permission to notify was not granted ('${currentPermission}').`);
         }
         return currentPermission;
     };

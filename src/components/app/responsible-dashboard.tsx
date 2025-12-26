@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
@@ -13,8 +12,7 @@ import {
   CardTitle,
   CardDescription,
 } from "../ui/card";
-import { Building, BookOpen, Users, AlertTriangle, Archive, BellRing, MessageSquare } from "lucide-react";
-import { Separator } from "../ui/separator";
+import { Building, BookOpen, Users, AlertTriangle, Archive, MessageSquare } from "lucide-react";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState, useMemo } from "react";
@@ -22,16 +20,11 @@ import { ClubUpdates } from "./club-updates";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { useUser } from "@/context/user-context";
-import { useFirebaseApp } from "@/firebase";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { AlertList } from "./alert-list";
 import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
-import { WelcomeHeader } from "./welcome-header";
-import { getToken, getMessaging } from "firebase/messaging";
-import { useToast } from "@/hooks/use-toast";
-import { RequestNotificationPermission } from "./request-notification-permission";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 
 
@@ -65,9 +58,6 @@ function UnreadChatBadge({ userId }: { userId: string }) {
 function ClubManagement({ clubId }: { clubId: string }) {
   const { userProfile, user } = useUser();
   const [refreshKey, setRefreshKey] = useState(0);
-  const app = useFirebaseApp();
-  const db = useFirestore();
-  const { toast } = useToast();
 
   const handleTeamChange = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
@@ -116,7 +106,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
                         <Archive className="mr-2 h-4 w-4" />
                         Bekijk Archief
                     </Button>
-                </Link>
+                 </Link>
             </div>
         </CardHeader>
         <CardContent>
@@ -216,10 +206,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
 export function ResponsibleDashboard({ clubId }: { clubId?: string }) {
     if (!clubId) {
         return (
-            <>
-                <WelcomeHeader />
-                <ResponsibleNoClub />
-            </>
+            <ResponsibleNoClub />
         )
     }
   return <ClubManagement clubId={clubId} />;

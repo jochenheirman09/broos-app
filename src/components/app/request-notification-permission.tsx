@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,28 +16,25 @@ export function RequestNotificationPermission() {
     useEffect(() => {
         if (!user) return; // Only run if user is logged in
         if ("Notification" in window) {
-            const currentPermission = Notification.permission;
-            setPermissionStatus(currentPermission);
-            // If permission is already granted, silently try to get/refresh the token.
-            if (currentPermission === 'granted') {
-                requestPermission(true);
-            }
+            setPermissionStatus(Notification.permission);
         } else {
             setPermissionStatus("unsupported");
         }
-    }, [user, requestPermission]);
+    }, [user]);
 
     const handleRequestPermission = async () => {
-        const newPermission = await requestPermission();
+        const newPermission = await requestPermission(false); // false = don't run silently
         if (newPermission) {
             setPermissionStatus(newPermission);
         }
     };
 
+    // Don't show the banner if permission is already granted, denied, or not supported.
     if (permissionStatus === 'granted' || permissionStatus === 'unsupported' || permissionStatus === 'denied') {
         return null;
     }
 
+    // Only show the banner if the permission state is 'default' (i.e., user hasn't been asked yet).
     return (
         <Alert className="mb-6 bg-primary/10 border-primary/50 text-primary-foreground">
             <BellRing className="h-4 w-4 !text-primary" />

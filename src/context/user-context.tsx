@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User as FirebaseUser } from "firebase/auth";
-import { doc, updateDoc, terminate, clearIndexedDbPersistence } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import {
   useUser as useFirebaseUser,
@@ -53,6 +53,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
 
+  // Get the token refresh function from our custom hook.
   const { requestPermission: refreshToken } = useRequestNotificationPermission();
 
   const userDocRef = useMemoFirebase(
@@ -90,11 +91,31 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Effect to silently update the FCM token on app load if permission is granted.
   useEffect(() => {
-    if (userProfile?.uid) {
-      console.log('[UserProvider] Attempting to silently update FCM token.');
-      // The requestPermission function now handles both requesting and refreshing.
-      refreshToken(true); // Pass `true` to indicate a silent refresh.
-    }
+    const autoRefreshToken = async () => {
+      // Wait for user profile and ensure we are in a browser
+      if (!userProfile?.uid || typeof window === 'undefined') return;
+
+      if ('serviceWorker' in navigator) {
+        try {
+          // Wait for the Service Worker to be ready
+          await navigator.serviceWorker.ready;
+          
+          // Small delay (500ms) to ensure everything is stable
+          setTimeout(() => {
+            // The refreshToken function (from useRequestNotificationPermission)
+            // now handles the logic of checking permission and getting the token.
+            // Pass `true` to indicate a silent refresh.
+            console.log('[UserProvider] Attempting to silently update FCM token.');
+            refreshToken(true); 
+          }, 500); 
+
+        } catch (swErr) {
+          console.error("Service Worker not ready for auto-refresh:", swErr);
+        }
+      }
+    };
+
+    autoRefreshToken();
   }, [userProfile?.uid, refreshToken]);
 
 
