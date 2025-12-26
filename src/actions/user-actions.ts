@@ -5,6 +5,8 @@ import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
 import { getStorage } from "firebase-admin/storage";
+import { FieldValue } from 'firebase-admin/firestore';
+
 
 // Function to generate a random 8-character alphanumeric code
 const generateCode = (length = 8) => {
@@ -271,7 +273,7 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   }
 
   const membersQuery = adminDb.collection('users').where('teamId', '==', teamId);
-  const snapshot = await getDocs(membersQuery);
+  const snapshot = await membersQuery.get();
 
   if (snapshot.empty) {
     console.log(`[User Action] No members found for team ${teamId}.`);
@@ -286,4 +288,31 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   return members;
 }
 
-    
+/**
+ * Saves a user's FCM token to Firestore using the Admin SDK.
+ * This is a secure server action.
+ */
+export async function saveFcmToken(userId: string, token: string, isManualRefresh: boolean): Promise<{ success: boolean; message: string }> {
+    if (!userId || !token) {
+        return { success: false, message: "Gebruikers-ID en token zijn vereist." };
+    }
+
+    console.log(`[FCM Token Action] Saving token for user ${userId}. Manual: ${isManualRefresh}`);
+    const { adminDb } = await getFirebaseAdmin();
+    const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
+
+    try {
+        await tokenRef.set({
+            token: token,
+            lastUpdated: FieldValue.serverTimestamp(),
+            platform: 'web',
+            manualRefresh: isManualRefresh
+        }, { merge: true });
+
+        console.log(`[FCM Token Action] Successfully saved token for user ${userId}.`);
+        return { success: true, message: "Token successfully saved." };
+    } catch (error: any) {
+        console.error(`[FCM Token Action] Error saving token for user ${userId}:`, error);
+        return { success: false, message: error.message || "Failed to save token." };
+    }
+}

@@ -10,45 +10,76 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Spinner } from "../ui/spinner";
-import { Wand } from "lucide-react";
+import { Wand, ShieldAlert } from "lucide-react";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
+import { useUser } from "@/context/user-context";
+import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 
 export function NotificationTroubleshooter() {
   const { toast } = useToast();
+  const { userProfile } = useUser();
   const [isLoading, setIsLoading] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
   const { requestPermission } = useRequestNotificationPermission();
 
+  useEffect(() => {
+    // Check the initial permission status when the component mounts
+    if ("Notification" in window) {
+      setPermissionStatus(Notification.permission);
+    }
+  }, []);
+
   const handleManualTokenRefresh = async () => {
+    if (!userProfile) return;
+
     setIsLoading(true);
     
-    // The requestPermission function now contains all the logic,
-    // including timeouts and error handling. We pass `false` to
-    // ensure it actively prompts the user if needed.
-    const finalPermission = await requestPermission(false);
+    try {
+      // The requestPermission function handles all logic, including timeouts and server actions.
+      // We pass `true` to indicate this is a manual action, which may prompt for permission.
+      const finalPermission = await requestPermission(true);
 
-    // Provide feedback to the user based on the outcome.
-    if (finalPermission === 'granted') {
-       toast({
-          title: "Token Vernieuwd!",
-          description: "Je apparaat is opnieuw geregistreerd voor push-meldingen."
+      // Update the component's state with the result.
+      setPermissionStatus(finalPermission || 'default');
+
+      if (finalPermission === 'granted') {
+        toast({
+            title: "Token Vernieuwd!",
+            description: "Je apparaat is opnieuw geregistreerd voor push-meldingen."
         });
-    } else if (finalPermission === 'denied') {
+      } else if (finalPermission === 'denied') {
+          // The main UI will now show a persistent message, but a toast is still good for immediate feedback.
+          toast({
+              variant: "destructive",
+              title: "Toestemming Geblokkeerd",
+              description: "Je moet meldingen voor deze site handmatig inschakelen in je browser-instellingen."
+          });
+      } else if (finalPermission === 'timeout') {
+          toast({
+              variant: "destructive",
+              title: "Timeout",
+              description: "De service worker reageerde niet op tijd. Probeer de app te herladen."
+          });
+      } else {
+        toast({
+            variant: "default",
+            title: "Actie geannuleerd",
+            description: "De aanvraag voor meldingen is niet voltooid."
+        });
+      }
+
+    } catch (error: any) {
+        console.error("Manual refresh failed:", error);
         toast({
             variant: "destructive",
-            title: "Toestemming Geblokkeerd",
-            description: "Je moet meldingen voor deze site handmatig inschakelen in je browser-instellingen."
+            title: "Fout bij vernieuwen",
+            description: error.message || "Een onbekende fout is opgetreden."
         });
-    } else if (finalPermission === 'timeout') {
-         toast({
-            variant: "destructive",
-            title: "Timeout",
-            description: "De service worker reageerde niet op tijd. Probeer de app te herladen."
-        });
+    } finally {
+        setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
@@ -59,19 +90,35 @@ export function NotificationTroubleshooter() {
                 <span>Notificatie Probleemoplosser</span>
             </CardTitle>
             <CardDescription className="text-orange-700 dark:text-orange-400">
-                Als je geen notificaties ontvangt, klik dan op de onderstaande knop om je apparaat opnieuw te registreren.
+                Gebruik deze tool als je problemen ondervindt met het ontvangen van push-meldingen.
             </CardDescription>
         </CardHeader>
         <CardContent>
-            <Button
-                onClick={handleManualTokenRefresh}
-                disabled={isLoading}
-                className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white"
-            >
-                {isLoading && <Spinner size="small" className="mr-2" />}
-                {isLoading ? "Bezig..." : "Forceer Token Vernieuwing"}
-            </Button>
+            {permissionStatus === 'denied' ? (
+                <Alert variant="destructive">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertTitle>Notificaties Geblokkeerd</AlertTitle>
+                    <AlertDescription>
+                        Je hebt meldingen voor deze site geblokkeerd. Om notificaties te ontvangen, moet je de toestemming handmatig aanpassen in de site-instellingen van je browser.
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                <>
+                    <p className="text-sm text-orange-700/90 dark:text-orange-400/90 mb-4">
+                        Als je geen meldingen ontvangt, klik dan op de onderstaande knop om de verbinding met de notificatieserver te herstellen en je apparaat opnieuw te registreren.
+                    </p>
+                    <Button
+                        onClick={handleManualTokenRefresh}
+                        disabled={isLoading}
+                        className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                        {isLoading && <Spinner size="small" className="mr-2" />}
+                        {isLoading ? "Bezig..." : "Forceer Token Vernieuwing"}
+                    </Button>
+                </>
+            )}
         </CardContent>
     </Card>
   );
 }
+

@@ -18,9 +18,12 @@ export function DashboardContent() {
   useEffect(() => {
     // This effect tries to silently refresh the token in the background on load.
     // It will only proceed if permission is already granted.
-    if (userProfile?.uid && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      console.log('[DashboardContent] Attempting silent FCM token refresh on load.');
-      refreshToken(true); // `true` indicates a silent attempt.
+    if (userProfile?.uid && typeof window !== 'undefined') {
+        // The refreshToken function (from useRequestNotificationPermission)
+        // now handles the logic of checking permission and getting the token.
+        // Pass `true` to indicate a silent attempt.
+        console.log('[DashboardContent] Attempting silent FCM token refresh on load.');
+        refreshToken(false); 
     }
   }, [userProfile?.uid, refreshToken]);
 
