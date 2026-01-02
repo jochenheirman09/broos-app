@@ -8,7 +8,7 @@ import { useUser } from '@/context/user-context';
 import type { UserProfile, Alert as AlertType, WithId, Team } from '@/lib/types';
 import { Spinner } from '../ui/spinner';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { AlertTriangle, Archive, Check, Shield, Calendar, MessageSquare, Tag, Users, MoreVertical, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Archive, Check, Shield, Calendar, MessageSquare, Tag, Users, MoreVertical, ChevronDown, UserX } from 'lucide-react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -38,8 +38,9 @@ const getInitials = (name: string = '') => {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase();
 };
 
-// Represents alerts grouped under a single player
+// Represents alerts grouped under a single player, either anonymously or identified
 interface PlayerAlertGroup {
+    isAnonymous: boolean;
     player: WithId<UserProfile>;
     alerts: WithId<AlertType>[];
 }
@@ -82,7 +83,10 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
   const { toast } = useToast();
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
-  const { player, alerts } = playerAlerts;
+  const { player, alerts, isAnonymous } = playerAlerts;
+
+  const displayName = isAnonymous ? "Een speler" : player.name;
+
 
   const handleUpdateAllStatus = async (status: 'acknowledged' | 'resolved') => {
     if (!user) return;
@@ -101,7 +105,7 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
     if (failedUpdates.length > 0) {
         toast({ variant: "destructive", title: "Fout", description: `Kon ${failedUpdates.length} alert(s) niet bijwerken.` });
     } else {
-        toast({ title: "Status bijgewerkt", description: `Alle alerts voor ${player.name} zijn bijgewerkt.` });
+        toast({ title: "Status bijgewerkt", description: `Alle alerts voor ${displayName} zijn bijgewerkt.` });
         onStatusChange();
     }
     
@@ -109,7 +113,7 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
   };
   
   const handleChatWithPlayer = async () => {
-    if (!user) return;
+    if (!user || isAnonymous) return;
     setIsUpdating(true);
     const { chatId, error } = await createOrGetChat([user.uid, player.id]);
     if (chatId) {
@@ -119,20 +123,31 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
     }
     setIsUpdating(false);
   };
+  
+  // Use a unique key for the accordion item based on player ID and anonymity status
+  const accordionValue = `${player.id}-${isAnonymous}`;
 
   return (
-    <AccordionItem value={player.id} className="border-t">
+    <AccordionItem value={accordionValue} className="border-t">
       <div className="flex items-center justify-between p-4 hover:bg-muted/50">
         <AccordionTrigger className="p-0 flex-grow hover:no-underline">
           <div className="flex items-center gap-4 text-left">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={player.photoURL} />
-              <AvatarFallback className="bg-primary/20 text-primary font-bold">
-                {getInitials(player.name)}
-              </AvatarFallback>
+             <Avatar className="h-10 w-10">
+                {isAnonymous ? (
+                    <AvatarFallback className="bg-muted-foreground/10 text-muted-foreground">
+                        <UserX className="h-5 w-5" />
+                    </AvatarFallback>
+                ) : (
+                    <>
+                    <AvatarImage src={player.photoURL} />
+                    <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                        {getInitials(player.name)}
+                    </AvatarFallback>
+                    </>
+                )}
             </Avatar>
             <div>
-              <p className="font-bold">{player.name}</p>
+              <p className="font-bold">{displayName}</p>
               <p className="text-sm text-muted-foreground">{alerts.length} {alerts.length > 1 ? 'actieve alerts' : 'actieve alert'}</p>
             </div>
           </div>
@@ -144,7 +159,7 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={handleChatWithPlayer}>
+             <DropdownMenuItem onSelect={handleChatWithPlayer} disabled={isAnonymous}>
               <MessageSquare className="mr-2 h-4 w-4" />
               <span>Chat met {player.name.split(' ')[0]}</span>
             </DropdownMenuItem>
@@ -171,6 +186,7 @@ const alertTypeTranslations: Record<AlertType['alertType'], string> = {
     'Aggression': 'Agressie',
     'Substance Abuse': 'Middelengebruik',
     'Extreme Negativity': 'Extreme Negativiteit',
+    'Request for Contact': 'Verzoek om Contact',
 };
 
 export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archived', limit?: number }) {
@@ -294,44 +310,57 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
   // Grouping logic, runs whenever data changes
   const groupedData: TeamAlertGroup[] = useMemo(() => {
     if (alerts.length === 0 || players.size === 0 || teams.size === 0) {
-      return [];
+        return [];
     }
 
+    // Map: teamId -> Map<compositePlayerKey, PlayerAlertGroup>
     const teamPlayerMap = new Map<string, Map<string, PlayerAlertGroup>>();
 
     for (const alert of alerts) {
-      const teamId = alert.teamId;
-      const playerId = alert.userId;
+        const teamId = alert.teamId;
+        const playerId = alert.userId;
+        
+        // An alert is considered 'identified' if consent is given OR it's a request for contact.
+        const isIdentified = !!alert.shareWithStaff || alert.alertType === 'Request for Contact';
+        const isAnonymous = !isIdentified;
 
-      // Ensure team exists in map
-      if (!teamPlayerMap.has(teamId)) {
-        teamPlayerMap.set(teamId, new Map());
-      }
-      const playerMap = teamPlayerMap.get(teamId)!;
-      
-      // Ensure player exists in map
-      if (!playerMap.has(playerId)) {
-        const playerProfile = players.get(playerId);
-        if (playerProfile) {
-          playerMap.set(playerId, { player: playerProfile, alerts: [] });
+        // Use a composite key to distinguish between anonymous and identified alerts for the SAME player.
+        const compositePlayerKey = `${playerId}-${isAnonymous}`;
+
+        // Ensure team exists in map
+        if (!teamPlayerMap.has(teamId)) {
+            teamPlayerMap.set(teamId, new Map());
         }
-      }
+        const playerMap = teamPlayerMap.get(teamId)!;
+        
+        // Ensure player group (anonymous or identified) exists in map
+        if (!playerMap.has(compositePlayerKey)) {
+            const playerProfile = players.get(playerId);
+            if (playerProfile) {
+                playerMap.set(compositePlayerKey, { 
+                    player: playerProfile, 
+                    alerts: [],
+                    isAnonymous: isAnonymous
+                });
+            }
+        }
 
-      // Add alert to player's list
-      const playerGroup = playerMap.get(playerId);
-      if (playerGroup) {
-        playerGroup.alerts.push(alert);
-      }
+        // Add alert to the correct player group
+        const playerGroup = playerMap.get(compositePlayerKey);
+        if (playerGroup) {
+            playerGroup.alerts.push(alert);
+        }
     }
     
     // Convert maps to sorted arrays for rendering
     return Array.from(teamPlayerMap.entries()).map(([teamId, playerMap]) => {
-      const team = teams.get(teamId)!; // Assume team exists if it's in the map
-      const playerGroups = Array.from(playerMap.values()).sort((a, b) => b.alerts.length - a.alerts.length);
-      return { team, players: playerGroups };
+        const team = teams.get(teamId)!;
+        const playerGroups = Array.from(playerMap.values()).sort((a, b) => b.alerts.length - a.alerts.length);
+        return { team, players: playerGroups };
     }).sort((a, b) => a.team.name.localeCompare(b.team.name));
 
-  }, [alerts, players, teams]);
+}, [alerts, players, teams]);
+
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-40"><Spinner /></div>;
@@ -368,7 +397,7 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
             <AccordionContent className="p-0">
                 <Accordion type="multiple" className="w-full">
                     {playerGroups.map(playerGroup => (
-                        <PlayerAccordion key={playerGroup.player.id} playerAlerts={playerGroup} teamId={team.id} onStatusChange={handleStatusChange} />
+                        <PlayerAccordion key={`${playerGroup.player.id}-${playerGroup.isAnonymous}`} playerAlerts={playerGroup} teamId={team.id} onStatusChange={handleStatusChange} />
                     ))}
                 </Accordion>
             </AccordionContent>

@@ -149,7 +149,7 @@ export interface Alert {
   teamId: string; // Denormalized for security rules
   date: string; // YYYY-MM-DD
   topic: string; // The topic of conversation when the alert was triggered
-  alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
+  alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity' | 'Request for Contact';
   triggeringMessage: string;
   status: 'new' | 'acknowledged' | 'resolved';
   shareWithStaff?: boolean; 
@@ -247,7 +247,7 @@ export interface FullWellnessAnalysisOutput {
   wellnessScores?: Partial<Omit<WellnessScore, "id" | "date" | "updatedAt" | "sleep" | "sleepReason">>;
   alert?: {
     topic: string;
-    alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity';
+    alertType: 'Mental Health' | 'Aggression' | 'Substance Abuse' | 'Extreme Negativity' | 'Request for Contact';
     triggeringMessage: string;
     shareWithStaff?: boolean; 
   };

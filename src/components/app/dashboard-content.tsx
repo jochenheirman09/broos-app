@@ -8,7 +8,8 @@ import { StaffDashboard } from "./staff-dashboard";
 import { ResponsibleDashboard } from "./responsible-dashboard";
 import { WelcomeHeader } from "./welcome-header";
 import { Spinner } from "@/components/ui/spinner";
-import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
+import Link from 'next/link';
+import { Button } from "@/components/ui/button";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
 export function DashboardContent() {
@@ -17,14 +18,31 @@ export function DashboardContent() {
 
   useEffect(() => {
     // This effect tries to silently refresh the token in the background on load.
-    // It will only proceed if permission is already granted.
-    if (userProfile?.uid && typeof window !== 'undefined') {
-        // The refreshToken function (from useRequestNotificationPermission)
-        // now handles the logic of checking permission and getting the token.
-        // Pass `true` to indicate a silent attempt.
-        console.log('[DashboardContent] Attempting silent FCM token refresh on load.');
-        refreshToken(false); 
-    }
+    const autoRefreshToken = async () => {
+      // Wait for user profile and ensure we are in a browser
+      if (!userProfile?.uid || typeof window === 'undefined') return;
+
+      if ('serviceWorker' in navigator) {
+        try {
+          // Wait for the Service Worker to be ready
+          await navigator.serviceWorker.ready;
+          
+          // Small delay (500ms) to ensure everything is stable
+          setTimeout(() => {
+            // The refreshToken function (from useRequestNotificationPermission)
+            // now handles the logic of checking permission and getting the token.
+            // Pass `true` to indicate a silent refresh.
+            console.log('[DashboardContent] Attempting to silently update FCM token.');
+            refreshToken(true); 
+          }, 500); 
+
+        } catch (swErr) {
+          console.error("Service Worker not ready for auto-refresh:", swErr);
+        }
+      }
+    };
+
+    autoRefreshToken();
   }, [userProfile?.uid, refreshToken]);
 
   if (loading || !userProfile) {
@@ -39,7 +57,6 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      <RequestNotificationPermission />
       <WelcomeHeader />
       
       {role === 'player' && <PlayerDashboard />}

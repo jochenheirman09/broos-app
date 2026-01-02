@@ -24,6 +24,7 @@ interface UserContextType {
   loading: boolean;
   logout: () => void;
   forceRefetch: () => void;
+  isUserLoading: boolean; // Exposing auth loading state
 }
 
 const UserContext = createContext<UserContextType>({
@@ -32,6 +33,7 @@ const UserContext = createContext<UserContextType>({
   loading: true,
   logout: async () => {},
   forceRefetch: () => {},
+  isUserLoading: true,
 });
 
 const LoadingScreen = () => (
@@ -191,7 +193,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         userProfile: userProfile as UserProfile | null,
         loading,
         logout,
-        forceRefetch: forceRefetchUser
+        forceRefetch: forceRefetchUser,
+        isUserLoading: isAuthLoading
       }}
     >
       {children}

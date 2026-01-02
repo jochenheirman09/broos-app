@@ -46,7 +46,8 @@ const onboardingBuddyPromptPromise = aiPromise.then(ai => ai.definePrompt({
 export async function runOnboardingFlow(
     userRef: DocumentReference,
     userProfile: UserProfile,
-    input: WellnessAnalysisInput
+    input: WellnessAnalysisInput,
+    isFirstInteraction: boolean // Receive the flag from the controller
 ): Promise<OnboardingOutput> {
     
     const onboardingBuddyPrompt = await onboardingBuddyPromptPromise;
@@ -78,8 +79,17 @@ export async function runOnboardingFlow(
         });
     }
 
+    let finalResponse = output.response || "";
+
+    // If it's the very first interaction, prepend the welcome message.
+    if (isFirstInteraction) {
+        const buddyName = userProfile.buddyName || 'Broos';
+        const welcomeMessage = `Hallo, aangenaam kennis te maken, ik ben ${buddyName} en zal jou helpen. Wees ervan bewust dat alles wat je tegen mij zegt vertrouwelijk blijft tussen ons en dat we telkens jouw toestemming zullen vragen als we iets willen communiceren met jouw trainers en clubverantwoordelijken. We zullen enkel algemene informatie gebruiken om te communiceren, tenzij je ons toestemming geeft om de details te delen, maar ook dat doen we in de grootste discretie. Weet dat we je ook altijd in contact kunnen brengen met een vertrouwenspersoon indien je dat wilt. We zijn hier samen om jou beter te maken, dus als je enige vragen of tips en advies nodig hebt, laat me zeker weten.`;
+        finalResponse = `${welcomeMessage}\n\n${finalResponse}`;
+    }
+
     return { 
-      response: output.response || "", 
+      response: finalResponse, 
       isTopicComplete: output.isTopicComplete ?? false,
       isLastTopic, 
       lastTopic: nextTopic 

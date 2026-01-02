@@ -51,7 +51,7 @@ export const useRequestNotificationPermission = () => {
 
             try {
                 console.log(`${logPrefix} Waiting for service worker to be ready...`);
-                // Race a timeout against the service worker readiness.
+                // Race a timeout against the service worker readiness. This prevents infinite spinners.
                 const swRegistration = await Promise.race([
                     navigator.serviceWorker.ready,
                     new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker not ready after 5 seconds.')), 5000))

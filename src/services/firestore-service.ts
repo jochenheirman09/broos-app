@@ -106,10 +106,10 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
       }).optional(),
       alert: z.object({
           topic: z.string().describe("Het onderwerp van gesprek waar de alert over ging, bv. 'School', 'Training', 'Familie'."),
-          alertType: z.enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity']),
-          triggeringMessage: z.string(),
+          alertType: z.enum(['Mental Health', 'Aggression', 'Substance Abuse', 'Extreme Negativity', 'Request for Contact']),
+          triggeringMessage: z.string().describe("De exacte boodschap van de gebruiker die de alert veroorzaakte."),
+          shareWithStaff: z.boolean().optional(),
       }).optional(),
-      askForConsent: z.boolean().optional(),
       gameUpdate: z.object({
           opponent: z.string().optional(),
           score: z.string().optional(),
@@ -119,7 +119,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
     });
 
     const analysisPrompt = ai.definePrompt({
-        name: 'chatDataExtractorPrompt_v4_strict_alerts',
+        name: 'chatDataExtractorPrompt_v6_final',
         model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.object({ chatHistory: z.string() }) },
         output: { schema: AnalysisOutputSchema },
@@ -127,11 +127,13 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
             Je bent een data-analist. Analyseer het volgende gesprek en extraheer de data.
             - **Samenvatting:** Geef een korte samenvatting van het hele gesprek.
             - **Welzijnsscores:** Leid scores (1-5) en redenen af voor de 8 welzijnsthema's. VRAAG NOOIT OM EEN SCORE. Een hoog stress-cijfer betekent WEINIG stress.
-            - **Alerts (STRIKT):** Genereer ALLEEN een alert bij DUIDELIJKE rode vlaggen. Een slechte dag, een lage score, of "het ging niet goed" is GEEN alert. Zoek naar expliciete vermeldingen van:
-                - Mentale problemen (bv. "ik zie het niet meer zitten", "voel me waardeloos", "het hoeft voor mij niet meer"). AlertType: 'Mental Health'.
-                - Agressie (bv. "ik werd zo boos dat ik iets kapot heb gemaakt", "ik wil vechten"). AlertType: 'Aggression'.
-                - Middelengebruik (bv. "ik heb gedronken voor de wedstrijd", "ik gebruik iets om beter te presteren"). AlertType: 'Substance Abuse'.
-                - Extreme Negativiteit (bv. een aanhoudende, hopeloze toon door het hele gesprek). AlertType: 'Extreme Negativity'.
+            - **Alerts (STRIKT):** Genereer ALLEEN een alert bij DUIDELIJKE rode vlaggen. Een slechte dag of "het ging niet goed" is GEEN alert.
+                - **Contactverzoek:** Als de speler expliciet vraagt om met een vertrouwenspersoon te praten (bv. "ja, ik wil praten"), creëer een 'Request for Contact' alert. De 'triggeringMessage' MOET de letterlijke vraag van de speler zijn. Zet 'shareWithStaff' op 'true'.
+                - **Andere Alerts:** Zoek naar expliciete vermeldingen van:
+                    - Mentale problemen (bv. "ik zie het niet meer zitten", "voel me waardeloos"). AlertType: 'Mental Health'. De 'triggeringMessage' is de zin van de speler.
+                    - Agressie (bv. "ik werd zo boos dat ik iets kapot heb gemaakt"). AlertType: 'Aggression'. De 'triggeringMessage' is de zin van de speler.
+                    - Middelengebruik (bv. "ik heb gedronken voor de wedstrijd"). AlertType: 'Substance Abuse'. De 'triggeringMessage' is de zin van de speler.
+                - **Toestemming:** Als de speler "ja" antwoordt op de vraag om details te delen, zet dan 'shareWithStaff' op 'true' voor de desbetreffende alert.
             - **Wedstrijd:** Als er over een wedstrijd is gesproken, vul het 'gameUpdate' object.
 
             Gespreksgeschiedenis:
@@ -175,6 +177,8 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                     teamId: userData.teamId,
                     date: today, 
                     status: 'new', 
+                    // Make sure 'shareWithStaff' defaults to false if not provided, unless it's a contact request
+                    shareWithStaff: output.alert.shareWithStaff ?? (output.alert.alertType === 'Request for Contact'),
                     createdAt: FieldValue.serverTimestamp(),
                 });
             }

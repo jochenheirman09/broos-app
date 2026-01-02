@@ -92,14 +92,16 @@ export async function chatWithBuddy(
     
     const messagesSnapshot = await userRef.collection('chats').doc(today).collection('messages').orderBy('sortOrder', 'asc').get();
     const chatHistory = messagesSnapshot.docs.map(doc => `${doc.data().role}: ${doc.data().content}`).join('\n');
-    console.log("[Chat Action] History fetched for AI context.");
+    const isFirstInteraction = messagesSnapshot.docs.length <= 1; // 0 or 1 (system message)
+    console.log(`[Chat Action] History fetched. Is first interaction: ${isFirstInteraction}`);
 
     const enrichedInput: WellnessAnalysisInput = { ...input, currentTime, chatHistory, todayActivity, isGameDay, game };
 
     let result;
     if (!userProfile.onboardingCompleted) {
       console.log('[Chat Action] Routing to onboarding flow.');
-      result = await runOnboardingFlow(userRef, userProfile, enrichedInput);
+      // Pass isFirstInteraction to the onboarding flow so it can handle the welcome message.
+      result = await runOnboardingFlow(userRef, userProfile, enrichedInput, isFirstInteraction);
     } else {
       console.log('[Chat Action] Routing to wellness analysis flow.');
       result = await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
