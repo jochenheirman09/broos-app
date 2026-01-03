@@ -1,72 +1,66 @@
-"use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, MessageSquare, ArrowLeft } from "lucide-react";
-import { NewChat } from "@/components/app/p2p-chat/new-chat";
-import { ExistingChatsList } from "@/components/app/p2p-chat/existing-chats-list";
-import { useUser } from "@/context/user-context";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
+'use client';
 
+import { use } from 'react';
+import { useUser } from '@/context/user-context';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { Conversation, WithId } from '@/lib/types';
+import { P2PChatInterface } from '@/components/app/p2p-chat-interface';
+import { Spinner } from '@/components/ui/spinner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { User, ShieldX } from 'lucide-react';
+import React from 'react';
 
-export default function P2PChatOverviewPage() {
-  const { userProfile } = useUser();
-  const isPlayer = userProfile?.role === 'player';
+// De complexe `usePartnerProfiles` hook is niet langer nodig omdat
+// de profielinformatie nu direct beschikbaar is in het `chatData` object.
 
-  return (
-    <div className="container mx-auto py-8">
-      <RequestNotificationPermission />
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap justify-between items-start gap-4">
-            <div className="flex-grow">
-              <CardTitle className="flex items-center text-2xl">
-                <Users className="h-6 w-6 mr-3" />
-                Team Chat
-              </CardTitle>
-              <CardDescription>
-                Bekijk je bestaande gesprekken of start een nieuw gesprek met je teamleden.
-              </CardDescription>
+function P2PChatLoader({ chatId }: { chatId: string }) {
+  const { user, isUserLoading: userLoading } = useUser();
+  const db = useFirestore();
+
+  // We halen nog steeds het centrale chat-document op, want daar staan de berichten.
+  const chatDocRef = useMemoFirebase(() => {
+      if (!chatId) return null;
+      return doc(db, 'p2p_chats', chatId);
+  }, [chatId, db]);
+  
+  const { data: chatData, isLoading: chatLoading, error: chatError } = useDoc<Conversation>(chatDocRef);
+
+  const isLoading = userLoading || chatLoading;
+
+  if (isLoading) {
+    return <div className="flex h-full w-full items-center justify-center"><Spinner /></div>;
+  }
+  
+  if (chatError) {
+    return (
+      <div className="container mx-auto py-8">
+        <Alert variant="destructive">
+          <User className="h-4 w-4" /><AlertTitle>Fout</AlertTitle><AlertDescription>Kon de chatgegevens niet laden.</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!chatData || !user || !chatData.participants.includes(user.uid)) {
+       return (
+            <div className="container mx-auto py-8">
+                <Alert variant="destructive">
+                <ShieldX className="h-4 w-4" /><AlertTitle>Geen Toegang</AlertTitle><AlertDescription>Je hebt geen toegang tot dit gesprek.</AlertDescription>
+                </Alert>
             </div>
-            {!isPlayer && (
-                 <Link href="/dashboard" passHref>
-                    <Button variant="outline" className="w-full sm:w-auto">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Terug naar Dashboard
-                    </Button>
-                 </Link>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="existing">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
-              <TabsTrigger value="existing">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Bestaande Gesprekken
-              </TabsTrigger>
-              <TabsTrigger value="new">
-                <Users className="mr-2 h-4 w-4" />
-                Nieuw Gesprek
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="existing" className="mt-6">
-              <ExistingChatsList />
-            </TabsContent>
-            <TabsContent value="new" className="mt-6">
-                <NewChat />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        );
+  }
+  
+  // De `P2PChatInterface` component krijgt nu het volledige `chatData`-object,
+  // inclusief de gedenormaliseerde `participantProfiles`.
+  return <P2PChatInterface chatId={chatId} chatData={chatData} />;
+}
+
+
+export default function P2PChatPage({ params }: { params: Promise<{ chatId: string }> }) {
+  const { chatId } = use(params);
+  
+  return <P2PChatLoader chatId={chatId} />;
 }

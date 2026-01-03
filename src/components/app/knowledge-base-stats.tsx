@@ -106,7 +106,7 @@ export function KnowledgeBaseManager() {
       <CardContent className="p-4 space-y-4">
         <Button onClick={handleUploadClick} className="w-full" disabled={isUploading}>
           {isUploading ? <Spinner size="small" className="mr-2"/> : <UploadCloud className="mr-2 h-4 w-4" />}
-          {isUploading ? "Verwerken..." : "Nieuw Document Uploaden (.txt, .md)"}
+          {isUploading ? "Verwerken..." : "Document uploaden"}
         </Button>
         <input
           type="file"
