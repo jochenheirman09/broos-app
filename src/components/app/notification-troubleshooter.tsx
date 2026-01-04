@@ -1,123 +1,123 @@
 
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
-import { Spinner } from "../ui/spinner";
-import { Wand, ShieldAlert } from "lucide-react";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
+import { BellRing, Wrench, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
-import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 
 export function NotificationTroubleshooter() {
-  const { toast } = useToast();
-  const { userProfile } = useUser();
-  const [isLoading, setIsLoading] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
-  const { requestPermission } = useRequestNotificationPermission();
+    const { user } = useUser();
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+    const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported" | "timeout">(
+        () => (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "unsupported"
+    );
 
-  useEffect(() => {
-    // Check the initial permission status when the component mounts
-    if ("Notification" in window) {
-      setPermissionStatus(Notification.permission);
-    }
-  }, []);
+    const { requestPermission } = useRequestNotificationPermission();
 
-  const handleManualTokenRefresh = async () => {
-    if (!userProfile) return;
+    const handleManualTokenRefresh = async () => {
+        setIsLoading(true);
+        try {
+            const newPermission = await requestPermission(true); // true = it's a manual action
+            
+            if (newPermission) {
+                setPermissionStatus(newPermission);
+            }
 
-    setIsLoading(true);
+            if (newPermission === 'granted') {
+                 toast({
+                    title: "Token Vernieuwd!",
+                    description: "Je notificatie-token is succesvol vernieuwd en opgeslagen.",
+                });
+            } else if (newPermission === 'denied') {
+                toast({
+                    variant: "destructive",
+                    title: "Permissie Geblokkeerd",
+                    description: "Je moet meldingen voor deze site handmatig inschakelen in je browserinstellingen.",
+                });
+            } else if (newPermission === 'timeout') {
+                 toast({
+                    variant: "destructive",
+                    title: "Timeout",
+                    description: "De service worker reageerde niet op tijd. Probeer de pagina te herladen.",
+                });
+            }
+        } catch (error: any) {
+            console.error("Manual token refresh failed:", error);
+            toast({
+                variant: "destructive",
+                title: "Fout",
+                description: `Kon token niet vernieuwen: ${error.message}`,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
     
-    try {
-      // The requestPermission function handles all logic, including timeouts and server actions.
-      // We pass `true` to indicate this is a manual action, which may prompt for permission.
-      const finalPermission = await requestPermission(true);
+    // Periodically check permission status in case it's changed in another tab
+    useState(() => {
+        const interval = setInterval(() => {
+            if ("Notification" in window) {
+                setPermissionStatus(Notification.permission);
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    });
 
-      // Update the component's state with the result.
-      setPermissionStatus(finalPermission || 'default');
-
-      if (finalPermission === 'granted') {
-        toast({
-            title: "Token Vernieuwd!",
-            description: "Je apparaat is opnieuw geregistreerd voor push-meldingen."
-        });
-      } else if (finalPermission === 'denied') {
-          // The main UI will now show a persistent message, but a toast is still good for immediate feedback.
-          toast({
-              variant: "destructive",
-              title: "Toestemming Geblokkeerd",
-              description: "Je moet meldingen voor deze site handmatig inschakelen in je browser-instellingen."
-          });
-      } else if (finalPermission === 'timeout') {
-          toast({
-              variant: "destructive",
-              title: "Timeout",
-              description: "De service worker reageerde niet op tijd. Probeer de app te herladen."
-          });
-      } else {
-        toast({
-            variant: "default",
-            title: "Actie geannuleerd",
-            description: "De aanvraag voor meldingen is niet voltooid."
-        });
-      }
-
-    } catch (error: any) {
-        console.error("Manual refresh failed:", error);
-        toast({
-            variant: "destructive",
-            title: "Fout bij vernieuwen",
-            description: error.message || "Een onbekende fout is opgetreden."
-        });
-    } finally {
-        setIsLoading(false);
+    if (permissionStatus === 'unsupported' || !user) {
+        return null; // Don't show this component if notifications aren't supported or user isn't logged in
     }
-  };
 
-  return (
-    <Card className="bg-orange-500/10 border-orange-500/50">
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
-                <Wand className="h-5 w-5" />
-                <span>Notificatie Probleemoplosser</span>
-            </CardTitle>
-            <CardDescription className="text-orange-700 dark:text-orange-400">
-                Gebruik deze tool als je problemen ondervindt met het ontvangen van push-meldingen.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            {permissionStatus === 'denied' ? (
-                <Alert variant="destructive">
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertTitle>Notificaties Geblokkeerd</AlertTitle>
-                    <AlertDescription>
-                        Je hebt meldingen voor deze site geblokkeerd. Om notificaties te ontvangen, moet je de toestemming handmatig aanpassen in de site-instellingen van je browser.
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <>
-                    <p className="text-sm text-orange-700/90 dark:text-orange-400/90 mb-4">
-                        Als je geen meldingen ontvangt, klik dan op de onderstaande knop om de verbinding met de notificatieserver te herstellen en je apparaat opnieuw te registreren.
-                    </p>
-                    <Button
-                        onClick={handleManualTokenRefresh}
-                        disabled={isLoading}
-                        className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white"
-                    >
-                        {isLoading && <Spinner size="small" className="mr-2" />}
-                        {isLoading ? "Bezig..." : "Forceer Token Vernieuwing"}
-                    </Button>
-                </>
-            )}
-        </CardContent>
-    </Card>
-  );
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center text-2xl">
+                    <Wrench className="mr-3 h-6 w-6 text-muted-foreground" />
+                    Notificatie Probleemoplosser
+                </CardTitle>
+                <CardDescription>
+                    Gebruik deze tool als je problemen ondervindt met het ontvangen van push-meldingen.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {permissionStatus === 'denied' ? (
+                     <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Meldingen Geblokkeerd</AlertTitle>
+                        <AlertDescription>
+                            Je hebt meldingen voor deze site geblokkeerd. Om meldingen te ontvangen, moet je de permissie handmatig aanpassen in de instellingen van je browser (meestal via het slot-icoontje in de adresbalk).
+                        </AlertDescription>
+                    </Alert>
+                ) : permissionStatus === 'granted' ? (
+                    <Alert className="bg-green-500/10 border-green-500/50 text-green-700 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4 !text-green-500" />
+                        <AlertTitle>Meldingen Ingeschakeld</AlertTitle>
+                        <AlertDescription>
+                           Je bent klaar om meldingen te ontvangen. Als je nog steeds problemen hebt, probeer dan de token te vernieuwen.
+                        </AlertDescription>
+                    </Alert>
+                ) : (
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Actie Vereist</AlertTitle>
+                        <AlertDescription>
+                            Je hebt nog geen toestemming gegeven voor meldingen. Gebruik de knop hieronder om dit in te schakelen.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                <Button onClick={handleManualTokenRefresh} disabled={isLoading || permissionStatus === 'denied'} className="w-full">
+                    {isLoading && <Spinner size="small" className="mr-2" />}
+                    {isLoading ? "Bezig..." : "Forceer Token Vernieuwing"}
+                </Button>
+            </CardContent>
+        </Card>
+    );
 }
+
