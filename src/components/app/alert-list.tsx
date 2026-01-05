@@ -238,6 +238,9 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
                     alertsCollection,
                     where('clubId', '==', clubId),
                     where('teamId', '==', teamId),
+                    // Staff canNOT see 'Request for Contact' alerts
+                    where('alertType', '!=', 'Request for Contact'),
+                    orderBy('alertType'), // Required for the inequality filter
                     orderBy('createdAt', 'desc')
                 );
                 console.log(`[AlertList] Staff query created for clubId: ${clubId}, teamId: ${teamId}`);

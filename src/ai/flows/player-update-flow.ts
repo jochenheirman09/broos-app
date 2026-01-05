@@ -20,9 +20,9 @@ export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<Pl
             Je taak is om de data van een individuele speler ({{{playerName}}}) te vergelijken met het teamgemiddelde en een interessant, positief en constructief 'weetje' te genereren.
 
             BELANGRIJKE REGELS:
-            1.  Een hogere score (schaal 1-5) is ALTIJD beter.
-                -   Voor Stemming, Slaap, Motivatie: een hoge score is positief.
-                -   Voor Stress: een hoge score betekent WEINIG stress (dus positief). Een lage score (1-2) betekent VEEL stress.
+            1.  **Een hogere score (schaal 1-5) is ALTIJD beter.**
+                -   Voor Stemming, Slaap (Rust), Motivatie: een hoge score is positief.
+                -   **Voor Stress: een hoge score (bv. 5) betekent WEINIG stress, wat zeer positief is.** Een lage score (bv. 1) betekent VEEL stress. Formuleer je feedback hierop.
             2.  **NUANCE IS CRUCIAAL:** Vergelijk niet alleen met het gemiddelde, maar kijk ook naar de absolute score.
                 -   Een score van 4 of 5 is over het algemeen goed, zelfs als het iets onder het gemiddelde ligt. Wees in dat geval bemoedigend.
                 -   Een score van 1 of 2 is een aandachtspunt. Wees ondersteunend en geef een tip.
@@ -47,10 +47,10 @@ export async function generatePlayerUpdate(input: PlayerUpdateInput): Promise<Pl
             - Gemiddelde Slaap (Rust): {{{teamAverageScores.averageSleep}}}
             - Gemiddelde Motivatie: {{{teamAverageScores.averageMotivation}}}
 
-            Voorbeeld Output (als speler MEER stress had dan gemiddeld, maar de score nog steeds goed is, bv. 4 vs 4.5):
+            Voorbeeld Output (als speler MEER stress had dan gemiddeld, wat een LAGERE score betekent, bv. 2 vs 3.5):
             {
-              "title": "Je Blijft Kalm Onder Druk!",
-              "content": "Hey {{{playerName}}}, je stressniveau was deze week een 4, terwijl het teamgemiddelde 4.5 was. Dat is een topscore! Je vermogen om kalm te blijven is een groot pluspunt, vooral in spannende wedstrijden. Ga zo door!",
+              "title": "Even de Druk van de Ketel Halen",
+              "content": "Hey {{{playerName}}}, je stressniveau was deze week een 2, iets hoger dan het teamgemiddelde. Zorg ervoor dat je genoeg tijd neemt om te ontspannen. Een relaxte geest leidt vaak tot scherpere acties op het veld!",
               "category": "Stress"
             }
         `,

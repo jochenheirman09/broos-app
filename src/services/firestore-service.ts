@@ -169,6 +169,11 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
             const userData = userDoc.data() as UserProfile | undefined;
             if (userData?.clubId && userData?.teamId) {
                 const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc();
+                
+                // CONFIDENTIALITY LOGIC
+                const isRequestForContact = output.alert.alertType === 'Request for Contact';
+                const shareWithStaff = isRequestForContact ? false : (output.alert.shareWithStaff ?? false);
+
                 batch.set(alertDocRef, {
                     ...output.alert,
                     id: alertDocRef.id,
@@ -177,8 +182,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                     teamId: userData.teamId,
                     date: today, 
                     status: 'new', 
-                    // Make sure 'shareWithStaff' defaults to false if not provided, unless it's a contact request
-                    shareWithStaff: output.alert.shareWithStaff ?? (output.alert.alertType === 'Request for Contact'),
+                    shareWithStaff: shareWithStaff,
                     createdAt: FieldValue.serverTimestamp(),
                 });
             }

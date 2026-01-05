@@ -22,10 +22,12 @@ export async function analyzeTeamData(input: TeamAnalysisInput): Promise<TeamAna
         output: { schema: TeamAnalysisOutputSchema },
         prompt: `
             Je bent een sportdata-analist voor een voetbalclub. Je taak is om de anonieme welzijnsdata van team '{{{teamName}}}' te analyseren.
+            
+            REGEL: Een hogere score (schaal 1-5) is ALTIJD beter. **Voor Stress betekent een hoge score (5/5) dus WEINIG stress.**
 
             DATA:
             {{#each playersData}}
-            - Speler {{name}}: Stemming: {{scores.mood}}, Stress: {{scores.stress}}, Slaap: {{scores.sleep}}, Motivatie: {{scores.motivation}}, Blessure: {{#if scores.injury}}Ja ({{scores.injuryReason}}){{else}}Nee{{/if}}. Redenen: {{scores.moodReason}}, {{scores.stressReason}}, {{scores.sleepReason}}, {{scores.motivationReason}}.
+            - Speler {{name}}: Stemming: {{scores.mood}}, Stress: {{scores.stress}}, Slaap: {{scores.rest}}, Motivatie: {{scores.motivation}}, Blessure: {{#if scores.injury}}Ja ({{scores.injuryReason}}){{else}}Nee{{/if}}. Redenen: {{scores.moodReason}}, {{scores.stressReason}}, {{scores.restReason}}, {{scores.motivationReason}}.
             {{/each}}
 
             TAKEN:
