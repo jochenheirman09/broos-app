@@ -47,15 +47,14 @@ export const useRequestNotificationPermission = () => {
             if (!vapidKey) {
                 console.error(`${logPrefix} CRITICAL: VAPID key is not available.`);
                 throw new Error("VAPID key for notifications ontbreekt in de applicatieconfiguratie.");
+            } else {
+                console.log(`${logPrefix} VAPID key found.`);
             }
 
             try {
                 console.log(`${logPrefix} Waiting for service worker to be ready...`);
-                // Race a timeout against the service worker readiness. This prevents infinite spinners.
-                const swRegistration = await Promise.race([
-                    navigator.serviceWorker.ready,
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker not ready after 5 seconds.')), 5000))
-                ]) as ServiceWorkerRegistration;
+                // Wait for the service worker to be ready.
+                const swRegistration = await navigator.serviceWorker.ready;
                 console.log(`${logPrefix} Service worker is ready.`);
 
                 const messaging = getMessaging(app);
@@ -67,7 +66,7 @@ export const useRequestNotificationPermission = () => {
                 });
 
                 if (currentToken) {
-                    console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 10)}...`);
+                    console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 20)}...`);
                     
                     // Call the secure server action to save the token
                     console.log(`${logPrefix} Calling server action to save token.`);
@@ -77,6 +76,7 @@ export const useRequestNotificationPermission = () => {
                         console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved.`);
                     } else {
                         // Throw error if the server action failed, so the UI can catch it.
+                        console.error(`${logPrefix} FAILED: Server action reported an error: ${result.message}`);
                         throw new Error(result.message);
                     }
 
@@ -86,10 +86,6 @@ export const useRequestNotificationPermission = () => {
                 }
             } catch (err: any) {
                 console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
-                if (err.message.includes('timeout')) {
-                    // Propagate a specific 'timeout' status.
-                    return 'timeout';
-                }
                 // Re-throw other errors to be handled by the caller
                 throw err;
             }
@@ -123,6 +119,7 @@ export const ForegroundMessageListener = () => {
                     if ('setAppBadge' in navigator && typeof navigator.setAppBadge === 'function') {
                         // Here you might want to fetch the real unread count
                         // For simplicity, we just increment or set to 1
+                        console.log('[Foreground Listener] Setting app badge.');
                         navigator.setAppBadge(1);
                     }
                 });

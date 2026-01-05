@@ -294,10 +294,11 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
  */
 export async function saveFcmToken(userId: string, token: string, isManualRefresh: boolean): Promise<{ success: boolean; message: string }> {
     if (!userId || !token) {
+        console.error("[FCM Token Action] Received invalid parameters.", { userId, token });
         return { success: false, message: "Gebruikers-ID en token zijn vereist." };
     }
 
-    console.log(`[FCM Token Action] Saving token for user ${userId}. Manual: ${isManualRefresh}`);
+    console.log(`[FCM Token Action] SERVER: Saving token for user ${userId}. Manual: ${isManualRefresh}`);
     const { adminDb } = await getFirebaseAdmin();
     const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
 
@@ -309,10 +310,10 @@ export async function saveFcmToken(userId: string, token: string, isManualRefres
             manualRefresh: isManualRefresh
         }, { merge: true });
 
-        console.log(`[FCM Token Action] Successfully saved token for user ${userId}.`);
+        console.log(`[FCM Token Action] SERVER: Successfully saved token for user ${userId}.`);
         return { success: true, message: "Token successfully saved." };
     } catch (error: any) {
-        console.error(`[FCM Token Action] Error saving token for user ${userId}:`, error);
+        console.error(`[FCM Token Action] SERVER: Error saving token for user ${userId}:`, error);
         return { success: false, message: error.message || "Failed to save token." };
     }
 }
