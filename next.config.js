@@ -10,7 +10,8 @@ const withPWA = require('next-pwa')({
 });
 
 const nextConfig = {
-  // The 'env' block is removed from here, as App Hosting handles runtime env vars.
+  // The incorrect 'env' block has been removed. 
+  // App Hosting now handles passing the public env var.
   webpack: (config, { isServer }) => {
     // This is the fix for the 'async_hooks' and 'child_process' errors.
     // It tells Webpack to not try to bundle these server-side modules
