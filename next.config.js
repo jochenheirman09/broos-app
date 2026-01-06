@@ -1,14 +1,12 @@
-
 /** @type {import('next').NextConfig} */
 
 const withPWA = require('next-pwa')({
-  // Point next-pwa to the public folder. It will generate its own service worker (e.g., sw.js)
-  // for offline caching, completely separate from our Firebase worker.
   dest: 'public',
-  sw: 'sw.js', // This is the output file for the PWA service worker.
+  // Point next-pwa to our custom service worker file, which will be output to the public folder.
+  swSrc: 'src/sw.js', 
+  sw: 'sw.js',
   register: true,
   skipWaiting: true,
-  // We disable this during development to avoid caching issues.
   disable: process.env.NODE_ENV === 'development',
 });
 

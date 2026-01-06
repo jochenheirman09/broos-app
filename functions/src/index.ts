@@ -1,4 +1,3 @@
-
 'use server';
 import * as functions from 'firebase-functions/v1';
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -12,6 +11,45 @@ import type { Alert } from '../../src/lib/types';
 if (!admin.apps.length) {
     admin.initializeApp();
 }
+
+const db = admin.firestore();
+const LOCK_TIMEOUT_SECONDS = 5 * 60; // 5 minutes
+
+/**
+ * Attempts to acquire a distributed lock.
+ * @param lockName The name of the lock to acquire.
+ * @returns A promise that resolves to true if the lock was acquired, false otherwise.
+ */
+async function acquireLock(lockName: string): Promise<boolean> {
+    const lockRef = db.collection('_locks').doc(lockName);
+    try {
+        await db.runTransaction(async (transaction) => {
+            const lockDoc = await transaction.get(lockRef);
+            if (lockDoc.exists) {
+                const lockData = lockDoc.data();
+                const lockTime = lockData?.timestamp.toDate();
+                const now = new Date();
+                // Check if the lock has expired
+                if (now.getTime() - lockTime.getTime() > LOCK_TIMEOUT_SECONDS * 1000) {
+                    console.log(`[LOCK] Stale lock '${lockName}' found. Overriding.`);
+                    transaction.set(lockRef, { timestamp: FieldValue.serverTimestamp() });
+                } else {
+                    // Lock is still active
+                    throw new Error(`Lock '${lockName}' is currently held.`);
+                }
+            } else {
+                // Lock does not exist, acquire it
+                transaction.set(lockRef, { timestamp: FieldValue.serverTimestamp() });
+            }
+        });
+        console.log(`[LOCK] Lock '${lockName}' acquired successfully.`);
+        return true;
+    } catch (error: any) {
+        console.log(`[LOCK] Failed to acquire lock '${lockName}': ${error.message}`);
+        return false;
+    }
+}
+
 
 /**
  * 1. NIGHTLY ANALYSIS JOB
@@ -33,7 +71,12 @@ export const morningSummary = onSchedule({
     schedule: "30 8 * * *",
     timeZone: "Europe/Brussels",
 }, async (event) => {
-    const db = admin.firestore();
+    const lockAcquired = await acquireLock('morningSummary');
+    if (!lockAcquired) {
+        console.log("[morningSummary] Could not acquire lock, another instance is running. Exiting.");
+        return;
+    }
+
     try {
         const users = await db.collection('users').get();
         for (const userDoc of users.docs) {
@@ -73,7 +116,12 @@ export const dailyCheckInReminder = onSchedule({
     schedule: "0 17 * * *",
     timeZone: "Europe/Brussels",
 }, async (event) => {
-    const db = admin.firestore();
+    const lockAcquired = await acquireLock('dailyCheckInReminder');
+    if (!lockAcquired) {
+        console.log("[dailyCheckInReminder] Could not acquire lock, another instance is running. Exiting.");
+        return;
+    }
+
     try {
         const players = await db.collection('users').where('role', '==', 'player').get();
         for (const playerDoc of players.docs) {
@@ -110,12 +158,10 @@ export const onAlertCreated = functions.firestore
     .document('clubs/{clubId}/teams/{teamId}/alerts/{alertId}')
     .onCreate(async (snapshot, context) => {
         const alertRef = snapshot.ref;
-        const db = admin.firestore();
+        console.log(`[onAlertCreated] Triggered for alert: ${alertRef.id}`);
 
         try {
             let shouldSend = false;
-            let tokensToSend: string[] = [];
-            let notificationPayload: any = {};
             const alertData = snapshot.data() as Alert;
 
             // STAP 1: De transactie is alleen voor de "lock"
@@ -123,14 +169,17 @@ export const onAlertCreated = functions.firestore
                 const doc = await transaction.get(alertRef);
                 const data = doc.data();
                 if (data && data.notificationStatus !== 'sent') {
+                    console.log(`[onAlertCreated] Lock acquired for alert ${alertRef.id}. Setting status to 'sent'.`);
                     transaction.update(alertRef, { notificationStatus: 'sent' });
                     shouldSend = true; 
+                } else {
+                    console.log(`[onAlertCreated] Notification for ${alertRef.id} already processed or data missing.`);
                 }
             });
 
             // STAP 2: Buiten de transactie doen we het zware werk
             if (shouldSend) {
-                console.log(`[onAlertCreated] ✅ Transaction complete, preparing to send alert for ${alertRef.id}.`);
+                console.log(`[onAlertCreated] Preparing to send notification for alert ${alertRef.id}.`);
                 const { clubId, teamId } = context.params;
 
                 const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
@@ -138,9 +187,11 @@ export const onAlertCreated = functions.firestore
                 const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
                 
                 const tokenSet = new Set<string>();
-                
+                const userIdsToNotify = new Set<string>();
+
                 const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
                      for (const userDoc of snap.docs) {
+                        userIdsToNotify.add(userDoc.id);
                         const tokens = await getTokensForUser(userDoc.id);
                         tokens.forEach(t => {
                             if (t && t.trim() !== "") {
@@ -153,10 +204,11 @@ export const onAlertCreated = functions.firestore
                 await processSnapshot(staffSnap);
                 await processSnapshot(responsibleSnap);
                
-                tokensToSend = Array.from(tokenSet);
+                const tokensToSend = Array.from(tokenSet);
+                console.log(`[onAlertCreated] Found ${tokensToSend.length} tokens for users:`, Array.from(userIdsToNotify));
 
                 if (tokensToSend.length > 0) {
-                     notificationPayload = {
+                     const notificationPayload = {
                         notification: {
                             title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
                             body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
@@ -173,12 +225,10 @@ export const onAlertCreated = functions.firestore
                     };
                     
                     const response = await admin.messaging().sendEachForMulticast({ tokens: tokensToSend, ...notificationPayload });
-                    console.log(`[onAlertCreated] ✅ Alert sent to ${response.successCount} unique devices.`);
+                    console.log(`[onAlertCreated] ✅ FCM response: ${response.successCount} success, ${response.failureCount} failure.`);
                 } else {
                     console.log(`[onAlertCreated] No tokens found for relevant staff/responsible users.`);
                 }
-            } else {
-                 console.log(`[onAlertCreated] Notification for alert ${alertRef.id} already sent or data missing. Aborting.`);
             }
 
         } catch (error) {
@@ -253,3 +303,5 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
+
+    

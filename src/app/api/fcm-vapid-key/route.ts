@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 
-/**
- * This API route securely exposes the VAPID key to the client.
- * The key is injected into the backend server's environment via apphosting.yaml.
- */
+// This API route securely exposes the VAPID key to the client.
+// It reads the key from server-side environment variables.
 export async function GET() {
     const vapidKey = process.env.FIREBASE_VAPID_KEY;
 
     if (!vapidKey) {
-        console.error('[API/VAPID] CRITICAL: FIREBASE_VAPID_KEY is not available in the server environment.');
+        console.error("[API/FCM] FIREBASE_VAPID_KEY is not set on the server.");
         return NextResponse.json(
-            { error: 'VAPID key not configured on the server.' },
+            { error: 'VAPID key not configured on the server.' }, 
             { status: 500 }
         );
     }

@@ -10,7 +10,7 @@ import { saveFcmToken } from '@/actions/user-actions';
 
 /**
  * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
- * This version fetches the VAPID key from a secure API endpoint at runtime.
+ * This version reads the VAPID key from public environment variables.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
@@ -41,32 +41,28 @@ export const useRequestNotificationPermission = () => {
         if (currentPermission === 'granted') {
             console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
             
-            let vapidKey: string | undefined;
             try {
-                console.log(`${logPrefix} Fetching VAPID key from API...`);
+                // Fetch the VAPID key from our secure API route.
                 const response = await fetch('/api/fcm-vapid-key');
                 if (!response.ok) {
-                    throw new Error(`API responded with status ${response.status}`);
+                    const errorText = await response.text();
+                    console.error(`${logPrefix} Failed to fetch VAPID key. Status: ${response.status}. Body: ${errorText}`);
+                    throw new Error(`Failed to fetch VAPID key: ${response.statusText}`);
                 }
-                const data = await response.json();
-                vapidKey = data.vapidKey;
-            } catch (error) {
-                 console.error(`${logPrefix} CRITICAL: Failed to fetch VAPID key from API.`, error);
-                 throw new Error("Kon de notificatieconfiguratie niet ophalen van de server.");
-            }
+                const { vapidKey } = await response.json();
 
-            if (!vapidKey) {
-                console.error(`${logPrefix} CRITICAL: VAPID key not available from API.`);
-                throw new Error("VAPID key for notifications ontbreekt in de applicatieconfiguratie.");
-            } else {
-                 console.log(`${logPrefix} VAPID key fetched successfully.`);
-            }
+                if (!vapidKey) {
+                    console.error(`${logPrefix} CRITICAL: VAPID key not available from API. Check server logs for the API route.`);
+                    throw new Error("VAPID key for notifications ontbreekt in de applicatieconfiguratie.");
+                }
+                console.log(`${logPrefix} Successfully fetched VAPID key.`);
 
-            try {
                 const messaging = getMessaging(app);
                 console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
-                // Let Firebase SDK handle finding the service worker at '/firebase-messaging-sw.js'
-                const currentToken = await getToken(messaging, { vapidKey });
+                // Let Firebase SDK handle finding the service worker at '/sw.js' (the PWA worker)
+                const serviceWorkerRegistration = await navigator.serviceWorker.ready;
+                console.log(`${logPrefix} Service Worker is ready. Using it for token retrieval.`);
+                const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
 
                 if (currentToken) {
                     console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 20)}...`);
@@ -108,14 +104,14 @@ export const ForegroundMessageListener = () => {
             try {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
-                    console.log('Foreground message received. ', payload);
+                    console.log('[Foreground Listener] Message received. ', payload);
                     new Notification(payload.notification?.title || 'New Message', {
                         body: payload.notification?.body,
                         icon: payload.notification?.icon
                     });
                     if ('setAppBadge' in navigator && typeof navigator.setAppBadge === 'function') {
                         console.log('[Foreground Listener] Setting app badge.');
-                        navigator.setAppBadge(1);
+                        navigator.setAppBadge(1).catch(e => console.error('[Foreground Listener] Error setting app badge:', e));
                     }
                 });
 
