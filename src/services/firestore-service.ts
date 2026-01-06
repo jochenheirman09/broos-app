@@ -76,7 +76,7 @@ export async function saveAssistantResponse(userId: string, today: string, assis
 /**
  * A dedicated server action that takes the full chat history of the day and
  * performs a comprehensive analysis to extract all structured data (scores, alerts, etc.).
- * It then saves all extracted data to Firestore in a single batch.
+ * It then saves all extracted data to Firestore in a single transaction to ensure idempotency.
  * This is a 'fire-and-forget' function from the client's perspective.
  */
 export async function analyzeAndSaveChatData(userId: string, fullChatHistory: string) {
@@ -151,44 +151,55 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
 
         const { adminDb } = await getFirebaseAdmin();
         const today = new Date().toISOString().split('T')[0];
-        const batch = adminDb.batch();
-        const userDocRef = adminDb.collection('users').doc(userId);
         
-        // Queue all database writes
-        if (output.summary) {
-            batch.set(userDocRef.collection('chats').doc(today), { summary: output.summary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-        }
-        if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
-            batch.set(userDocRef.collection('wellnessScores').doc(today), { ...output.wellnessScores, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-        }
-        if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
-            batch.set(userDocRef.collection('games').doc(today), { ...output.gameUpdate, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-        }
-        if (output.alert) {
-            const userDoc = await userDocRef.get();
-            const userData = userDoc.data() as UserProfile | undefined;
-            if (userData?.clubId && userData?.teamId) {
-                const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc();
-                
-                // CONFIDENTIALITY LOGIC
-                const isRequestForContact = output.alert.alertType === 'Request for Contact';
-                const shareWithStaff = isRequestForContact ? false : (output.alert.shareWithStaff ?? false);
-
-                batch.set(alertDocRef, {
-                    ...output.alert,
-                    id: alertDocRef.id,
-                    userId, 
-                    clubId: userData.clubId, 
-                    teamId: userData.teamId,
-                    date: today, 
-                    status: 'new', 
-                    shareWithStaff: shareWithStaff,
-                    createdAt: FieldValue.serverTimestamp(),
-                });
+        await adminDb.runTransaction(async (transaction) => {
+            const userDocRef = adminDb.collection('users').doc(userId);
+            
+            // Check if the summary for today already exists to prevent re-writes.
+            // This serves as our idempotency check.
+            const chatDocRef = userDocRef.collection('chats').doc(today);
+            const chatDoc = await transaction.get(chatDocRef);
+            if (chatDoc.exists && chatDoc.data()?.summary) {
+                console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} already exists.`);
+                return;
             }
-        }
-        
-        await batch.commit();
+
+            if (output.summary) {
+                transaction.set(chatDocRef, { summary: output.summary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+            }
+            if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
+                const wellnessDocRef = userDocRef.collection('wellnessScores').doc(today);
+                transaction.set(wellnessDocRef, { ...output.wellnessScores, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+            }
+            if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
+                const gameDocRef = userDocRef.collection('games').doc(today);
+                transaction.set(gameDocRef, { ...output.gameUpdate, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+            }
+            if (output.alert) {
+                const userDoc = await transaction.get(userDocRef); // Get user doc within transaction
+                const userData = userDoc.data() as UserProfile | undefined;
+                if (userData?.clubId && userData?.teamId) {
+                    const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc();
+                    
+                    const isRequestForContact = output.alert.alertType === 'Request for Contact';
+                    const shareWithStaff = isRequestForContact ? false : (output.alert.shareWithStaff ?? false);
+
+                    transaction.set(alertDocRef, {
+                        ...output.alert,
+                        id: alertDocRef.id,
+                        userId, 
+                        clubId: userData.clubId, 
+                        teamId: userData.teamId,
+                        date: today, 
+                        status: 'new',
+                        notificationStatus: 'pending', // Set initial status for idempotency
+                        shareWithStaff: shareWithStaff,
+                        createdAt: FieldValue.serverTimestamp(),
+                    });
+                }
+            }
+        });
+
         console.log(`[Analysis Service] Successfully analyzed and saved data for user ${userId}.`);
 
     } catch (error) {

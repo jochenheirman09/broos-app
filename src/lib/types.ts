@@ -137,7 +137,6 @@ export interface P2PChatMessage {
     senderId: string;
     content: string;
     timestamp: any; // Firestore ServerTimestamp
-    notificationStatus?: 'pending' | 'sent';
 }
 
 export type WithId<T> = T & { id: string };

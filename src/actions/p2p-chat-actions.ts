@@ -147,7 +147,6 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
                 senderId,
                 content,
                 timestamp: FieldValue.serverTimestamp(),
-                notificationStatus: 'sent'
             };
             transaction.set(newMessageRef, messageData);
 
