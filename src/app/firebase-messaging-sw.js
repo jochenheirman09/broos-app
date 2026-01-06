@@ -1,13 +1,8 @@
-
 // IMPORTANT: This file MUST be in the /src/app directory to be served from the root.
 
-// Give the service worker access to Firebase Messaging.
-// Note that you can only use Firebase Messaging here, other Firebase services
-// are not available in the service worker.
-import { initializeApp } from 'firebase/app';
-import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
-
-console.log('[SW] Firebase Messaging Service Worker script executing.');
+// Using compat versions for robust service worker support
+importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
 
 // Your web app's Firebase configuration. This MUST be present.
 const firebaseConfig = {
@@ -22,19 +17,28 @@ const firebaseConfig = {
 
 // Initialize the Firebase app in the service worker
 try {
-    const app = initializeApp(firebaseConfig);
-    console.log('[SW] Firebase app initialized in service worker.');
+    firebase.initializeApp(firebaseConfig);
+    console.log('[SW] Firebase app initialized with compat library.');
     
-    const messaging = getMessaging(app);
-    console.log('[SW] Firebase Messaging instance created.');
+    const messaging = firebase.messaging();
+    console.log('[SW] Firebase Messaging (compat) instance created.');
 
-    onBackgroundMessage(messaging, (payload) => {
-        console.log('[SW] Received background message: ', payload);
+    // THIS IS CRITICAL: Set up the background message handler
+    messaging.onBackgroundMessage((payload) => {
+        console.log('[SW] Received background message ', payload);
 
-        const notificationTitle = payload.notification?.title || 'Nieuw Bericht';
+        if (!payload.notification) {
+            console.warn('[SW] Received background message without notification payload. Cannot display.');
+            return;
+        }
+
+        const notificationTitle = payload.notification.title || 'Nieuw Bericht';
         const notificationOptions = {
-            body: payload.notification?.body || 'Je hebt een nieuw bericht.',
-            icon: payload.notification?.icon || '/icons/icon-192x192.png'
+            body: payload.notification.body || 'Je hebt een nieuw bericht.',
+            icon: payload.notification.icon || '/icons/icon-192x192.png',
+            data: {
+              link: payload.fcmOptions?.link || '/'
+            }
         };
 
         self.registration.showNotification(notificationTitle, notificationOptions);
@@ -45,6 +49,33 @@ try {
         }
     });
 
+    self.addEventListener('notificationclick', (event) => {
+      console.log('[SW] Notification click received.', event.notification.data);
+      event.notification.close();
+    
+      const link = event.notification.data?.link || '/';
+    
+      event.waitUntil(
+        clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        }).then((clientList) => {
+          // If a window for the app is already open, focus it.
+          for (const client of clientList) {
+            // Check if the client's URL is already the target link.
+            if (client.url === link && 'focus' in client) {
+              return client.focus();
+            }
+          }
+          // If no window is open or no window has the target URL, open a new one.
+          if (clients.openWindow) {
+            return clients.openWindow(link);
+          }
+        })
+      );
+    });
+
+
 } catch (error) {
-    console.error('[SW] CRITICAL: Error initializing Firebase in service worker:', error);
+    console.error('[SW] CRITICAL: Error initializing Firebase compat in service worker:', error);
 }

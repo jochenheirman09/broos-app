@@ -22,9 +22,86 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldAlert, Users, Wrench } from "lucide-react";
+import { Trash2, ShieldAlert, Users, Wrench, PlayCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { handleCleanup, handleConditionalUserCleanup, handleFixStuckOnboarding } from "@/actions/cleanup-actions";
+import { handleRunAnalysisJob } from "@/actions/cron-actions";
+
+function AnalysisJobCard() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const onRunJob = async () => {
+    setIsLoading(true);
+    try {
+      const result = await handleRunAnalysisJob();
+      if (result.success) {
+        toast({
+          title: "Analyse Voltooid!",
+          description: result.message,
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Analyse Mislukt",
+        description: error.message || "Er is een onbekende fout opgetreden.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <PlayCircle className="h-8 w-8 text-primary" />
+          <div>
+            <CardTitle className="text-2xl">Start Dagelijkse Analyse Job</CardTitle>
+            <CardDescription>
+              Voer handmatig de nachtelijke analyse en notificatie-taak uit.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-6">
+          Deze actie simuleert de dagelijkse cron job. Het analyseert alle data van vandaag, genereert inzichten (weetjes) voor spelers, staf en club, en verstuurt notificaties naar gebruikers die nieuwe inzichten hebben.
+        </p>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="default" className="w-full" size="lg">
+              {isLoading ? <Spinner className="mr-2 h-5 w-5" /> : <PlayCircle className="mr-2 h-5 w-5" />}
+              Start Handmatige Analyse
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Bevestig handmatige analyse</AlertDialogTitle>
+              <AlertDialogDescription>
+                Weet je zeker dat je de dagelijkse analyse job nu wilt starten? Dit kan enkele minuten duren en zal notificaties versturen.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>
+                Annuleren
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={onRunJob} disabled={isLoading}>
+                {isLoading && <Spinner size="small" className="mr-2" />}
+                Ja, start analyse
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 function ConditionalCleanupCard() {
   const { toast } = useToast();
@@ -263,6 +340,7 @@ export default function CleanupDbPage() {
   return (
     <div className="container mx-auto py-8">
         <div className="space-y-8 max-w-xl mx-auto">
+            <AnalysisJobCard />
             <OnboardingFixCard />
             <ConditionalCleanupCard />
             <FullCleanupCard />

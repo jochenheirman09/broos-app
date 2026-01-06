@@ -27,11 +27,16 @@ export async function sendNotification(
         webpush: {
             notification: {
                 icon: '/icons/icon-192x192.png',
-                // You can add actions here, e.g., to open the app
             },
             fcmOptions: {
-                link: link || '/', // Link to open when notification is clicked
+                link: link || '/',
             },
+            headers: {
+                Urgency: 'high'
+            }
+        },
+        android: {
+            priority: 'high'
         },
         tokens: tokens,
     };
@@ -42,6 +47,7 @@ export async function sendNotification(
 
       if (response.failureCount > 0) {
         console.warn(`Failed to send notification to ${response.failureCount} tokens.`);
+        // Optional: Clean up invalid tokens
       }
 
       return { success: true, message: "Notification sent successfully." };

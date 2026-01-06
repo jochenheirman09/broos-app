@@ -147,3 +147,29 @@ export async function runAnalysisJob() {
     return { success: false, message: "Cron job failed." };
   }
 }
+
+
+/**
+ * A server action wrapper for the `runAnalysisJob` function.
+ * This can be called from a client component (e.g., a button on an admin page).
+ */
+export async function handleRunAnalysisJob(): Promise<{ success: boolean; message: string }> {
+  // Optional: Add an environment check to prevent this from being run in production.
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      success: false,
+      message: "Forbidden: Manual job execution is not available in production.",
+    };
+  }
+
+  try {
+    const result = await runAnalysisJob();
+    return result;
+  } catch (error: any) {
+    console.error("[Server Action] handleRunAnalysisJob failed:", error);
+    return {
+      success: false,
+      message: error.message || "An internal server error occurred.",
+    };
+  }
+}

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import {
@@ -22,7 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { useState, useMemo } from "react";
 import { ProfileSheet } from "./profile-sheet";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
+import { collection, query } from "firebase/firestore";
 import type { MyChat } from "@/lib/types";
 
 const navItems = [
