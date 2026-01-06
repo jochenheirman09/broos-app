@@ -98,7 +98,7 @@ export async function createOrGetChat(
       // And also denormalize to each participant's `myChats` subcollection
       for (const userId of existingChatData.participants) {
         const myChatRef = db.collection('users').doc(userId).collection('myChats').doc(chatId);
-        // Use set with merge to create/update the denormalized chat document
+        // Use set with merge to create/update the denormalized user document
         batch.set(myChatRef, updatedChatData, { merge: true });
       }
     }
@@ -115,8 +115,7 @@ export async function createOrGetChat(
 }
 
 /**
- * Sends a P2P message, updates last message details, increments unread counts for other participants,
- * and triggers notifications. Uses a transaction to ensure idempotency.
+ * Sends a P2P message using a transaction to ensure idempotency, preventing duplicate notifications.
  */
 export async function sendP2PMessage(chatId: string, senderId: string, content: string, messageId: string) {
     if (!chatId || !senderId || !content || !messageId) {

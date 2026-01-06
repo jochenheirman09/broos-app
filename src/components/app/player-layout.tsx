@@ -117,7 +117,11 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 pb-24">{children}</main>
+        <main className="flex-1 pb-24">
+           <div className="container mx-auto py-8">
+              {children}
+            </div>
+        </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto grid h-20 max-w-lg grid-cols-4 items-center justify-items-center text-sm">

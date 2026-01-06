@@ -1,11 +1,11 @@
 
-"use server";
-
+'use server';
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
 import { getStorage } from "firebase-admin/storage";
 import { FieldValue } from 'firebase-admin/firestore';
+import { getDocs } from "firebase/firestore";
 
 
 // Function to generate a random 8-character alphanumeric code
@@ -272,14 +272,19 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
       throw new Error("Je hebt geen toegang tot de leden van dit team.");
   }
 
+  // This query will fail on the client if there's no index on 'teamId'.
+  // However, it should work fine from the Admin SDK on the server.
   const membersQuery = adminDb.collection('users').where('teamId', '==', teamId);
-  const snapshot = await getDocs(membersQuery);
-
+  const snapshot = await membersQuery.get();
+  
   if (snapshot.empty) {
     console.log(`[User Action] No members found for team ${teamId}.`);
     return [];
   }
 
+  // Post-filter to ensure all returned members are from the requester's club.
+  // This is a redundant security check as Firestore rules should enforce this,
+  // but it's good practice for server actions.
   const members = snapshot.docs
     .map(doc => ({ ...doc.data() as UserProfile, id: doc.id }))
     .filter(member => member.clubId === requesterProfile.clubId);

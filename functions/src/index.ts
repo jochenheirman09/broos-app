@@ -113,29 +113,31 @@ export const onAlertCreated = functions.firestore
         const db = admin.firestore();
 
         try {
+            let shouldSend = false;
+            let tokensToSend: string[] = [];
+            let notificationPayload: any = {};
+            const alertData = snapshot.data() as Alert;
+
+            // STAP 1: De transactie is alleen voor de "lock"
             await db.runTransaction(async (transaction) => {
                 const doc = await transaction.get(alertRef);
-                if (!doc.exists) {
-                    throw "Document does not exist!";
+                const data = doc.data();
+                if (data && data.notificationStatus !== 'sent') {
+                    transaction.update(alertRef, { notificationStatus: 'sent' });
+                    shouldSend = true; 
                 }
+            });
 
-                const alertData = doc.data() as Alert;
-                
-                // Idempotency Check: If a notification has already been sent, abort.
-                if (alertData.notificationStatus === 'sent') {
-                    console.log(`[onAlertCreated] Notification for alert ${alertRef.id} already sent. Aborting.`);
-                    return;
-                }
-
+            // STAP 2: Buiten de transactie doen we het zware werk
+            if (shouldSend) {
+                console.log(`[onAlertCreated] ✅ Transaction complete, preparing to send alert for ${alertRef.id}.`);
                 const { clubId, teamId } = context.params;
 
                 const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
                 const responsibleQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
-
                 const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
                 
                 const tokenSet = new Set<string>();
-                const userTokenMap = new Map<string, string>();
                 
                 const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
                      for (const userDoc of snap.docs) {
@@ -143,7 +145,6 @@ export const onAlertCreated = functions.firestore
                         tokens.forEach(t => {
                             if (t && t.trim() !== "") {
                                 tokenSet.add(t);
-                                userTokenMap.set(t, userDoc.id);
                             }
                         });
                     }
@@ -152,53 +153,36 @@ export const onAlertCreated = functions.firestore
                 await processSnapshot(staffSnap);
                 await processSnapshot(responsibleSnap);
                
-                const uniqueTokens = Array.from(tokenSet);
+                tokensToSend = Array.from(tokenSet);
 
-                if (uniqueTokens.length > 0) {
-                    const message = {
-                        tokens: uniqueTokens,
+                if (tokensToSend.length > 0) {
+                     notificationPayload = {
                         notification: {
                             title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
                             body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
                         },
                         data: {
-                            link: "/alerts", // Ensures click action works
+                            link: "/alerts",
                             type: "ALERT",
                             alertId: context.params.alertId
                         },
-                         webpush: { // Add webpush config for PWA
-                            notification: {
-                                badge: "1"
-                            },
-                            fcmOptions: {
-                                link: "/alerts"
-                            }
+                         webpush: {
+                            notification: { badge: "1" },
+                            fcmOptions: { link: "/alerts" }
                         }
                     };
-                    const response = await admin.messaging().sendEachForMulticast(message);
+                    
+                    const response = await admin.messaging().sendEachForMulticast({ tokens: tokensToSend, ...notificationPayload });
                     console.log(`[onAlertCreated] ✅ Alert sent to ${response.successCount} unique devices.`);
-
-                    // Cleanup invalid tokens
-                    const tokensToRemove: Promise<any>[] = [];
-                    response.responses.forEach((resp, idx) => {
-                        if (!resp.success && resp.error?.code === 'messaging/registration-token-not-registered') {
-                            const invalidToken = uniqueTokens[idx];
-                            const userId = userTokenMap.get(invalidToken);
-                            if (userId) {
-                                console.log(`[onAlertCreated] 🧹 Stale token ${invalidToken} for user ${userId} will be removed.`);
-                                tokensToRemove.push(db.collection('users').doc(userId).collection('fcmTokens').doc(invalidToken).delete());
-                            }
-                        }
-                    });
-                    await Promise.all(tokensToRemove);
+                } else {
+                    console.log(`[onAlertCreated] No tokens found for relevant staff/responsible users.`);
                 }
-                
-                // Mark as sent within the transaction to prevent re-sending.
-                transaction.update(alertRef, { notificationStatus: 'sent' });
-            });
-            console.log(`[onAlertCreated] Transaction for alert ${alertRef.id} completed successfully.`);
+            } else {
+                 console.log(`[onAlertCreated] Notification for alert ${alertRef.id} already sent or data missing. Aborting.`);
+            }
+
         } catch (error) {
-            console.error(`[onAlertCreated] ❌ Transaction failed for alert ${alertRef.id}:`, error);
+            console.error(`[onAlertCreated] ❌ Transaction or send failed for alert ${alertRef.id}:`, error);
         }
     });
 
@@ -269,6 +253,3 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
-
-
-    

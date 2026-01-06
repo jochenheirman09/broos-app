@@ -59,8 +59,8 @@ function P2PChatLoader({ chatId }: { chatId: string }) {
 }
 
 
-export default function P2PChatPage({ params }: { params: Promise<{ chatId: string }> }) {
-  const { chatId } = use(params);
+export default function P2PChatPage({ params }: { params: { chatId: string } }) {
+  const { chatId } = params;
   
   return <P2PChatLoader chatId={chatId} />;
 }

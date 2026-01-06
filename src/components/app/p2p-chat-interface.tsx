@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useMemo, useRef, useEffect, useCallback } from 'react';
@@ -29,6 +28,7 @@ import Link from 'next/link';
 import { sendP2PMessage, markChatAsRead } from '@/actions/p2p-chat-actions';
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from 'uuid'; // Import uuid
+import { Spinner } from '../ui/spinner';
 
 interface ChatInput {
     content: string;
@@ -86,6 +86,7 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   
   const form = useForm<ChatInput>({ defaultValues: { content: '' } });
+  const { formState: { isSubmitting } } = form;
 
   const messagesQuery = useMemoFirebase(() => {
     if (!chatId) return null;
@@ -117,7 +118,7 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
 
 
   const handleSendMessage = async (data: ChatInput) => {
-    if (!data.content.trim() || !user || !chatData) return;
+    if (isSubmitting || !data.content.trim() || !user || !chatData) return;
     
     const localFormContent = data.content;
     form.reset();
@@ -195,6 +196,12 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
                   {messages?.map((message) => (
                     <ChatMessage key={message.id} message={message} currentUserId={user!.uid} chatData={chatData} />
                   ))}
+                  {isSubmitting && (
+                    <div className="flex items-center gap-2 justify-end my-2 text-muted-foreground text-sm">
+                      <Spinner size="small" />
+                      <span>Verzenden...</span>
+                    </div>
+                  )}
                 </div>
               </ScrollViewport>
             </ScrollArea>
@@ -204,9 +211,10 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
                   {...form.register('content')}
                   placeholder="Typ je bericht..."
                   autoComplete="off"
+                  disabled={isSubmitting}
                 />
-                <Button type="submit" size="icon" disabled={!form.watch('content')?.trim()}>
-                  <SendHorizonal className="h-5 w-5" />
+                <Button type="submit" size="icon" disabled={isSubmitting || !form.watch('content')?.trim()}>
+                  {isSubmitting ? <Spinner size="small" /> : <SendHorizonal className="h-5 w-5" />}
                 </Button>
               </form>
             </div>

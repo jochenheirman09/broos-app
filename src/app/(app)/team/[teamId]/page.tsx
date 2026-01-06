@@ -61,12 +61,11 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
   );
 }
 
-export default function TeamMembersPage({
-  params,
+function TeamMembersPageContents({
+  teamId,
 }: {
-  params: Promise<{ teamId: string }>;
+  teamId: string;
 }) {
-  const { teamId } = use(params);
   const { user, userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   
@@ -166,4 +165,8 @@ export default function TeamMembersPage({
       </Card>
     </div>
   );
+}
+
+export default function TeamMembersPage({ params }: { params: { teamId: string } }) {
+  return <TeamMembersPageContents teamId={params.teamId} />;
 }
