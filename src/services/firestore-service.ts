@@ -154,26 +154,26 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
         
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);
-            
-            // Check if the summary for today already exists to prevent re-writes.
-            // This serves as our idempotency check.
             const chatDocRef = userDocRef.collection('chats').doc(today);
+
+            // Idempotency check: only proceed if the chat doc for today doesn't exist or has no summary.
             const chatDoc = await transaction.get(chatDocRef);
             if (chatDoc.exists && chatDoc.data()?.summary) {
-                console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} already exists.`);
+                console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} already analyzed.`);
                 return;
             }
 
+            // Proceed with updates within the transaction
             if (output.summary) {
-                transaction.set(chatDocRef, { summary: output.summary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+                transaction.set(chatDocRef, { summary: output.summary, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
                 const wellnessDocRef = userDocRef.collection('wellnessScores').doc(today);
-                transaction.set(wellnessDocRef, { ...output.wellnessScores, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+                transaction.set(wellnessDocRef, { ...output.wellnessScores, date: today, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
                 const gameDocRef = userDocRef.collection('games').doc(today);
-                transaction.set(gameDocRef, { ...output.gameUpdate, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+                transaction.set(gameDocRef, { ...output.gameUpdate, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.alert) {
                 const userDoc = await transaction.get(userDocRef); // Get user doc within transaction
@@ -204,6 +204,5 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
 
     } catch (error) {
         console.error(`[Analysis Service] CRITICAL: Failed to analyze and save data for user ${userId}:`, error);
-        // We don't re-throw here because it's a background process.
     }
 }

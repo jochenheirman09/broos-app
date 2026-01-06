@@ -119,17 +119,17 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
   const handleSendMessage = async (data: ChatInput) => {
     if (!data.content.trim() || !user || !chatData) return;
     
-    // Optimistically clear the input
+    const localFormContent = data.content;
     form.reset();
     
     // Generate a unique ID for the message on the client.
     const messageId = uuidv4();
 
     // Fire-and-forget the server action. UI updates will come via the listener.
-    sendP2PMessage(chatId, user.uid, data.content, messageId).catch(err => {
+    sendP2PMessage(chatId, user.uid, localFormContent, messageId).catch(err => {
       console.error("Failed to send message:", err);
       // Optionally, revert the input field and show a toast
-      form.setValue('content', data.content);
+      form.setValue('content', localFormContent);
     });
   };
 
