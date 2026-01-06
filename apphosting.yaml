@@ -17,6 +17,5 @@ env:
     secret: GEMINI_API_KEY
   - variable: FIREBASE_ADMIN_SERVICE_ACCOUNT
     secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
-  # The VAPID key is a build-time argument for Next.js and does not need
-  # to be injected into the backend server environment at runtime.
-  # NEXT_PUBLIC_FIREBASE_VAPID_KEY should be set in the App Hosting console.
+  - variable: FIREBASE_VAPID_KEY # This makes the key available to the backend server at runtime
+    secret: FIREBASE_VAPID_KEY

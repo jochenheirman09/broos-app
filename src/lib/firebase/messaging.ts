@@ -10,12 +10,13 @@ import { saveFcmToken } from '@/actions/user-actions';
 
 /**
  * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
+ * This version fetches the VAPID key from a secure API endpoint at runtime.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { user } = useUser();
 
-    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | 'timeout' | undefined> => {
+    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | undefined> => {
         const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Manual: ${isManualAction} |`;
         
         if (!app || !user) {
@@ -30,7 +31,7 @@ export const useRequestNotificationPermission = () => {
         let currentPermission = Notification.permission;
         console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
-        // Only actively ask for permission if it's a manual action and permission hasn't been granted or denied yet.
+        // Only actively ask for permission if it's a manual click and permission is not yet granted/denied.
         if (isManualAction && currentPermission === 'default') {
             console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
@@ -40,22 +41,31 @@ export const useRequestNotificationPermission = () => {
         if (currentPermission === 'granted') {
             console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
             
-            // For client-side code, Next.js makes NEXT_PUBLIC_ variables directly available on process.env
-            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+            let vapidKey: string | undefined;
+            try {
+                console.log(`${logPrefix} Fetching VAPID key from API...`);
+                const response = await fetch('/api/fcm-vapid-key');
+                if (!response.ok) {
+                    throw new Error(`API responded with status ${response.status}`);
+                }
+                const data = await response.json();
+                vapidKey = data.vapidKey;
+            } catch (error) {
+                 console.error(`${logPrefix} CRITICAL: Failed to fetch VAPID key from API.`, error);
+                 throw new Error("Kon de notificatieconfiguratie niet ophalen van de server.");
+            }
 
             if (!vapidKey) {
-                console.error(`${logPrefix} CRITICAL: VAPID key is not available.`);
+                console.error(`${logPrefix} CRITICAL: VAPID key not available from API.`);
                 throw new Error("VAPID key for notifications ontbreekt in de applicatieconfiguratie.");
             } else {
-                console.log(`${logPrefix} VAPID key found.`);
+                 console.log(`${logPrefix} VAPID key fetched successfully.`);
             }
 
             try {
                 const messaging = getMessaging(app);
-                
                 console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
-                // Let Firebase handle the service worker registration.
-                // It will automatically look for '/firebase-messaging-sw.js'.
+                // Let Firebase SDK handle finding the service worker at '/firebase-messaging-sw.js'
                 const currentToken = await getToken(messaging, { vapidKey });
 
                 if (currentToken) {
@@ -72,12 +82,12 @@ export const useRequestNotificationPermission = () => {
                     }
 
                 } else {
-                    console.warn(`${logPrefix} No registration token available. This may happen if the service worker is not yet active. Please try again.`);
-                    throw new Error('Kon geen registratietoken genereren. Probeer de pagina te herladen en probeer het opnieuw.');
+                    console.warn(`${logPrefix} No registration token available. This may happen if the service worker registration fails.`);
+                    throw new Error('Kon geen registratietoken genereren. Controleer de console op service worker-fouten.');
                 }
             } catch (err: any) {
-                console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err.message);
-                throw err;
+                console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
+                throw err; // Re-throw to be caught by the UI
             }
         } else {
             console.log(`${logPrefix} Permission to notify was not granted ('${currentPermission}').`);
