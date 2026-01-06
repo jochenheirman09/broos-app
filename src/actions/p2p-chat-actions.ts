@@ -116,6 +116,7 @@ export async function createOrGetChat(
 
 /**
  * Sends a P2P message using a transaction to ensure idempotency, preventing duplicate notifications.
+ * This version uses a `notificationSent` flag on the message document itself.
  */
 export async function sendP2PMessage(chatId: string, senderId: string, content: string, messageId: string) {
     if (!chatId || !senderId || !content || !messageId) {
@@ -126,30 +127,36 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
     const chatRef = db.collection('p2p_chats').doc(chatId);
     const newMessageRef = chatRef.collection('messages').doc(messageId);
 
-    let wasNewMessage = false;
+    let shouldSendNotification = false;
 
     try {
         await db.runTransaction(async (transaction) => {
             const messageDoc = await transaction.get(newMessageRef);
-            if (messageDoc.exists) {
-                console.log(`[P2P Chat Action] Idempotency check: Message ${messageId} already exists. Skipping write.`);
-                return; // Abort transaction, message already processed.
+            
+            // IDEMPOTENCY CHECK: If the message exists and notification is already marked as sent, stop.
+            if (messageDoc.exists && messageDoc.data()?.notificationSent === true) {
+                console.log(`[P2P Chat Action] Idempotency check PASSED: Message ${messageId} already processed and notified. Aborting.`);
+                shouldSendNotification = false;
+                return;
             }
 
+            // If message exists but wasn't notified, or doesn't exist, proceed.
             const chatSnapshot = await transaction.get(chatRef);
             const chatData = chatSnapshot.data() as Conversation | undefined;
             if (!chatData) {
                 throw new Error("Chat document not found inside transaction.");
             }
 
-            // 1. Create the new message since it doesn't exist
+            // 1. Create/Update the message document with notificationSent: true
             const messageData = {
                 id: messageId,
                 senderId,
                 content,
                 timestamp: FieldValue.serverTimestamp(),
+                notificationSent: true, // Mark for notification idempotency
             };
-            transaction.set(newMessageRef, messageData);
+            // Use `set` with merge to handle both creation and update scenarios.
+            transaction.set(newMessageRef, messageData, { merge: true });
 
             // 2. Update the main chat document with last message details and unread counts
             const lastMessageUpdate: { [key: string]: any } = {
@@ -171,14 +178,16 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
                 transaction.set(myChatRef, lastMessageUpdate, { merge: true });
             });
 
-            // If we reached here, it means we are about to commit a new message.
-            wasNewMessage = true;
+            // If we reached here, it means we are committing the notification flag.
+            // The winner of the transaction will send the notification.
+            shouldSendNotification = true;
+            console.log(`[P2P Chat Action] Transaction WINNER for message ${messageId}. Will send notification.`);
         });
 
-        console.log(`[P2P Chat Action] Transaction for message ${messageId} completed. Was new: ${wasNewMessage}`);
+        console.log(`[P2P Chat Action] Transaction for message ${messageId} completed. Should send notification: ${shouldSendNotification}`);
 
-        // 4. Send notifications ONLY if the transaction resulted in a new message.
-        if (wasNewMessage) {
+        // 4. Send notifications ONLY if the transaction resulted in the flag being set.
+        if (shouldSendNotification) {
             const finalChatSnapshot = await chatRef.get();
             const finalChatData = finalChatSnapshot.data() as Conversation;
 
@@ -187,7 +196,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
                 const senderName = senderProfile?.name || "Iemand";
                 const title = finalChatData.isGroupChat ? `${senderName} in ${finalChatData.name}` : senderName;
                 
-                console.log(`[P2P Chat Action] Sending notifications for new message ${messageId}.`);
+                console.log(`[P2P Chat Action] ✅ Unique notification procedure started for message ${messageId}.`);
                 for (const userId of finalChatData.participants) {
                     if (userId === senderId) continue;
                     sendNotification({
@@ -200,7 +209,7 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
             }
         }
     } catch (error) {
-        console.error(`[P2P Chat Action] Transaction failed for chat ${chatId}:`, error);
+        console.error(`[P2P Chat Action] ❌ Transaction or send failed for chat ${chatId}:`, error);
         throw error;
     }
 }

@@ -1,4 +1,3 @@
-
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -137,6 +136,7 @@ export interface P2PChatMessage {
     senderId: string;
     content: string;
     timestamp: any; // Firestore ServerTimestamp
+    notificationSent?: boolean; // Flag for idempotency
 }
 
 export type WithId<T> = T & { id: string };
@@ -229,7 +229,6 @@ export interface WellnessAnalysisInput {
     retrievedDocs?: any;
     todayActivity?: string;
     currentTime?: string;
-    // Add all structured memory fields for context
     familySituation?: string;
     schoolSituation?: string;
     personalGoals?: string;
@@ -237,7 +236,6 @@ export interface WellnessAnalysisInput {
     recoveryHabits?: string;
     additionalHobbies?: string;
     personalDetails?: string;
-    // Game day context
     isGameDay?: boolean;
     game?: Partial<Game>;
 }
@@ -253,6 +251,7 @@ export interface FullWellnessAnalysisOutput {
     shareWithStaff?: boolean; 
   };
   askForConsent?: boolean;
+  wantsToTalkToSpokesperson?: boolean;
   updatedFields?: Partial<Pick<UserProfile, 'familySituation' | 'schoolSituation' | 'personalGoals' | 'matchPreparation' | 'recoveryHabits' | 'additionalHobbies' | 'personalDetails'>>;
   gameUpdate?: Partial<Omit<Game, 'id' | 'userId' | 'date' | 'createdAt' | 'updatedAt'>>;
 }

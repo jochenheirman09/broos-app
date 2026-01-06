@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getFirebaseAdmin } from '@/ai/genkit';
@@ -92,7 +91,7 @@ export async function chatWithBuddy(
     
     const messagesSnapshot = await userRef.collection('chats').doc(today).collection('messages').orderBy('sortOrder', 'asc').get();
     const chatHistory = messagesSnapshot.docs.map(doc => `${doc.data().role}: ${doc.data().content}`).join('\n');
-    const isFirstInteraction = messagesSnapshot.docs.length <= 1; // 0 or 1 (system message)
+    const isFirstInteraction = messagesSnapshot.docs.length <= 1;
     console.log(`[Chat Action] History fetched. Is first interaction: ${isFirstInteraction}`);
 
     const enrichedInput: WellnessAnalysisInput = { ...input, currentTime, chatHistory, todayActivity, isGameDay, game };
@@ -100,7 +99,6 @@ export async function chatWithBuddy(
     let result;
     if (!userProfile.onboardingCompleted) {
       console.log('[Chat Action] Routing to onboarding flow.');
-      // Pass isFirstInteraction to the onboarding flow so it can handle the welcome message.
       result = await runOnboardingFlow(userRef, userProfile, enrichedInput, isFirstInteraction);
     } else {
       console.log('[Chat Action] Routing to wellness analysis flow.');
@@ -111,13 +109,11 @@ export async function chatWithBuddy(
     await saveAssistantResponse(userId, today, result.response);
     console.log("[Chat Action] Assistant response saved.");
     
-    // Fire-and-forget the full analysis. The full chat history now includes the latest user and assistant messages.
     const finalChatHistory = chatHistory + `\nuser: ${input.userMessage}\nassistant: ${result.response}`;
     analyzeAndSaveChatData(userId, finalChatHistory).catch(err => {
         console.error(`[Chat Action] Background analysis failed for user ${userId}:`, err);
     });
 
-    // Only return the direct response to the client for a fast UI update.
     return { response: result.response };
 
   } catch (error: any) {
@@ -128,7 +124,6 @@ export async function chatWithBuddy(
         response: "Mijn excuses, ik heb het even te druk. Probeer het over een momentje opnieuw.",
       };
     }
-    // Re-throw other errors so the client-side catch block can handle them.
     throw error;
   }
 }

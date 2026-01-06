@@ -1,4 +1,3 @@
-
 'use server';
 import { getFirebaseAdmin, getAiInstance } from '../ai/genkit';
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
@@ -44,7 +43,6 @@ export async function saveUserMessage(userId: string, today: string, userMessage
     const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
     const clientTimestampMs = Date.now();
     
-    // Using a specific document ID to avoid race conditions from `addDoc`
     const newMessageRef = messagesColRef.doc(`msg_${clientTimestampMs}_user`);
     
     await newMessageRef.set({
@@ -59,9 +57,8 @@ export async function saveAssistantResponse(userId: string, today: string, assis
   console.log(`[Firestore Service] Saving assistant response for ${userId}.`);
   const { adminDb } = await getFirebaseAdmin();
   const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
-  const clientTimestampMs = Date.now() + 1; // Ensure it's after user message
+  const clientTimestampMs = Date.now() + 1;
   
-  // Using a specific document ID to avoid race conditions from `addDoc`
   const newMessageRef = messagesColRef.doc(`msg_${clientTimestampMs}_assistant`);
 
   await newMessageRef.set({
@@ -155,10 +152,12 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);
             const chatDocRef = userDocRef.collection('chats').doc(today);
+            const wellnessDocRef = userDocRef.collection('wellnessScores').doc(today);
 
-            // Idempotency check: only proceed if the chat doc for today doesn't exist or has no summary.
-            const chatDoc = await transaction.get(chatDocRef);
-            if (chatDoc.exists && chatDoc.data()?.summary) {
+            // Idempotency check: only proceed if the wellness doc doesn't exist.
+            // Wellness is the last thing to be processed, so it's a good flag for idempotency.
+            const wellnessDoc = await transaction.get(wellnessDocRef);
+            if (wellnessDoc.exists) {
                 console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} already analyzed.`);
                 return;
             }
@@ -168,7 +167,6 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                 transaction.set(chatDocRef, { summary: output.summary, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
-                const wellnessDocRef = userDocRef.collection('wellnessScores').doc(today);
                 transaction.set(wellnessDocRef, { ...output.wellnessScores, date: today, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
@@ -176,7 +174,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                 transaction.set(gameDocRef, { ...output.gameUpdate, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.alert) {
-                const userDoc = await transaction.get(userDocRef); // Get user doc within transaction
+                const userDoc = await transaction.get(userDocRef);
                 const userData = userDoc.data() as UserProfile | undefined;
                 if (userData?.clubId && userData?.teamId) {
                     const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc();
@@ -192,7 +190,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                         teamId: userData.teamId,
                         date: today, 
                         status: 'new',
-                        notificationStatus: 'pending', // Set initial status for idempotency
+                        notificationStatus: 'pending',
                         shareWithStaff: shareWithStaff,
                         createdAt: FieldValue.serverTimestamp(),
                     });

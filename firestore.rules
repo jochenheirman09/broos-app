@@ -125,6 +125,14 @@ service cloud.firestore {
       allow read, write: if false; // Only backend can write
     }
 
+    // This collection is used to create distributed locks.
+    // It should be writable by any signed-in user (as any function can attempt to acquire a lock),
+    // but the transaction logic ensures only one can succeed at a time.
+    match /_locks/{lockName} {
+      allow read, write: if isSignedIn();
+    }
+
+
     // --- COLLECTION GROUP QUERIES ---
     // This rule specifically handles the 'alerts' collectionGroup query from the client.
     match /{path=**}/alerts/{alertId} {
@@ -134,3 +142,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
