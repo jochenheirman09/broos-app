@@ -273,7 +273,7 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   }
 
   const membersQuery = adminDb.collection('users').where('teamId', '==', teamId);
-  const snapshot = await membersQuery.get();
+  const snapshot = await getDocs(membersQuery);
 
   if (snapshot.empty) {
     console.log(`[User Action] No members found for team ${teamId}.`);

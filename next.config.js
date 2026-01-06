@@ -5,7 +5,7 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true, // This is crucial for the new service worker to take over immediately.
-  sw: 'firebase-messaging-sw.js', // This remains correct.
+  swSrc: 'src/app/firebase-messaging-sw.js', // Use our custom worker
   disable: process.env.NODE_ENV === 'development',
 });
 
