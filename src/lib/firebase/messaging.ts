@@ -10,15 +10,12 @@ import { saveFcmToken } from '@/actions/user-actions';
 
 /**
  * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
- * It can be used to actively prompt the user for permission or to
- * silently refresh the token if permission is already granted.
- * @returns An object with a `requestPermission` function.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { user } = useUser();
 
-    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | 'timeout' | undefined> => {
+    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | undefined> => {
         const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Manual: ${isManualAction} |`;
         
         if (!app || !user) {
@@ -33,7 +30,6 @@ export const useRequestNotificationPermission = () => {
         let currentPermission = Notification.permission;
         console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
-        // Only ask for permission if it's a manual action and permission is currently 'default'.
         if (isManualAction && currentPermission === 'default') {
             console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
@@ -52,41 +48,32 @@ export const useRequestNotificationPermission = () => {
             }
 
             try {
-                console.log(`${logPrefix} Waiting for service worker to be ready...`);
-                // Wait for the service worker to be ready.
-                const swRegistration = await navigator.serviceWorker.ready;
-                console.log(`${logPrefix} Service worker is ready.`);
-
                 const messaging = getMessaging(app);
                 
                 console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
-                const currentToken = await getToken(messaging, { 
-                    vapidKey,
-                    serviceWorkerRegistration: swRegistration
-                });
+                // Let Firebase handle the service worker registration.
+                // It will automatically look for '/firebase-messaging-sw.js'.
+                const currentToken = await getToken(messaging, { vapidKey });
 
                 if (currentToken) {
                     console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 20)}...`);
                     
-                    // Call the secure server action to save the token
                     console.log(`${logPrefix} Calling server action to save token.`);
                     const result = await saveFcmToken(user.uid, currentToken, isManualAction);
                     
                     if (result.success) {
                         console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved.`);
                     } else {
-                        // Throw error if the server action failed, so the UI can catch it.
                         console.error(`${logPrefix} FAILED: Server action reported an error: ${result.message}`);
                         throw new Error(result.message);
                     }
 
                 } else {
-                    console.warn(`${logPrefix} No registration token available. This can happen if the service worker is not active or registration fails.`);
-                    throw new Error('Kon geen registratietoken genereren. Probeer de pagina te herladen.');
+                    console.warn(`${logPrefix} No registration token available. This may happen if the service worker is not yet active.`);
+                    throw new Error('Kon geen registratietoken genereren. Probeer de pagina te herladen en probeer het opnieuw.');
                 }
             } catch (err: any) {
                 console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
-                // Re-throw other errors to be handled by the caller
                 throw err;
             }
         } else {
@@ -109,16 +96,11 @@ export const ForegroundMessageListener = () => {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
                     console.log('Foreground message received. ', payload);
-                    // You can show a custom in-app notification here
-                    // For now, we'll just log it.
                     new Notification(payload.notification?.title || 'New Message', {
                         body: payload.notification?.body,
                         icon: payload.notification?.icon
                     });
-                     // Update the app badge if the API is available
                     if ('setAppBadge' in navigator && typeof navigator.setAppBadge === 'function') {
-                        // Here you might want to fetch the real unread count
-                        // For simplicity, we just increment or set to 1
                         console.log('[Foreground Listener] Setting app badge.');
                         navigator.setAppBadge(1);
                     }

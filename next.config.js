@@ -2,43 +2,34 @@
 /** @type {import('next').NextConfig} */
 
 const withPWA = require('next-pwa')({
+  // Point next-pwa to the public folder. It will generate its own service worker (e.g., sw.js)
+  // for offline caching, completely separate from our Firebase worker.
   dest: 'public',
+  sw: 'sw.js', // This is the output file for the PWA service worker.
   register: true,
-  skipWaiting: true, // This is crucial for the new service worker to take over immediately.
-  swSrc: 'src/app/firebase-messaging-sw.js', // Use our custom worker
+  skipWaiting: true,
+  // We disable this during development to avoid caching issues.
   disable: process.env.NODE_ENV === 'development',
 });
 
 const nextConfig = {
-  // The incorrect 'env' block has been removed. 
-  // App Hosting now handles passing the public env var.
   webpack: (config, { isServer }) => {
-    // This is the fix for the 'async_hooks' and 'child_process' errors.
-    // It tells Webpack to not try to bundle these server-side modules
-    // for the client-side.
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         async_hooks: false,
         child_process: false,
-        fs: false, // Often needed with server-side SDKs
-        net: false, // Often needed with server-side SDKs
-        tls: false, // Often needed with server-side SDKs
+        fs: false, 
+        net: false, 
+        tls: false, 
       };
     }
-
     return config;
   },
   typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // !! WARN !!
     ignoreBuildErrors: true,
   },
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
   images: {
