@@ -1,3 +1,4 @@
+
 // IMPORTANT: This file MUST be in the /src/app directory to be served from the root.
 
 // Give the service worker access to Firebase Messaging.

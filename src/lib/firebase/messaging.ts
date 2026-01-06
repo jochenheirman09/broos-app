@@ -15,7 +15,7 @@ export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { user } = useUser();
 
-    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | undefined> => {
+    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | 'timeout' | undefined> => {
         const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Manual: ${isManualAction} |`;
         
         if (!app || !user) {
@@ -30,6 +30,7 @@ export const useRequestNotificationPermission = () => {
         let currentPermission = Notification.permission;
         console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
+        // Only actively ask for permission if it's a manual action and permission hasn't been granted or denied yet.
         if (isManualAction && currentPermission === 'default') {
             console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
@@ -39,7 +40,9 @@ export const useRequestNotificationPermission = () => {
         if (currentPermission === 'granted') {
             console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
             
+            // For client-side code, Next.js makes NEXT_PUBLIC_ variables directly available on process.env
             const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+
             if (!vapidKey) {
                 console.error(`${logPrefix} CRITICAL: VAPID key is not available.`);
                 throw new Error("VAPID key for notifications ontbreekt in de applicatieconfiguratie.");
@@ -69,11 +72,11 @@ export const useRequestNotificationPermission = () => {
                     }
 
                 } else {
-                    console.warn(`${logPrefix} No registration token available. This may happen if the service worker is not yet active.`);
+                    console.warn(`${logPrefix} No registration token available. This may happen if the service worker is not yet active. Please try again.`);
                     throw new Error('Kon geen registratietoken genereren. Probeer de pagina te herladen en probeer het opnieuw.');
                 }
             } catch (err: any) {
-                console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
+                console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err.message);
                 throw err;
             }
         } else {
