@@ -23,6 +23,7 @@ import { ProfileSheet } from "./profile-sheet";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
 import type { MyChat } from "@/lib/types";
+import { RequestNotificationPermission } from "./request-notification-permission";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -119,6 +120,7 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 pb-24">
            <div className="container mx-auto py-8">
+              <RequestNotificationPermission />
               {children}
             </div>
         </main>
