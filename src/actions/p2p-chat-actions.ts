@@ -191,7 +191,8 @@ export async function sendP2PMessage(chatId: string, senderId: string, content: 
                         userId,
                         title,
                         body: content,
-                        link: `/p2p-chat/${chatId}`
+                        link: `/p2p-chat/${chatId}`,
+                        id: messageId, // Pass messageId for tagging
                     }).catch(e => console.error(`[P2P Chat Action] Failed to send notification to ${userId}:`, e));
                 }
             }

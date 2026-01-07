@@ -9,7 +9,7 @@ import { type NotificationInput } from '../types';
 export async function sendNotification(
   input: NotificationInput
 ): Promise<{ success: boolean; message: string }> {
-    const { userId, title, body, link } = input;
+    const { userId, title, body, link, id } = input;
     console.log(`[sendNotification] Invoked for user ${userId} with title: "${title}"`);
     const { adminDb, adminMessaging } = await getFirebaseAdmin();
 
@@ -25,7 +25,11 @@ export async function sendNotification(
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
     const message: MulticastMessage = {
-        // NOTIFICATION object is removed to create a data-only message.
+        // Re-added for higher delivery priority, especially on iOS.
+        notification: {
+            title: title,
+            body: body,
+        },
         data: {
             title: title || '',
             body: body || '',
@@ -37,19 +41,22 @@ export async function sendNotification(
         apns: {
             payload: {
                 aps: {
-                    'content-available': 1, // Wake the app silently
+                    'content-available': 1,
                     sound: 'default',
                     badge: 1,
                 },
             },
             headers: {
-                'apns-priority': '10', // Required for background delivery
-                'apns-push-type': 'background' // Specify background type
+                'apns-priority': '10',
             },
         },
         webpush: {
-            headers: {
-                Urgency: 'high'
+            notification: {
+                title: title,
+                body: body,
+                icon: '/icons/icon-192x192.png',
+                tag: id, // Use unique ID to prevent duplicates for the same event
+                renotify: true,
             },
             fcmOptions: {
                 link: link || '/',
@@ -58,7 +65,7 @@ export async function sendNotification(
         tokens: tokens,
     };
     
-    console.log('[sendNotification] FCM Payload (data-only):', JSON.stringify(message, null, 2));
+    console.log('[sendNotification] FCM Payload:', JSON.stringify(message, null, 2));
 
     try {
       const response = await adminMessaging.sendEachForMulticast(message);

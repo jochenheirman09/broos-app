@@ -89,6 +89,7 @@ export const NotificationInputSchema = z.object({
   title: z.string(),
   body: z.string(),
   link: z.string().optional(),
+  id: z.string().optional(), // Added for notification tagging/idempotency
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
 

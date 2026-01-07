@@ -2,6 +2,7 @@
 'use server';
 
 import { sendNotification } from '@/ai/flows/notification-flow';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Sends a test notification to the specified user.
@@ -23,6 +24,7 @@ export async function sendTestNotification(userId: string): Promise<{ success: b
             title: "Test Melding van Broos 2.0",
             body: "Als je deze melding ontvangt, werken je notificaties correct! 🎉",
             link: "/dashboard",
+            id: `test_${uuidv4()}`, // Add a unique ID for tagging
         });
 
         if (result.success) {
