@@ -55,11 +55,14 @@ interface TeamAlertGroup {
 function SingleAlertDetail({ alert }: { alert: WithId<AlertType> }) {
   const translatedType = alertTypeTranslations[alert.alertType] || alert.alertType;
 
+  // Use createdAt for the timestamp if it exists, otherwise fall back to date
+  const alertTimestamp = alert.createdAt?.toDate ? alert.createdAt.toDate() : new Date(alert.date);
+
   return (
     <div className="pl-6 border-l ml-6 my-4 space-y-2">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Calendar className="h-4 w-4" />
-        <span>{format(new Date(alert.date), 'dd MMM yyyy, HH:mm', { locale: nl })}</span>
+        <span>{format(alertTimestamp, 'dd MMM yyyy, HH:mm', { locale: nl })}</span>
       </div>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
          <Tag className="h-4 w-4" />
@@ -159,10 +162,12 @@ function PlayerAccordion({ playerAlerts, teamId, onStatusChange }: { playerAlert
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-             <DropdownMenuItem onSelect={handleChatWithPlayer} disabled={isAnonymous}>
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Chat met {player.name.split(' ')[0]}</span>
-            </DropdownMenuItem>
+             {!isAnonymous && (
+              <DropdownMenuItem onSelect={handleChatWithPlayer}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                <span>Chat met {player.name.split(' ')[0]}</span>
+              </DropdownMenuItem>
+             )}
             <DropdownMenuItem onSelect={() => handleUpdateAllStatus('acknowledged')}>
               <Archive className="mr-2 h-4 w-4" />
               <span>Markeer alles als Behandeld</span>

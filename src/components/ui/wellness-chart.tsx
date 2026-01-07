@@ -15,7 +15,7 @@ import type { WellnessScore } from "@/lib/types"
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { TrendingUp, FileWarning } from "lucide-react"
 import { Spinner } from "../ui/spinner"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "../ui/button"
 import {
   Sheet,
@@ -25,6 +25,9 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { ScrollArea, ScrollViewport } from "../ui/scroll-area"
+import { format } from "date-fns"
+import { nl } from "date-fns/locale"
 
 const chartConfig = {
   mood: { label: "Stemming", color: "hsl(var(--chart-1))" },
@@ -75,6 +78,25 @@ const CustomBar = (props: any) => {
   );
 };
 
+// Custom Y-axis tick to include the date
+const CustomYAxisTick = (props: any) => {
+  const { x, y, payload } = props;
+  const { value, lastUpdated } = payload;
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={4} textAnchor="end" fill="hsl(var(--muted-foreground))" className="text-sm">
+        {value}
+      </text>
+      {lastUpdated && (
+        <text x={0} y={14} dy={4} textAnchor="end" fill="hsl(var(--muted-foreground))" className="text-xs">
+          ({lastUpdated})
+        </text>
+      )}
+    </g>
+  );
+};
+
 
 export function WellnessChart() {
   const { user } = useUser();
@@ -86,7 +108,7 @@ export function WellnessChart() {
     return query(
       collection(db, `users/${user.uid}/wellnessScores`),
       orderBy("date", "desc"),
-      limit(1)
+      limit(7)
     );
   }, [user, db]);
 
@@ -96,10 +118,51 @@ export function WellnessChart() {
     error,
   } = useCollection<WellnessScore>(scoresQuery);
 
-  const latestScore =
-    !isLoading && scoresData && scoresData.length > 0
-      ? scoresData[0]
-      : null;
+  const chartData = useMemo(() => {
+    return Object.entries(chartConfig).map(([key, config]) => {
+      let latestValue: number | undefined;
+      let latestReason: string | undefined;
+      let latestDate: string | undefined;
+
+      // Find the most recent score for this specific metric
+      if (scoresData) {
+        for (const scoreDoc of scoresData) {
+          let value = scoreDoc[key as keyof WellnessScore] as number | undefined;
+          let reason = scoreDoc[`${key}Reason` as keyof WellnessScore] as string | undefined;
+
+          // Handle 'rest' vs 'sleep' legacy data
+          if (key === 'rest' && !value && scoreDoc.sleep) {
+            value = scoreDoc.sleep;
+            reason = scoreDoc.sleepReason;
+          }
+
+          if (value !== undefined && value !== 0) {
+            latestValue = value;
+            latestReason = reason;
+            latestDate = scoreDoc.date;
+            break; // Found the most recent one for this key
+          }
+        }
+      }
+
+      const isPlaceholder = !latestValue || latestValue === 0;
+      const displayValue = isPlaceholder ? 3 : Number(latestValue);
+      const lastUpdatedFormatted = latestDate ? format(new Date(`${latestDate}T00:00:00`), 'EEE', { locale: nl }) : undefined;
+
+      return {
+        metric: config.label,
+        value: displayValue,
+        isPlaceholder,
+        fill: config.color,
+        emoji: EMOJIS[Math.round(displayValue)] || "😐",
+        reason: latestReason || "Nog geen data beschikbaar.",
+        lastUpdated: lastUpdatedFormatted,
+        lastUpdatedFull: latestDate ? format(new Date(`${latestDate}T00:00:00`), 'PPP', { locale: nl }) : "Onbekend",
+      };
+    });
+  }, [scoresData]);
+
+  const hasAnyData = useMemo(() => chartData.some(d => !d.isPlaceholder), [chartData]);
 
   if (isLoading) {
     return (
@@ -120,43 +183,14 @@ export function WellnessChart() {
       </Alert>
     );
   }
-  
-  const chartData = Object.entries(chartConfig)
-    .map(([key, config]) => {
-      let scoreValue = latestScore?.[key as keyof WellnessScore] as number | undefined;
-      let reasonKey = `${key}Reason` as keyof WellnessScore;
-      let reason = latestScore?.[reasonKey] as string | undefined;
 
-      // --- DATA MERGE LOGIC ---
-      // If the key is 'rest' and there is no 'rest' score, but there is an old 'sleep' score, use the sleep score.
-      if (key === 'rest' && !scoreValue && latestScore?.sleep) {
-        scoreValue = latestScore.sleep;
-        reason = latestScore.sleepReason;
-      }
-      // --- END MERGE LOGIC ---
-
-      const isPlaceholder = !scoreValue || scoreValue === 0;
-      const displayValue = isPlaceholder ? 3 : scoreValue;
-
-      return {
-        metric: config.label,
-        value: displayValue,
-        isPlaceholder,
-        fill: config.color,
-        emoji: EMOJIS[Math.round(displayValue)] || "😐",
-        reason: reason || "Nog geen data beschikbaar.",
-      };
-    });
-
-
-  if (!latestScore || chartData.every(d => d.isPlaceholder)) {
+  if (!hasAnyData) {
     return (
       <Alert>
         <TrendingUp className="h-4 w-4" />
         <AlertTitle>Nog geen scores ingevuld</AlertTitle>
         <AlertDescription>
-          In je laatste gesprek zijn nog geen scores geregistreerd. Praat met
-          {user?.displayName ? ` ${user.displayName.split(' ')[0]}` : 'je buddy'} om je dashboard te vullen!
+          Praat met {user?.displayName ? ` ${user.displayName.split(' ')[0]}` : 'je buddy'} om je dashboard te vullen!
         </AlertDescription>
       </Alert>
     );
@@ -170,7 +204,7 @@ export function WellnessChart() {
           <BarChart
             accessibilityLayer
             data={chartData}
-            margin={{ top: 10, right: 10, bottom: 20, left: 10 }}
+            margin={{ top: 10, right: 10, bottom: 0, left: 10 }}
             layout="vertical"
           >
             <CartesianGrid horizontal={false} />
@@ -180,9 +214,9 @@ export function WellnessChart() {
               tickLine={false}
               axisLine={false}
               tickMargin={10}
-              width={90}
-              tick={{ textAnchor: 'end' }}
-              className="text-sm fill-muted-foreground"
+              width={100}
+              interval={0}
+              tick={<CustomYAxisTick />}
             />
             <XAxis dataKey="value" type="number" domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} />
             <ChartTooltip
@@ -201,7 +235,10 @@ export function WellnessChart() {
                       const formattedValue = typeof value === 'number' ? (value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)) : value;
                       return (
                       <div className="flex flex-col">
-                          <span className="font-bold">{`${item.payload.metric}: ${formattedValue}`}</span>
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold">{`${item.payload.metric}: ${formattedValue}`}</span>
+                            <span className="text-xs text-muted-foreground ml-4">{item.payload.lastUpdated}</span>
+                          </div>
                           <span className="text-xs text-muted-foreground mt-1">{item.payload.reason}</span>
                       </div>
                   )}}
@@ -220,34 +257,40 @@ export function WellnessChart() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="flex flex-col p-0">
+          <SheetHeader className="p-6 pb-4">
             <SheetTitle>Details van je Welzijnsscores</SheetTitle>
             <SheetDescription>
-              Hier is een gedetailleerd overzicht van de scores uit je laatste
-              gesprek.
+              Hier is een gedetailleerd overzicht van de meest recente scores voor elk onderwerp.
             </SheetDescription>
           </SheetHeader>
-          <div className="py-4 space-y-6">
-            {chartData.map((item) => {
-                const isPlaceholder = item.isPlaceholder;
-                const displayValue = item.value;
-                const displayReason = item.reason;
-                const formattedValue = displayValue % 1 === 0 ? displayValue.toFixed(0) : displayValue.toFixed(1);
+          <ScrollArea className="flex-1 min-h-0">
+            <ScrollViewport>
+              <div className="px-6 pb-6 space-y-6">
+                {chartData.map((item) => {
+                    const isPlaceholder = item.isPlaceholder;
+                    const displayValue = Number(item.value);
+                    const displayReason = item.reason;
+                    const formattedValue = displayValue % 1 === 0 ? displayValue.toFixed(0) : displayValue.toFixed(1);
 
-                return (
-              <div key={item.metric} className={cn("p-4 rounded-xl shadow-clay-card", isPlaceholder ? "bg-muted/50" : "bg-card/50")}>
-                 <div className="flex items-center justify-between mb-2">
-                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{item.emoji}</span>
-                    <h3 className="font-bold text-lg">{item.metric}</h3>
-                   </div>
-                   <div className={cn("font-bold text-lg", isPlaceholder && "text-muted-foreground")}>{formattedValue}</div>
-                 </div>
-                 <p className="text-muted-foreground text-sm">{displayReason}</p>
+                    return (
+                  <div key={item.metric} className={cn("p-4 rounded-xl shadow-clay-card", isPlaceholder ? "bg-muted/50" : "bg-card/50")}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{item.emoji}</span>
+                        <h3 className="font-bold text-lg">{item.metric}</h3>
+                      </div>
+                      <div className={cn("font-bold text-lg", isPlaceholder && "text-muted-foreground")}>{formattedValue}</div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{displayReason}</p>
+                    <p className="text-xs text-muted-foreground/80 mt-2">
+                      Laatst bijgewerkt: {item.lastUpdatedFull}
+                    </p>
+                  </div>
+                )})}
               </div>
-            )})}
-          </div>
+            </ScrollViewport>
+          </ScrollArea>
         </SheetContent>
       </Sheet>
     </div>

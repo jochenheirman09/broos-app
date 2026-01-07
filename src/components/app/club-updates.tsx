@@ -3,7 +3,7 @@
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, Timestamp, where } from "firebase/firestore";
 import type { ClubUpdate } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";

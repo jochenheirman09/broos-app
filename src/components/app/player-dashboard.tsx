@@ -20,7 +20,9 @@ import { AddTrainingDialog } from "./add-training-dialog";
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
-
+import { NotificationBadge } from "./notification-badge";
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { useFirestore, useMemoFirebase } from "@/firebase";
 
 function ProfileIncompleteAlert() {
   return (
@@ -36,7 +38,8 @@ function ProfileIncompleteAlert() {
 }
 
 export function PlayerDashboard() {
-  const { userProfile } = useUser();
+  const { userProfile, user } = useUser();
+  const db = useFirestore();
   const [isAddTrainingOpen, setIsAddTrainingOpen] = useState(false);
   const [refreshSchedule, setRefreshSchedule] = useState(0);
 
@@ -44,6 +47,18 @@ export function PlayerDashboard() {
     setIsAddTrainingOpen(false);
     setRefreshSchedule(prev => prev + 1);
   };
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const firestoreToday = Timestamp.fromDate(today);
+
+  const newUpdatesQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+        collection(db, "users", user.uid, "updates"),
+        where("read", "==", false)
+    );
+  }, [user, db]);
 
 
   if (!userProfile) {
@@ -82,9 +97,10 @@ export function PlayerDashboard() {
                       </CardDescription>
                   </div>
                   <Link href="/archive/player-updates" passHref>
-                      <Button variant="secondary" size="sm">
+                      <Button variant="secondary" size="sm" className="flex items-center">
                           <Archive className="mr-2 h-4 w-4" />
                           Bekijk Archief
+                          <NotificationBadge query={newUpdatesQuery} />
                       </Button>
                   </Link>
               </div>
@@ -111,4 +127,3 @@ export function PlayerDashboard() {
     </>
   );
 }
-

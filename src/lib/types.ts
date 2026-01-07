@@ -165,6 +165,7 @@ export interface PlayerUpdate {
   content: string;
   category: 'Sleep' | 'Nutrition' | 'Motivation' | 'Stress' | 'Wellness';
   date: string; // YYYY-MM-DD
+  read?: boolean; // To track if the update has been seen
 }
 
 export interface StaffUpdate {
@@ -173,6 +174,7 @@ export interface StaffUpdate {
   content: string;
   category: 'Team Performance' | 'Player Wellness' | 'Injury Risk';
   date: string;
+  read?: boolean; // To track if the update has been seen
 }
 
 export interface ClubUpdate {
@@ -181,6 +183,7 @@ export interface ClubUpdate {
     content: string;
     category: 'Club Trends' | 'Team Comparison' | 'Resource Suggestion';
     date: string;
+    read?: boolean; // To track if the update has been seen
 }
 
 
@@ -271,5 +274,7 @@ export interface OnboardingOutput {
   siblings?: { name: string; age?: number }[];
   pets?: { name: string; type: string }[];
 }
+
+    
 
     

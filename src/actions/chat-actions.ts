@@ -1,9 +1,10 @@
+
 'use server';
 
 import { getFirebaseAdmin } from '@/ai/genkit';
 import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
-import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, Game } from '@/lib/types';
+import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, Game, ChatMessage } from '@/lib/types';
 import { GenkitError } from 'genkit';
 import { getDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -49,11 +50,11 @@ export async function chatWithBuddy(
     const currentTime = formatInTimeZone(now, timeZone, 'HH:mm');
 
     const isSystemStartMessage = input.userMessage === 'Start het gesprek voor vandaag.';
-    if (!isSystemStartMessage) {
-        console.log("[Chat Action] Saving user message first.");
-        await saveUserMessage(userId, today, input.userMessage);
-        console.log("[Chat Action] User message saved.");
-    }
+    
+    // Save the new user message. This also returns the saved message with its server timestamp.
+    const savedUserMessage = isSystemStartMessage 
+      ? { role: 'user' as const, content: input.userMessage, timestamp: now, id: `msg_${Date.now()}_user` }
+      : await saveUserMessage(userId, today, input.userMessage);
     
     console.log("[Chat Action] Fetching user profile and building context.");
     const userDoc = await userRef.get();
@@ -90,7 +91,9 @@ export async function chatWithBuddy(
     }
     
     const messagesSnapshot = await userRef.collection('chats').doc(today).collection('messages').orderBy('sortOrder', 'asc').get();
-    const chatHistory = messagesSnapshot.docs.map(doc => `${doc.data().role}: ${doc.data().content}`).join('\n');
+    const chatHistoryMessages = messagesSnapshot.docs.map(doc => doc.data() as ChatMessage);
+    const chatHistory = chatHistoryMessages.map(doc => `${doc.role}: ${doc.content}`).join('\n');
+
     const isFirstInteraction = messagesSnapshot.docs.length <= 1;
     console.log(`[Chat Action] History fetched. Is first interaction: ${isFirstInteraction}`);
 
@@ -106,11 +109,12 @@ export async function chatWithBuddy(
     }
     
     console.log("[Chat Action] Saving assistant response.");
-    await saveAssistantResponse(userId, today, result.response);
+    const savedAssistantMessage = await saveAssistantResponse(userId, today, result.response);
     console.log("[Chat Action] Assistant response saved.");
     
-    const finalChatHistory = chatHistory + `\nuser: ${input.userMessage}\nassistant: ${result.response}`;
-    analyzeAndSaveChatData(userId, finalChatHistory).catch(err => {
+    // Pass the full message objects to the background analysis function
+    const fullChatMessages = [...chatHistoryMessages, savedAssistantMessage];
+    analyzeAndSaveChatData(userId, fullChatMessages).catch(err => {
         console.error(`[Chat Action] Background analysis failed for user ${userId}:`, err);
     });
 

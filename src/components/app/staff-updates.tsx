@@ -3,12 +3,13 @@
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
-import { collection, query, orderBy, where, getDocs, doc, getDoc, limit } from "firebase/firestore";
+import { collection, query, orderBy, where, getDocs, doc, getDoc, limit, Timestamp } from "firebase/firestore";
 import type { StaffUpdate, WithId, Team } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Users, Activity, HeartPulse, AlertTriangle } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
+import { NotificationBadge } from "./notification-badge";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   'Team Performance': <Activity className="h-5 w-5 text-primary" />,

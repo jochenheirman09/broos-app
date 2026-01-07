@@ -2,7 +2,7 @@
 "use client";
 
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, collection, query } from "firebase/firestore";
+import { doc, collection, query, collectionGroup, where } from "firebase/firestore";
 import type { Club, Team, MyChat } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import {
@@ -26,37 +26,12 @@ import { AlertList } from "./alert-list";
 import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
+import { NotificationBadge } from "./notification-badge";
 
-
-function UnreadChatBadge({ userId }: { userId: string }) {
-    const db = useFirestore();
-
-    const myChatsQuery = useMemoFirebase(() => {
-        return query(collection(db, "users", userId, "myChats"));
-    }, [userId, db]);
-
-    const { data: myChats, isLoading } = useCollection<MyChat>(myChatsQuery);
-    
-    const totalUnreadCount = useMemo(() => {
-        if (isLoading || !myChats) return 0;
-        return myChats.reduce((total, chat) => {
-            const count = chat.unreadCounts?.[userId] || 0;
-            return total + count;
-        }, 0);
-    }, [myChats, userId, isLoading]);
-
-    if (isLoading || totalUnreadCount === 0) return null;
-
-    return (
-        <span className="relative flex h-3 w-3 ml-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-        </span>
-    );
-}
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const { userProfile, user } = useUser();
+  const db = useFirestore();
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleTeamChange = useCallback(() => {
@@ -64,6 +39,28 @@ function ClubManagement({ clubId }: { clubId: string }) {
   }, []);
 
   const claimsReady = !!(userProfile && userProfile.role && userProfile.clubId);
+
+  // Queries for Notification Badges
+  const myChatsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(db, "users", user.uid, "myChats"));
+  }, [user, db]);
+
+  const newAlertsQuery = useMemoFirebase(() => {
+    if (!clubId) return null;
+    return query(collectionGroup(db, 'alerts'), where('clubId', '==', clubId), where('status', '==', 'new'));
+  }, [db, clubId]);
+  
+  const newStaffUpdatesQuery = useMemoFirebase(() => {
+      if (!clubId) return null;
+      return query(collectionGroup(db, 'staffUpdates'), where('clubId', '==', clubId));
+  }, [db, clubId]);
+
+  const newClubUpdatesQuery = useMemoFirebase(() => {
+      if (!clubId) return null;
+      return query(collection(db, `clubs/${clubId}/clubUpdates`));
+  }, [db, clubId]);
+
 
   return (
     <>
@@ -80,9 +77,10 @@ function ClubManagement({ clubId }: { clubId: string }) {
               </CardDescription>
             </div>
              <Link href="/archive/club-updates" passHref>
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" className="flex items-center">
                     <Archive className="mr-2 h-4 w-4" />
                     Bekijk Archief
+                    <NotificationBadge query={newClubUpdatesQuery} />
                 </Button>
             </Link>
           </div>
@@ -102,9 +100,10 @@ function ClubManagement({ clubId }: { clubId: string }) {
                     </CardDescription>
                 </div>
                  <Link href="/archive/staff-updates" passHref>
-                    <Button variant="secondary" size="sm">
+                    <Button variant="secondary" size="sm" className="flex items-center">
                         <Archive className="mr-2 h-4 w-4" />
                         Bekijk Archief
+                        <NotificationBadge query={newStaffUpdatesQuery} />
                     </Button>
                  </Link>
             </div>
@@ -125,8 +124,9 @@ function ClubManagement({ clubId }: { clubId: string }) {
               </CardTitle>
             </div>
             <Link href="/alerts" passHref>
-              <Button variant="outline" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full sm:w-auto flex items-center">
                 Bekijk Alle Alerts
+                <NotificationBadge query={newAlertsQuery} />
               </Button>
             </Link>
           </div>
@@ -152,10 +152,10 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardHeader>
         <CardContent>
             <Link href="/p2p-chat" passHref>
-                <Button>
+                <Button className="flex items-center">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Open Team Chat
-                    {user && <UnreadChatBadge userId={user.uid} />}
+                    <NotificationBadge query={myChatsQuery} countField="unreadCounts" />
                 </Button>
             </Link>
         </CardContent>

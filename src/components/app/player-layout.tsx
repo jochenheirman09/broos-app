@@ -20,10 +20,10 @@ import { ThemeToggle } from "../theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { useState, useMemo } from "react";
 import { ProfileSheet } from "./profile-sheet";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
-import type { MyChat } from "@/lib/types";
 import { RequestNotificationPermission } from "./request-notification-permission";
+import { NotificationBadge } from "./notification-badge";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -32,42 +32,12 @@ const navItems = [
   { href: "/archive", icon: Archive, label: "Archief" },
 ];
 
-function NavItemBadge({ userId }: { userId: string }) {
-    const db = useFirestore();
-    const myChatsQuery = useMemoFirebase(() => {
-        return query(
-            collection(db, "users", userId, "myChats")
-        );
-    }, [userId, db]);
-
-    const { data: myChats } = useCollection<MyChat>(myChatsQuery);
-
-    const totalUnreadCount = useMemo(() => {
-        if (!myChats) return 0;
-        return myChats.reduce((total, chat) => {
-            const count = chat.unreadCounts?.[userId] || 0;
-            return total + count;
-        }, 0);
-    }, [myChats, userId]);
-
-    if (totalUnreadCount === 0) return null;
-
-    return (
-        <div className="absolute top-0 right-0 -translate-y-1/3 translate-x-1/3">
-            <span className="relative flex h-5 w-5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-5 w-5 bg-primary text-primary-foreground text-xs items-center justify-center">
-                  {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
-                </span>
-            </span>
-        </div>
-    )
-}
 
 export function PlayerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, userProfile } = useUser();
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
+  const db = useFirestore();
 
   const getInitials = (name: string = "") => {
     return name
@@ -76,6 +46,12 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
       .join("")
       .toUpperCase();
   };
+  
+  // Query for Team Chat Badge
+  const myChatsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(db, "users", user.uid, "myChats"));
+  }, [user, db]);
 
   return (
     <>
@@ -142,7 +118,7 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="h-6 w-6" />
                   <span>{label}</span>
-                  {label === 'Team' && user && <NavItemBadge userId={user.uid} />}
+                  {label === 'Team' && <NotificationBadge query={myChatsQuery} countField="unreadCounts" />}
                 </Link>
               );
             })}

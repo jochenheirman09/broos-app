@@ -56,7 +56,7 @@ function ExistingChatItem({ chat }: { chat: WithId<MyChat> }) {
             <p className="text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
             {unreadCount > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                {unreadCount}
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </div>

@@ -1,9 +1,11 @@
+
 'use server';
 import { getFirebaseAdmin, getAiInstance } from '../ai/genkit';
 import { FieldValue, type DocumentReference } from 'firebase-admin/firestore';
-import type { OnboardingTopic, UserProfile, Game, WellnessScore, FullWellnessAnalysisOutput } from '../lib/types';
+import type { OnboardingTopic, UserProfile, Game, WellnessScore, ChatMessage, WithId } from '../lib/types';
 import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
+import { createHash } from 'crypto';
 
 export async function saveOnboardingSummary(
     userRef: DocumentReference,
@@ -37,7 +39,7 @@ export async function saveOnboardingSummary(
     }
 }
 
-export async function saveUserMessage(userId: string, today: string, userMessage: string) {
+export async function saveUserMessage(userId: string, today: string, userMessage: string): Promise<WithId<ChatMessage>> {
     console.log(`[Firestore Service] Saving user message for ${userId}.`);
     const { adminDb } = await getFirebaseAdmin();
     const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
@@ -45,15 +47,18 @@ export async function saveUserMessage(userId: string, today: string, userMessage
     
     const newMessageRef = messagesColRef.doc(`msg_${clientTimestampMs}_user`);
     
-    await newMessageRef.set({
+    const messageData: ChatMessage = {
         role: 'user',
         content: userMessage,
         timestamp: FieldValue.serverTimestamp(),
         sortOrder: clientTimestampMs,
-    });
+    };
+    
+    await newMessageRef.set(messageData);
+    return { ...messageData, id: newMessageRef.id, timestamp: new Date() }; // Return with ID and a temporary timestamp
 }
 
-export async function saveAssistantResponse(userId: string, today: string, assistantResponse: string) {
+export async function saveAssistantResponse(userId: string, today: string, assistantResponse: string): Promise<WithId<ChatMessage>> {
   console.log(`[Firestore Service] Saving assistant response for ${userId}.`);
   const { adminDb } = await getFirebaseAdmin();
   const messagesColRef = adminDb.collection('users').doc(userId).collection('chats').doc(today).collection('messages');
@@ -61,12 +66,15 @@ export async function saveAssistantResponse(userId: string, today: string, assis
   
   const newMessageRef = messagesColRef.doc(`msg_${clientTimestampMs}_assistant`);
 
-  await newMessageRef.set({
+  const messageData: ChatMessage = {
       role: 'assistant',
       content: assistantResponse,
       timestamp: FieldValue.serverTimestamp(),
       sortOrder: clientTimestampMs,
-  });
+  };
+
+  await newMessageRef.set(messageData);
+  return { ...messageData, id: newMessageRef.id, timestamp: new Date() };
 }
 
 
@@ -76,9 +84,11 @@ export async function saveAssistantResponse(userId: string, today: string, assis
  * It then saves all extracted data to Firestore in a single transaction to ensure idempotency.
  * This is a 'fire-and-forget' function from the client's perspective.
  */
-export async function analyzeAndSaveChatData(userId: string, fullChatHistory: string) {
+export async function analyzeAndSaveChatData(userId: string, fullChatMessages: ChatMessage[]) {
     console.log(`[Analysis Service] Starting full analysis for user ${userId}.`);
     const ai = await getAiInstance();
+    const fullChatHistory = fullChatMessages.map(m => `${m.role}: ${m.content}`).join('\n');
+    const lastUserMessage = fullChatMessages.filter(m => m.role === 'user').pop();
 
     // Define the Zod schema for the expected output of the analysis prompt.
     const AnalysisOutputSchema = z.object({
@@ -151,23 +161,26 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
         
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);
-            const chatDocRef = userDocRef.collection('chats').doc(today);
+            
             const wellnessDocRef = userDocRef.collection('wellnessScores').doc(today);
-
-            // Idempotency check: only proceed if the wellness doc doesn't exist.
-            // Wellness is the last thing to be processed, so it's a good flag for idempotency.
             const wellnessDoc = await transaction.get(wellnessDocRef);
-            if (wellnessDoc.exists) {
-                console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} already analyzed.`);
-                return;
+            
+            const chatSha = createHash('sha256').update(fullChatHistory).digest('hex');
+            const lastSha = wellnessDoc.data()?.chatSha;
+
+            if (wellnessDoc.exists && lastSha === chatSha) {
+                 console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} with the same chat history already analyzed.`);
+                 return;
             }
 
-            // Proceed with updates within the transaction
+            // --- Proceed with all writes within the transaction ---
+
             if (output.summary) {
+                const chatDocRef = userDocRef.collection('chats').doc(today);
                 transaction.set(chatDocRef, { summary: output.summary, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
-                transaction.set(wellnessDocRef, { ...output.wellnessScores, date: today, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+                transaction.set(wellnessDocRef, { ...output.wellnessScores, date: today, updatedAt: FieldValue.serverTimestamp(), chatSha: chatSha }, { merge: true });
             }
             if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
                 const gameDocRef = userDocRef.collection('games').doc(today);
@@ -177,10 +190,14 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                 const userDoc = await transaction.get(userDocRef);
                 const userData = userDoc.data() as UserProfile | undefined;
                 if (userData?.clubId && userData?.teamId) {
-                    const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc();
                     
+                    const alertHash = createHash('md5').update(userId + today + output.alert.triggeringMessage).digest('hex');
+                    const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc(alertHash);
+
                     const isRequestForContact = output.alert.alertType === 'Request for Contact';
                     const shareWithStaff = isRequestForContact ? false : (output.alert.shareWithStaff ?? false);
+                    
+                    const alertTimestamp = lastUserMessage?.timestamp || FieldValue.serverTimestamp();
 
                     transaction.set(alertDocRef, {
                         ...output.alert,
@@ -192,7 +209,7 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                         status: 'new',
                         notificationStatus: 'pending',
                         shareWithStaff: shareWithStaff,
-                        createdAt: FieldValue.serverTimestamp(),
+                        createdAt: alertTimestamp,
                     });
                 }
             }

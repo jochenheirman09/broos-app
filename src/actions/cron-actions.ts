@@ -8,6 +8,7 @@ import type { TeamAnalysisInput, NotificationInput, PlayerUpdateInput, ClubAnaly
 import type { UserProfile, Team, WellnessScore, WithId, ClubUpdate, PlayerUpdate } from '../lib/types';
 import { getFirebaseAdmin } from '../ai/genkit';
 import { formatInTimeZone } from 'date-fns-tz';
+import { createHash } from 'crypto';
 
 const TIME_ZONE = 'Europe/Brussels';
 
@@ -88,13 +89,20 @@ export async function runAnalysisJob() {
                 if (teamAnalysisResult && teamAnalysisResult.summary && teamAnalysisResult.insight) {
                     allTeamSummariesForClub.push({ teamName: team.name, summary: teamAnalysisResult.summary });
                     
-                    // 6. Save the staff update (team insight)
-                    const staffUpdateRef = db.collection('clubs').doc(clubId).collection('teams').doc(team.id).collection('staffUpdates').doc();
-                    const staffUpdateData: Omit<TeamInsight, 'id'> = { ...teamAnalysisResult.insight, date: today };
-                    await staffUpdateRef.set({ ...staffUpdateData, id: staffUpdateRef.id });
-                    console.log(`[CRON] Saved staff update for team ${team.name}`);
+                    // 6. Save the staff update (team insight) idempotently
+                    const staffUpdateRef = db.collection('clubs').doc(clubId).collection('teams').doc(team.id).collection('staffUpdates').doc(today);
+                    await db.runTransaction(async (transaction) => {
+                        const doc = await transaction.get(staffUpdateRef);
+                        if (!doc.exists) {
+                            const staffUpdateData: Omit<TeamInsight, 'id'> = { ...teamAnalysisResult.insight, date: today, read: false };
+                            transaction.set(staffUpdateRef, { ...staffUpdateData, id: staffUpdateRef.id });
+                            console.log(`[CRON] Saved NEW staff update for team ${team.name}`);
+                        } else {
+                            console.log(`[CRON] Staff update for team ${team.name} on ${today} already exists. Skipping.`);
+                        }
+                    });
 
-                    // 7. Generate and save individual player "weetjes"
+                    // 7. Generate and save individual player "weetjes" idempotently
                     for (const playerData of playersWithData) {
                         const playerUpdateInput: PlayerUpdateInput = {
                             playerName: playerData.playerProfile.name,
@@ -104,16 +112,24 @@ export async function runAnalysisJob() {
                         const playerUpdateResult = await generatePlayerUpdate(playerUpdateInput);
 
                         if (playerUpdateResult) {
-                            const playerUpdateRef = db.collection('users').doc(playerData.playerProfile.uid).collection('updates').doc();
-                            const playerUpdateData: Omit<PlayerUpdate, 'id'> = { 
-                                ...playerUpdateResult, 
-                                title: playerUpdateResult.title ?? "Persoonlijk Weetje",
-                                content: playerUpdateResult.content ?? "Je nieuwe wellness-update staat klaar.",
-                                category: playerUpdateResult.category ?? "Wellness",
-                                date: today 
-                            };
-                            await playerUpdateRef.set({ ...playerUpdateData, id: playerUpdateRef.id });
-                            console.log(`[CRON] Saved player update for ${playerData.playerProfile.name}`);
+                            const playerUpdateRef = db.collection('users').doc(playerData.playerProfile.uid).collection('updates').doc(today);
+                             await db.runTransaction(async (transaction) => {
+                                const doc = await transaction.get(playerUpdateRef);
+                                if (!doc.exists) {
+                                    const playerUpdateData: Omit<PlayerUpdate, 'id'> = { 
+                                        ...playerUpdateResult, 
+                                        title: playerUpdateResult.title ?? "Persoonlijk Weetje",
+                                        content: playerUpdateResult.content ?? "Je nieuwe wellness-update staat klaar.",
+                                        category: playerUpdateResult.category ?? "Wellness",
+                                        date: today,
+                                        read: false
+                                    };
+                                    transaction.set(playerUpdateRef, { ...playerUpdateData, id: playerUpdateRef.id });
+                                    console.log(`[CRON] Saved NEW player update for ${playerData.playerProfile.name}`);
+                                } else {
+                                     console.log(`[CRON] Player update for ${playerData.playerProfile.name} on ${today} already exists. Skipping.`);
+                                }
+                            });
                         }
                     }
                 }
@@ -127,16 +143,24 @@ export async function runAnalysisJob() {
             const clubInsightResult = await analyzeClubData(clubAnalysisInput);
 
             if (clubInsightResult) {
-                const clubUpdateRef = db.collection('clubs').doc(clubId).collection('clubUpdates').doc();
-                const clubUpdateData: Omit<ClubUpdate, 'id'> = { 
-                    ...clubInsightResult, 
-                    title: clubInsightResult.title ?? `Club Update ${today}`,
-                    content: clubInsightResult.content ?? "Geen specifieke details beschikbaar voor deze update.",
-                    category: clubInsightResult.category ?? "Club Trends",
-                    date: today
-                };
-                await clubUpdateRef.set({ ...clubUpdateData, id: clubUpdateRef.id });
-                console.log(`[CRON] Saved club update for ${clubName}`);
+                const clubUpdateRef = db.collection('clubs').doc(clubId).collection('clubUpdates').doc(today);
+                await db.runTransaction(async (transaction) => {
+                    const doc = await transaction.get(clubUpdateRef);
+                    if (!doc.exists) {
+                        const clubUpdateData: Omit<ClubUpdate, 'id'> = { 
+                            ...clubInsightResult, 
+                            title: clubInsightResult.title ?? `Club Update ${today}`,
+                            content: clubInsightResult.content ?? "Geen specifieke details beschikbaar voor deze update.",
+                            category: clubInsightResult.category ?? "Club Trends",
+                            date: today,
+                            read: false,
+                        };
+                        transaction.set(clubUpdateRef, { ...clubUpdateData, id: clubUpdateRef.id });
+                        console.log(`[CRON] Saved NEW club update for ${clubName}`);
+                    } else {
+                        console.log(`[CRON] Club update for ${clubName} on ${today} already exists. Skipping.`);
+                    }
+                });
             }
         }
     } // End of club loop
@@ -173,3 +197,5 @@ export async function handleRunAnalysisJob(): Promise<{ success: boolean; messag
     };
   }
 }
+
+    
