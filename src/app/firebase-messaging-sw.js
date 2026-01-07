@@ -3,6 +3,11 @@
 // Using compat versions for robust service worker support
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.1/firebase-messaging-compat.js');
+import { precacheAndRoute } from 'workbox-precaching';
+
+// This line is required for next-pwa to inject the manifest.
+precacheAndRoute(self.__WB_MANIFEST || []);
+
 
 // This function will be called by the PWA's service worker (sw.js)
 self.addEventListener('message', (event) => {
