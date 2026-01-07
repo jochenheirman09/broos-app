@@ -30,22 +30,26 @@ self.addEventListener('message', (event) => {
         messaging.onBackgroundMessage((payload) => {
             console.log('[SW] Received background message ', payload);
 
-            if (!payload.notification) {
-                console.warn('[SW] Received background message without notification payload. Cannot display.');
+            // The OS will NOT show a notification for data-only messages.
+            // We MUST construct and show it ourselves from the `data` payload.
+            const { title, body, link } = payload.data;
+
+            if (!title) {
+                console.warn('[SW] Received background message without a title in the data payload. Cannot display.');
                 return;
             }
 
-            const notificationTitle = payload.notification.title || 'Nieuw Bericht';
             const notificationOptions = {
-                body: payload.notification.body || 'Je hebt een nieuw bericht.',
-                icon: payload.notification.icon || '/icons/icon-192x192.png',
+                body: body || 'Je hebt een nieuw bericht.',
+                icon: '/icons/icon-192x192.png',
+                badge: '/icons/icon-192x192.png',
                 data: {
-                  link: payload.fcmOptions?.link || payload.data?.link || '/'
+                  link: link || '/'
                 }
             };
 
-            console.log(`[SW] Showing notification: "${notificationTitle}"`);
-            self.registration.showNotification(notificationTitle, notificationOptions);
+            console.log(`[SW] Showing notification: "${title}"`);
+            self.registration.showNotification(title, notificationOptions);
 
             if ('setAppBadge' in self.navigator) {
                 console.log('[SW] App supports badging. Setting badge.');

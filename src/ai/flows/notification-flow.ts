@@ -25,8 +25,7 @@ export async function sendNotification(
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
     const message: MulticastMessage = {
-        notification: { title, body },
-        // Data is cruciaal voor klik-afhandeling in de achtergrond
+        // NOTIFICATION object is removed to create a data-only message.
         data: {
             title: title || '',
             body: body || '',
@@ -34,35 +33,23 @@ export async function sendNotification(
         },
         android: {
             priority: 'high',
-            notification: {
-                sound: 'default',
-                priority: 'high',
-                channelId: 'default', // Zorg dat dit kanaal bestaat op Android
-            }
         },
         apns: {
             payload: {
                 aps: {
-                    alert: { title, body },
+                    'content-available': 1, // Wake the app silently
                     sound: 'default',
                     badge: 1,
-                    'content-available': 1, // Maakt de app wakker
                 },
             },
             headers: {
-                'apns-priority': '10', // 10 is direct, 5 is energiezuinig
+                'apns-priority': '10', // Required for background delivery
+                'apns-push-type': 'background' // Specify background type
             },
         },
         webpush: {
             headers: {
-                Urgency: 'high' // Let op: hoofdletter U
-            },
-            notification: {
-                title,
-                body,
-                icon: '/icons/icon-192x192.png',
-                badge: '/icons/icon-192x192.png',
-                requireInteraction: true, // Houdt de notificatie zichtbaar
+                Urgency: 'high'
             },
             fcmOptions: {
                 link: link || '/',
@@ -70,12 +57,12 @@ export async function sendNotification(
         },
         tokens: tokens,
     };
-
-    console.log('[sendNotification] FCM Payload:', JSON.stringify(message, null, 2));
+    
+    console.log('[sendNotification] FCM Payload (data-only):', JSON.stringify(message, null, 2));
 
     try {
       const response = await adminMessaging.sendEachForMulticast(message);
-      console.log(`[sendNotification] Successfully sent message to ${response.successCount} of ${tokens.length} tokens.`);
+      console.log(`[sendNotification] ✅ Successfully sent message to ${response.successCount} of ${tokens.length} tokens.`);
 
       if (response.failureCount > 0) {
         console.warn(`[sendNotification] Failed to send to ${response.failureCount} tokens.`);
