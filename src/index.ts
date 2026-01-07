@@ -159,26 +159,22 @@ export const onAlertCreated = functions.firestore
     .document('clubs/{clubId}/teams/{teamId}/alerts/{alertId}')
     .onCreate(async (snapshot, context) => {
         const alertRef = snapshot.ref;
+        console.log(`[onAlertCreated] Triggered for alert: ${alertRef.id}`);
 
         try {
-            let shouldSend = false;
-            let tokensToSend: string[] = [];
-            let notificationPayload: any = {};
-            const alertData = snapshot.data() as Alert;
-
-            // STAP 1: De transactie is alleen voor de "lock"
-            await db.runTransaction(async (transaction) => {
+            const shouldSend = await db.runTransaction(async (transaction) => {
                 const doc = await transaction.get(alertRef);
                 const data = doc.data();
                 if (data && data.notificationStatus !== 'sent') {
                     transaction.update(alertRef, { notificationStatus: 'sent' });
-                    shouldSend = true; 
+                    return true; 
                 }
+                return false;
             });
 
-            // STAP 2: Buiten de transactie doen we het zware werk
             if (shouldSend) {
-                console.log(`[onAlertCreated] ✅ Transaction complete, preparing to send alert for ${alertRef.id}.`);
+                console.log(`[onAlertCreated] ✅ WINNER for alert ${alertRef.id}, preparing to send notification.`);
+                const alertData = snapshot.data() as Alert;
                 const { clubId, teamId } = context.params;
 
                 const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
@@ -186,9 +182,11 @@ export const onAlertCreated = functions.firestore
                 const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
                 
                 const tokenSet = new Set<string>();
-                
+                const userIdsToNotify = new Set<string>();
+
                 const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
                      for (const userDoc of snap.docs) {
+                        userIdsToNotify.add(userDoc.id);
                         const tokens = await getTokensForUser(userDoc.id);
                         tokens.forEach(t => {
                             if (t && t.trim() !== "") {
@@ -201,10 +199,11 @@ export const onAlertCreated = functions.firestore
                 await processSnapshot(staffSnap);
                 await processSnapshot(responsibleSnap);
                
-                tokensToSend = Array.from(tokenSet);
+                const tokensToSend = Array.from(tokenSet);
+                console.log(`[onAlertCreated] Found ${tokensToSend.length} tokens for users:`, Array.from(userIdsToNotify));
 
                 if (tokensToSend.length > 0) {
-                     notificationPayload = {
+                     const notificationPayload = {
                         notification: {
                             title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
                             body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
@@ -221,12 +220,12 @@ export const onAlertCreated = functions.firestore
                     };
                     
                     const response = await admin.messaging().sendEachForMulticast({ tokens: tokensToSend, ...notificationPayload });
-                    console.log(`[onAlertCreated] ✅ Alert sent to ${response.successCount} unique devices.`);
+                    console.log(`[onAlertCreated] ✅ FCM response: ${response.successCount} success, ${response.failureCount} failure.`);
                 } else {
                     console.log(`[onAlertCreated] No tokens found for relevant staff/responsible users.`);
                 }
             } else {
-                 console.log(`[onAlertCreated] Notification for alert ${alertRef.id} already sent or data missing. Aborting.`);
+                 console.log(`[onAlertCreated] ❌ Notification for alert ${alertRef.id} already handled. Skipping.`);
             }
 
         } catch (error) {
@@ -301,5 +300,7 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
+
+    
 
     
