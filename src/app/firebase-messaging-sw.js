@@ -32,66 +32,58 @@ self.addEventListener('message', (event) => {
 
             // The OS will NOT show a notification for data-only messages.
             // We MUST construct and show it ourselves from the `data` payload.
-            const { title, body, link } = payload.data;
-
-            if (!title) {
-                console.warn('[SW] Received background message without a title in the data payload. Cannot display.');
-                return;
-            }
-
+            const notificationTitle = payload.data.title || "Nieuw Bericht";
             const notificationOptions = {
-                body: body || 'Je hebt een nieuw bericht.',
+                body: payload.data.body || 'Je hebt een nieuw bericht.',
                 icon: '/icons/icon-192x192.png',
                 badge: '/icons/icon-192x192.png',
                 data: {
-                  link: link || '/'
+                  link: payload.data.link || '/'
                 }
             };
 
-            console.log(`[SW] Showing notification: "${title}"`);
-            self.registration.showNotification(title, notificationOptions);
+            console.log(`[SW] Showing notification: "${notificationTitle}"`);
+            self.registration.showNotification(notificationTitle, notificationOptions);
 
             if ('setAppBadge' in self.navigator) {
                 console.log('[SW] App supports badging. Setting badge.');
                 self.navigator.setAppBadge(1).catch(e => console.error('[SW] Error setting app badge:', e));
             }
         });
-
-        self.addEventListener('notificationclick', (event) => {
-          console.log('[SW] Notification click received.', event.notification.data);
-          event.notification.close();
-        
-          const link = event.notification.data?.link || '/';
-          console.log(`[SW] Opening window: ${link}`);
-        
-          event.waitUntil(
-            self.clients.matchAll({
-              type: 'window',
-              includeUncontrolled: true
-            }).then((clientList) => {
-              // Check if a window with the same URL is already open.
-              for (const client of clientList) {
-                // Use URL objects to compare paths without query parameters if needed.
-                const clientUrl = new URL(client.url);
-                const targetUrl = new URL(link, self.location.origin);
-                
-                if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
-                  console.log('[SW] Found existing window. Focusing it.');
-                  return client.focus();
-                }
-              }
-              // If no window is found, open a new one.
-              if (self.clients.openWindow) {
-                console.log('[SW] No existing window found. Opening new one.');
-                return self.clients.openWindow(link);
-              }
-            })
-          );
-        });
-
-
     } catch (error) {
         console.error('[SW] CRITICAL: Error initializing Firebase compat in service worker:', error);
     }
   }
+});
+
+self.addEventListener('notificationclick', (event) => {
+    console.log('[SW] Notification click received.', event.notification.data);
+    event.notification.close();
+  
+    const link = event.notification.data?.link || '/';
+    console.log(`[SW] Opening window: ${link}`);
+  
+    event.waitUntil(
+      self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      }).then((clientList) => {
+        // Check if a window with the same URL is already open.
+        for (const client of clientList) {
+          // Use URL objects to compare paths without query parameters if needed.
+          const clientUrl = new URL(client.url);
+          const targetUrl = new URL(link, self.location.origin);
+          
+          if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
+            console.log('[SW] Found existing window. Focusing it.');
+            return client.focus();
+          }
+        }
+        // If no window is found, open a new one.
+        if (self.clients.openWindow) {
+          console.log('[SW] No existing window found. Opening new one.');
+          return self.clients.openWindow(link);
+        }
+      })
+    );
 });
