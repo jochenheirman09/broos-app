@@ -9,7 +9,6 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
-  getDocs, // Import getDocs for one-time fetch
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -98,39 +97,38 @@ export function useCollection<T = any>(
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        const snapshot = await getDocs(memoizedTargetRefOrQuery);
-        if (isMounted) {
-          const results: ResultItemType[] = [];
-          for (const doc of snapshot.docs) {
-            results.push({ ...(doc.data() as T), id: doc.id });
-          }
-          setData(results);
-          setError(null);
+    const unsubscribe = onSnapshot(
+      memoizedTargetRefOrQuery,
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        if (!isMounted) return;
+        const results: ResultItemType[] = [];
+        for (const doc of snapshot.docs) {
+          results.push({ ...(doc.data() as T), id: doc.id });
         }
-      } catch (err: any) {
-        if (isMounted) {
-          console.error(`[useCollection] PERMISSION ERROR on: ${path}`, err);
-          const contextualError = new FirestorePermissionError({
-            operation: 'list',
-            path,
-          })
-          setError(contextualError);
-          setData(null);
-          errorEmitter.emit('permission-error', contextualError);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        setData(results);
+        setError(null);
+        setIsLoading(false);
+      },
+      (error: FirestoreError) => {
+        if (!isMounted) return;
+        console.error(`[useCollection] PERMISSION ERROR on: ${path}`, error);
+        const contextualError = new FirestorePermissionError({
+          operation: 'list',
+          path,
+        })
+
+        setError(contextualError)
+        setData(null)
+        setIsLoading(false)
+
+        // trigger global error propagation
+        errorEmitter.emit('permission-error', contextualError);
       }
-    };
-    
-    fetchData();
+    );
 
     return () => {
       isMounted = false;
+      unsubscribe();
     }
   }, [memoizedTargetRefOrQuery, refetchTrigger]); // Re-run if the target query/reference or trigger changes.
 

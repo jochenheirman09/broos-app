@@ -1,8 +1,10 @@
 
+'use server';
 import * as functions from 'firebase-functions/v1';
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import type { Alert } from '../../src/lib/types';
 
 // TIJDELIJK: Comment de import uit die buiten de folder gaat
 // import { runAnalysisJob } from "../../src/actions/cron-actions";
@@ -10,6 +12,45 @@ import { FieldValue } from 'firebase-admin/firestore';
 if (!admin.apps.length) {
     admin.initializeApp();
 }
+
+const db = admin.firestore();
+const LOCK_TIMEOUT_SECONDS = 5 * 60; // 5 minutes
+
+/**
+ * Attempts to acquire a distributed lock.
+ * @param lockName The name of the lock to acquire.
+ * @returns A promise that resolves to true if the lock was acquired, false otherwise.
+ */
+async function acquireLock(lockName: string): Promise<boolean> {
+    const lockRef = db.collection('_locks').doc(lockName);
+    try {
+        await db.runTransaction(async (transaction) => {
+            const lockDoc = await transaction.get(lockRef);
+            if (lockDoc.exists) {
+                const lockData = lockDoc.data();
+                const lockTime = lockData?.timestamp.toDate();
+                const now = new Date();
+                // Check if the lock has expired
+                if (now.getTime() - lockTime.getTime() > LOCK_TIMEOUT_SECONDS * 1000) {
+                    console.log(`[LOCK] Stale lock '${lockName}' found. Overriding.`);
+                    transaction.set(lockRef, { timestamp: FieldValue.serverTimestamp() });
+                } else {
+                    // Lock is still active
+                    throw new Error(`Lock '${lockName}' is currently held.`);
+                }
+            } else {
+                // Lock does not exist, acquire it
+                transaction.set(lockRef, { timestamp: FieldValue.serverTimestamp() });
+            }
+        });
+        console.log(`[LOCK] Lock '${lockName}' acquired successfully.`);
+        return true;
+    } catch (error: any) {
+        console.log(`[LOCK] Failed to acquire lock '${lockName}': ${error.message}`);
+        return false;
+    }
+}
+
 
 /**
  * 1. NIGHTLY ANALYSIS JOB
@@ -31,7 +72,12 @@ export const morningSummary = onSchedule({
     schedule: "30 8 * * *",
     timeZone: "Europe/Brussels",
 }, async (event) => {
-    const db = admin.firestore();
+    const lockAcquired = await acquireLock('morningSummary');
+    if (!lockAcquired) {
+        console.log("[morningSummary] Could not acquire lock, another instance is running. Exiting.");
+        return;
+    }
+
     try {
         const users = await db.collection('users').get();
         for (const userDoc of users.docs) {
@@ -44,6 +90,14 @@ export const morningSummary = onSchedule({
                 notification: {
                     title: role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten",
                     body: "Er staan nieuwe updates voor je klaar in de Broos app."
+                },
+                data: {
+                    link: '/dashboard'
+                },
+                webpush: {
+                    fcmOptions: {
+                        link: '/dashboard'
+                    }
                 }
             };
             
@@ -63,7 +117,12 @@ export const dailyCheckInReminder = onSchedule({
     schedule: "0 17 * * *",
     timeZone: "Europe/Brussels",
 }, async (event) => {
-    const db = admin.firestore();
+    const lockAcquired = await acquireLock('dailyCheckInReminder');
+    if (!lockAcquired) {
+        console.log("[dailyCheckInReminder] Could not acquire lock, another instance is running. Exiting.");
+        return;
+    }
+
     try {
         const players = await db.collection('users').where('role', '==', 'player').get();
         for (const playerDoc of players.docs) {
@@ -74,6 +133,14 @@ export const dailyCheckInReminder = onSchedule({
                     notification: {
                         title: "Check-in met Broos!",
                         body: `Hey ${playerDoc.data().name || 'buddy'}, je buddy wacht op je!`
+                    },
+                    data: {
+                        link: '/chat'
+                    },
+                    webpush: {
+                        fcmOptions: {
+                            link: '/chat'
+                        }
                     }
                 });
             }
@@ -85,82 +152,99 @@ export const dailyCheckInReminder = onSchedule({
 
 
 /**
- * 4. ON ALERT CREATED (v1) - Real-time
+ * 4. ON ALERT CREATED (v1) - Real-time and Idempotent
+ * This function now uses a transaction to ensure a notification is sent only once.
  */
 export const onAlertCreated = functions.firestore
     .document('clubs/{clubId}/teams/{teamId}/alerts/{alertId}')
     .onCreate(async (snapshot, context) => {
-        const alertData = snapshot.data();
-        if (!alertData) return null;
-
-        const { clubId, teamId } = context.params;
+        const alertRef = snapshot.ref;
+        console.log(`[onAlertCreated] Triggered for alert: ${alertRef.id}`);
 
         try {
-            // This query now also finds 'responsible' users who belong to the club but might not have a specific teamId
-            const staffQuery = admin.firestore().collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
-            const responsibleQuery = admin.firestore().collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
+            let shouldSend = false;
+            const alertData = snapshot.data() as Alert;
 
-            const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
-            
-            const tokenSet = new Set<string>();
-            
-            const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
-                 for (const doc of snap.docs) {
-                    const tokens = await getTokensForUser(doc.id);
-                    tokens.forEach(t => {
-                        if (t && t.trim() !== "") {
-                            tokenSet.add(t);
+            // STAP 1: De transactie is alleen voor de "lock"
+            await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(alertRef);
+                const data = doc.data();
+                if (data && data.notificationStatus !== 'sent') {
+                    console.log(`[onAlertCreated] Lock acquired for alert ${alertRef.id}. Setting status to 'sent'.`);
+                    transaction.update(alertRef, { notificationStatus: 'sent' });
+                    shouldSend = true; 
+                } else {
+                    console.log(`[onAlertCreated] Notification for ${alertRef.id} already processed or data missing.`);
+                }
+            });
+
+            // STAP 2: Buiten de transactie doen we het zware werk
+            if (shouldSend) {
+                console.log(`[onAlertCreated] Preparing to send notification for alert ${alertRef.id}.`);
+                const { clubId, teamId } = context.params;
+
+                const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
+                const responsibleQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
+                const [staffSnap, responsibleSnap] = await Promise.all([staffQuery.get(), responsibleQuery.get()]);
+                
+                const tokenSet = new Set<string>();
+                const userIdsToNotify = new Set<string>();
+
+                const processSnapshot = async (snap: FirebaseFirestore.QuerySnapshot) => {
+                     for (const userDoc of snap.docs) {
+                        userIdsToNotify.add(userDoc.id);
+                        const tokens = await getTokensForUser(userDoc.id);
+                        tokens.forEach(t => {
+                            if (t && t.trim() !== "") {
+                                tokenSet.add(t);
+                            }
+                        });
+                    }
+                }
+                
+                await processSnapshot(staffSnap);
+                await processSnapshot(responsibleSnap);
+               
+                const tokensToSend = Array.from(tokenSet);
+                console.log(`[onAlertCreated] Found ${tokensToSend.length} tokens for users:`, Array.from(userIdsToNotify));
+
+                if (tokensToSend.length > 0) {
+                     const notificationPayload = {
+                        notification: {
+                            title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
+                            body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
+                        },
+                        data: {
+                            link: "/alerts",
+                            type: "ALERT",
+                            alertId: context.params.alertId
+                        },
+                         webpush: {
+                            notification: { badge: "1" },
+                            fcmOptions: { link: "/alerts" }
                         }
-                    });
+                    };
+                    
+                    const response = await admin.messaging().sendEachForMulticast({ tokens: tokensToSend, ...notificationPayload });
+                    console.log(`[onAlertCreated] ✅ FCM response: ${response.successCount} success, ${response.failureCount} failure.`);
+                } else {
+                    console.log(`[onAlertCreated] No tokens found for relevant staff/responsible users.`);
                 }
             }
-            
-            await processSnapshot(staffSnap);
-            await processSnapshot(responsibleSnap);
-           
-            const uniqueTokens = Array.from(tokenSet);
 
-            if (uniqueTokens.length > 0) {
-                const message = {
-                    tokens: uniqueTokens,
-                    notification: {
-                        title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
-                        body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
-                    },
-                    data: {
-                        click_action: "FLUTTER_NOTIFICATION_CLICK",
-                        type: "ALERT",
-                        alertId: context.params.alertId
-                    }
-                };
-                const response = await admin.messaging().sendEachForMulticast(message);
-                console.log(`✅ Alert verstuurd naar ${response.successCount} unieke apparaten.`);
-
-                // Bonus: Clean up invalid tokens
-                response.responses.forEach((resp, idx) => {
-                    if (!resp.success && resp.error) {
-                        const errorCode = resp.error.code;
-                        if (errorCode === 'messaging/registration-token-not-registered' || 
-                            errorCode === 'messaging/invalid-registration-token') {
-                            const invalidToken = uniqueTokens[idx];
-                            console.log(`🧹 Verlopen token gedetecteerd: ${invalidToken}. Deze moet worden verwijderd.`);
-                            // Optional: Add logic here to delete the token from Firestore.
-                        }
-                    }
-                });
-            }
-            return null;
         } catch (error) {
-            console.error("❌ Alert Notification Error", error);
-            return null;
+            console.error(`[onAlertCreated] ❌ Transaction or send failed for alert ${alertRef.id}:`, error);
         }
     });
 
 /**
- * HELPER: Tokens ophalen
+ * HELPER: Fetches all valid FCM tokens for a user from their subcollection.
  */
 async function getTokensForUser(userId: string): Promise<string[]> {
     const snap = await admin.firestore().collection('users').doc(userId).collection('fcmTokens').get();
+    if (snap.empty) {
+        return [];
+    }
     return snap.docs.map(doc => doc.id);
 }
 
