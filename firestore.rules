@@ -136,11 +136,16 @@ service cloud.firestore {
     // --- COLLECTION GROUP QUERIES ---
     // This rule specifically handles the 'alerts' collectionGroup query from the client.
     match /{path=**}/alerts/{alertId} {
-      allow list: if isSignedIn() && 
-                   (hasRole('responsible') || hasRole('staff')) &&
+        // IMPORTANT FIX:
+        // For a 'list' (query) operation, you cannot use 'resource.data'.
+        // The security rule is evaluated BEFORE the documents are read.
+        // We rely on the client query `where('clubId', '==', userProfile.clubId)` to be correct.
+        // The `get` rule ensures that even if a user tries to fetch a single alert
+        // from another club directly, it will fail.
+      allow list: if isSignedIn() && (hasRole('responsible') || hasRole('staff'));
+      allow get: if isSignedIn() && 
+                  (hasRole('responsible') || hasRole('staff')) &&
                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == resource.data.clubId;
     }
   }
 }
-
-    

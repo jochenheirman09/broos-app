@@ -208,13 +208,6 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
 
   useEffect(() => {
     const fetchAlertsAndPlayers = async () => {
-      console.log("[AlertList] useEffect triggered. Status:", {
-        dbExists: !!db,
-        profileExists: !!userProfile,
-        clubId: userProfile?.clubId,
-        role: userProfile?.role,
-      });
-
       if (!db || !userProfile?.clubId || !userProfile?.role) {
         setIsLoading(true);
         return;
@@ -229,38 +222,30 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
             const alertsCollection = collectionGroup(db, 'alerts');
             let alertsQuery;
 
-            console.log(`[AlertList] Building query for role: ${role}`);
-
             if (role === 'responsible') {
                 alertsQuery = query(
                     alertsCollection,
                     where('clubId', '==', clubId),
                     orderBy('createdAt', 'desc')
                 );
-                console.log(`[AlertList] Responsible query created for clubId: ${clubId}`);
             } else if (role === 'staff' && teamId) {
                alertsQuery = query(
                     alertsCollection,
                     where('clubId', '==', clubId),
                     where('teamId', '==', teamId),
-                    // Staff canNOT see 'Request for Contact' alerts
                     where('alertType', '!=', 'Request for Contact'),
-                    orderBy('alertType'), // Required for the inequality filter
+                    orderBy('alertType'),
                     orderBy('createdAt', 'desc')
                 );
-                console.log(`[AlertList] Staff query created for clubId: ${clubId}, teamId: ${teamId}`);
             }
             
             if (!alertsQuery) {
-              console.log("[AlertList] No valid query could be constructed. Aborting fetch.");
               setAlerts([]);
               setIsLoading(false);
               return;
             }
             
-            console.log("[AlertList] Executing alerts query...");
             const alertsSnapshot = await getDocs(alertsQuery);
-            console.log(`[AlertList] Query executed. Found ${alertsSnapshot.size} total alerts.`);
             
             const allAlerts = alertsSnapshot.docs.map(doc => ({ ...doc.data() as AlertType, id: doc.id }));
 
@@ -270,13 +255,11 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
               return true; 
             });
 
-            console.log(`[AlertList] Filtered to ${filteredAlerts.length} alerts for status: '${status}'.`);
             setAlerts(limit ? filteredAlerts.slice(0, limit) : filteredAlerts);
             
             const userIdsToFetch = [...new Set(filteredAlerts.map(a => a.userId))];
             const teamIdsToFetch = [...new Set(filteredAlerts.map(a => a.teamId))];
             
-            console.log(`[AlertList] Fetching details for ${userIdsToFetch.length} users and ${teamIdsToFetch.length} teams.`);
             const playersMap = new Map<string, WithId<UserProfile>>();
             const teamsMap = new Map<string, WithId<Team>>();
 
@@ -321,27 +304,22 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
         return [];
     }
 
-    // Map: teamId -> Map<compositePlayerKey, PlayerAlertGroup>
     const teamPlayerMap = new Map<string, Map<string, PlayerAlertGroup>>();
 
     for (const alert of alerts) {
         const teamId = alert.teamId;
         const playerId = alert.userId;
         
-        // An alert is considered 'identified' if consent is given OR it's a request for contact.
         const isIdentified = !!alert.shareWithStaff || alert.alertType === 'Request for Contact';
         const isAnonymous = !isIdentified;
 
-        // Use a composite key to distinguish between anonymous and identified alerts for the SAME player.
         const compositePlayerKey = `${playerId}-${isAnonymous}`;
 
-        // Ensure team exists in map
         if (!teamPlayerMap.has(teamId)) {
             teamPlayerMap.set(teamId, new Map());
         }
         const playerMap = teamPlayerMap.get(teamId)!;
         
-        // Ensure player group (anonymous or identified) exists in map
         if (!playerMap.has(compositePlayerKey)) {
             const playerProfile = players.get(playerId);
             if (playerProfile) {
@@ -353,19 +331,18 @@ export function AlertList({ status = 'new', limit }: { status?: 'new' | 'archive
             }
         }
 
-        // Add alert to the correct player group
         const playerGroup = playerMap.get(compositePlayerKey);
         if (playerGroup) {
             playerGroup.alerts.push(alert);
         }
     }
     
-    // Convert maps to sorted arrays for rendering
     return Array.from(teamPlayerMap.entries()).map(([teamId, playerMap]) => {
         const team = teams.get(teamId)!;
         const playerGroups = Array.from(playerMap.values()).sort((a, b) => b.alerts.length - a.alerts.length);
         return { team, players: playerGroups };
-    }).sort((a, b) => a.team.name.localeCompare(b.team.name));
+    }).filter(group => group.team)
+      .sort((a, b) => a.team.name.localeCompare(b.team.name));
 
 }, [alerts, players, teams]);
 

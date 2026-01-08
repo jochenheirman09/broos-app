@@ -9,7 +9,8 @@ import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Users, Activity, HeartPulse, AlertTriangle } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { NotificationBadge } from "./notification-badge";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   'Team Performance': <Activity className="h-5 w-5 text-primary" />,
@@ -18,10 +19,11 @@ const categoryIcons: { [key: string]: React.ReactNode } = {
   default: <Users className="h-5 w-5 text-primary" />,
 };
 
-function TeamUpdates({ teamId, teamName, clubId, status }: { teamId: string, teamName: string, clubId: string, status: 'new' | 'archived' }) {
+function TeamUpdates({ teamId, teamName, clubId, status, showDateInHeader }: { teamId: string, teamName: string, clubId: string, status: 'new' | 'archived', showDateInHeader?: boolean }) {
   const db = useFirestore();
 
   const updatesQuery = useMemoFirebase(() => {
+    if (!db || !clubId || !teamId) return null;
     return query(
       collection(db, `clubs/${clubId}/teams/${teamId}/staffUpdates`),
       orderBy("date", "desc"),
@@ -37,6 +39,12 @@ function TeamUpdates({ teamId, teamName, clubId, status }: { teamId: string, tea
     const latestDate = allUpdates[0].date;
     return allUpdates.filter(update => update.date === latestDate);
   }, [allUpdates, status]);
+  
+  const latestUpdateDate = useMemo(() => {
+    if (!updates || updates.length === 0) return null;
+    // Ensure date string is parsed correctly to avoid timezone issues
+    return format(new Date(updates[0].date + 'T00:00:00'), 'dd MMM yyyy', { locale: nl });
+  }, [updates]);
 
 
   if (isLoading) {
@@ -60,7 +68,14 @@ function TeamUpdates({ teamId, teamName, clubId, status }: { teamId: string, tea
 
   return (
     <div className="mb-6 last:mb-0">
-      <h3 className="font-bold text-lg mb-3">{teamName}</h3>
+      <div className="flex justify-between items-baseline mb-3">
+        <h3 className="font-bold text-lg">{teamName}</h3>
+        {showDateInHeader && latestUpdateDate && (
+          <p className="text-sm text-muted-foreground">
+            {latestUpdateDate}
+          </p>
+        )}
+      </div>
       <div className="space-y-4">
         {updates.map((update) => (
           <div key={update.id} className="p-4 rounded-xl bg-card/50 flex gap-4 items-start shadow-clay-card">
@@ -78,7 +93,7 @@ function TeamUpdates({ teamId, teamName, clubId, status }: { teamId: string, tea
   );
 }
 
-export function StaffUpdates({ clubId, teamId, status = 'new' }: { clubId: string, teamId?: string, status?: 'new' | 'archived' }) {
+export function StaffUpdates({ clubId, teamId, status = 'new', showDateInHeader = false }: { clubId: string, teamId?: string, status?: 'new' | 'archived', showDateInHeader?: boolean }) {
   const { userProfile, loading: userLoading } = useUser();
   const db = useFirestore();
   const [teams, setTeams] = useState<WithId<Team>[]>([]);
@@ -86,8 +101,7 @@ export function StaffUpdates({ clubId, teamId, status = 'new' }: { clubId: strin
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (userLoading) return;
-    if (!userProfile || !db) {
+    if (userLoading || !userProfile || !db) {
         setIsLoading(false);
         return;
     }
@@ -160,7 +174,7 @@ export function StaffUpdates({ clubId, teamId, status = 'new' }: { clubId: strin
   return (
     <div className="space-y-6">
       {teams.map((team) => (
-        <TeamUpdates key={team.id} teamId={team.id} teamName={team.name} clubId={clubId} status={status} />
+        <TeamUpdates key={team.id} teamId={team.id} teamName={team.name} clubId={clubId} status={status} showDateInHeader={showDateInHeader} />
       ))}
     </div>
   );

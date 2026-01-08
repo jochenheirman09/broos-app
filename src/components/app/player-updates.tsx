@@ -9,6 +9,8 @@ import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Info, Sparkles, Lightbulb, BrainCircuit } from "lucide-react";
 import { useMemo } from "react";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   Sleep: <Lightbulb className="h-5 w-5 text-primary" />,
@@ -19,12 +21,13 @@ const categoryIcons: { [key: string]: React.ReactNode } = {
   default: <Info className="h-5 w-5 text-primary" />,
 };
 
-export function PlayerUpdates({ status = 'new' }: { status?: 'new' | 'archived' }) {
+export function PlayerUpdates({ status = 'new', showDateInHeader = false }: { status?: 'new' | 'archived', showDateInHeader?: boolean }) {
   const { user } = useUser();
   const db = useFirestore();
 
+  // Guarded query
   const updatesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user) return null; // Wait for user
     return query(
       collection(db, `users/${user.uid}/updates`),
       orderBy("date", "desc"),
@@ -46,6 +49,11 @@ export function PlayerUpdates({ status = 'new' }: { status?: 'new' | 'archived' 
     const latestDate = allUpdates[0].date;
     return allUpdates.filter(update => update.date === latestDate);
   }, [allUpdates, status]);
+  
+  const latestUpdateDate = useMemo(() => {
+    if (!updates || updates.length === 0) return null;
+    return format(new Date(updates[0].date + 'T00:00:00'), 'dd MMM yyyy', { locale: nl });
+  }, [updates]);
 
 
   if (isLoading) {
@@ -84,6 +92,11 @@ export function PlayerUpdates({ status = 'new' }: { status?: 'new' | 'archived' 
 
   return (
     <div className="space-y-4">
+      {showDateInHeader && latestUpdateDate && (
+        <p className="text-sm text-muted-foreground">
+          Laatst bijgewerkt op: {latestUpdateDate}
+        </p>
+      )}
       {updates.map((update) => (
         <div key={update.id} className="p-4 rounded-xl bg-card/50 flex gap-4 items-start shadow-clay-card">
           <div className="mt-1">

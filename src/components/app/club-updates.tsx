@@ -3,12 +3,14 @@
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { useUser } from "@/context/user-context";
-import { collection, query, orderBy, limit, Timestamp, where } from "firebase/firestore";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 import type { ClubUpdate } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { TrendingUp, BarChart3, Building } from "lucide-react";
 import { useMemo } from "react";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 
 const categoryIcons: { [key: string]: React.ReactNode } = {
   'Club Trends': <TrendingUp className="h-5 w-5 text-primary" />,
@@ -17,12 +19,12 @@ const categoryIcons: { [key: string]: React.ReactNode } = {
   default: <Building className="h-5 w-5 text-primary" />,
 };
 
-export function ClubUpdates({ clubId, status = 'new' }: { clubId: string, status?: 'new' | 'archived' }) {
+export function ClubUpdates({ clubId, status = 'new', showDateInHeader = false }: { clubId: string, status?: 'new' | 'archived', showDateInHeader?: boolean }) {
   const { user } = useUser();
   const db = useFirestore();
 
   const updatesQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !clubId) return null;
     return query(
       collection(db, `clubs/${clubId}/clubUpdates`),
       orderBy("date", "desc"),
@@ -40,11 +42,14 @@ export function ClubUpdates({ clubId, status = 'new' }: { clubId: string, status
     if (!allUpdates || allUpdates.length === 0) return [];
     if (status === 'archived') return allUpdates;
 
-    // Only show updates from the most recent day on the dashboard
     const latestDate = allUpdates[0].date;
     return allUpdates.filter(update => update.date === latestDate);
   }, [allUpdates, status]);
 
+  const latestUpdateDate = useMemo(() => {
+    if (!updates || updates.length === 0) return null;
+    return format(new Date(updates[0].date + 'T00:00:00'), 'dd MMM yyyy', { locale: nl });
+  }, [updates]);
 
   if (isLoading) {
     return (
@@ -82,6 +87,11 @@ export function ClubUpdates({ clubId, status = 'new' }: { clubId: string, status
 
   return (
     <div className="space-y-4">
+       {showDateInHeader && latestUpdateDate && (
+        <p className="text-sm text-muted-foreground">
+          Laatst bijgewerkt op: {latestUpdateDate}
+        </p>
+      )}
       {updates.map((update) => (
         <div key={update.id} className="p-4 rounded-xl bg-card/50 flex gap-4 items-start shadow-clay-card">
           <div className="mt-1">

@@ -103,7 +103,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <main className="flex-1">
+      <main className="container mx-auto flex-1 py-8">
           {children}
       </main>
       <Toaster />

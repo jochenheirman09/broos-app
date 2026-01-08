@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -71,16 +70,15 @@ export function ExistingChatsList() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   
-  // AANGEPAST: De query leest nu de veilige, gedenormaliseerde subcollectie.
+  // Guarded query
   const myChatsQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user) return null; // Wait for user to be available
     return query(
       collection(db, "users", user.uid, "myChats"),
       orderBy("lastMessageTimestamp", "desc")
     );
   }, [user, db]);
 
-  // We gebruiken MyChat, wat een kopie is van Conversation
   const { data: chats, isLoading, error } = useCollection<MyChat>(myChatsQuery);
   
   if (isUserLoading || isLoading) {
@@ -113,5 +111,3 @@ export function ExistingChatsList() {
     </div>
   );
 }
-
-    

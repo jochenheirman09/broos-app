@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { User as FirebaseUser } from "firebase/auth";
+import { User as FirebaseUser, getIdTokenResult } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { useRouter, usePathname } from "next/navigation";
 import {
@@ -54,8 +54,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
-
-  // Get the token refresh function from our custom hook.
   const { requestPermission: refreshToken } = useRequestNotificationPermission();
 
   const userDocRef = useMemoFirebase(
@@ -74,12 +72,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const syncClaims = async () => {
       if (user) {
         try {
-          await user.getIdToken(true);
-          console.log("[UserProvider] Token refreshed in background.");
+          // Force refresh the ID token to get the latest custom claims
+          const tokenResult = await getIdTokenResult(user, true);
+          console.log("[UserProvider] Token refreshed. Claims:", tokenResult.claims);
           setClaimsReady(true);
         } catch (error) {
            console.error("[UserProvider] Failed to refresh token:", error);
-           setClaimsReady(true);
+           setClaimsReady(true); // Proceed even if refresh fails, might be offline
         }
       }
     };
@@ -87,26 +86,19 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     if (!isAuthLoading && user) {
       syncClaims();
     } else if (!isAuthLoading && !user) {
-      setClaimsReady(true);
+      setClaimsReady(true); // No user, so no claims to wait for
     }
   }, [user, isAuthLoading]);
 
   // Effect to silently update the FCM token on app load if permission is granted.
   useEffect(() => {
     const autoRefreshToken = async () => {
-      // Wait for user profile and ensure we are in a browser
       if (!userProfile?.uid || typeof window === 'undefined') return;
 
       if ('serviceWorker' in navigator) {
         try {
-          // Wait for the Service Worker to be ready
           await navigator.serviceWorker.ready;
-          
-          // Small delay (500ms) to ensure everything is stable
           setTimeout(() => {
-            // The refreshToken function (from useRequestNotificationPermission)
-            // now handles the logic of checking permission and getting the token.
-            // Pass `true` to indicate a silent refresh.
             console.log('[UserProvider] Attempting to silently update FCM token.');
             refreshToken(true); 
           }, 500); 
@@ -121,19 +113,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   }, [userProfile?.uid, refreshToken]);
 
 
-  const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady || !!profileError));
+  const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));
 
   useEffect(() => {
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/' || pathname.startsWith('/verify-email');
 
     if (!user) {
-      if (!isAuthPage) {
-        router.replace("/login");
-      }
+      if (!isAuthPage) router.replace("/login");
       return;
     }
 
@@ -142,9 +130,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     if (!user.emailVerified) {
-      if (pathname !== '/verify-email') {
-        router.replace("/verify-email");
-      }
+      if (pathname !== '/verify-email') router.replace("/verify-email");
       return;
     }
 
@@ -181,8 +167,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     forceRefetch();
   }, [forceRefetch]);
 
-
-  if (loading) {
+  if (loading || isLoggingOut) {
     return <LoadingScreen />;
   }
 

@@ -24,14 +24,14 @@ export default function ClubUpdatesArchivePage() {
 
     if (userProfile?.role !== 'responsible') {
         return (
-            <div className="container mx-auto py-8">
+            <div className="space-y-6">
                 <p>Geen toegang.</p>
             </div>
         )
     }
 
     return (
-        <div className="container mx-auto py-8">
+        <div className="space-y-6">
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

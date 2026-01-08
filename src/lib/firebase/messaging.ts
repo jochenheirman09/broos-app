@@ -31,7 +31,6 @@ export const useRequestNotificationPermission = () => {
         let currentPermission = Notification.permission;
         console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
-        // Only actively ask for permission if it's a manual click and permission is not yet granted/denied.
         if (isManualAction && currentPermission === 'default') {
             console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
@@ -42,7 +41,6 @@ export const useRequestNotificationPermission = () => {
             console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
             
             try {
-                // Fetch the VAPID key from our secure API route.
                 const response = await fetch('/api/fcm-vapid-key');
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -59,7 +57,6 @@ export const useRequestNotificationPermission = () => {
 
                 const messaging = getMessaging(app);
                 console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
-                // Let Firebase SDK handle finding the service worker at '/sw.js' (the PWA worker)
                 const serviceWorkerRegistration = await navigator.serviceWorker.ready;
                 console.log(`${logPrefix} Service Worker is ready. Using it for token retrieval.`);
                 const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
@@ -83,7 +80,7 @@ export const useRequestNotificationPermission = () => {
                 }
             } catch (err: any) {
                 console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
-                throw err; // Re-throw to be caught by the UI
+                throw err;
             }
         } else {
             console.log(`${logPrefix} Permission to notify was not granted ('${currentPermission}').`);

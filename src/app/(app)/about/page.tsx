@@ -64,7 +64,7 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
            <div className="relative flex w-full justify-center items-center">

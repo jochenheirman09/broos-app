@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -22,7 +23,7 @@ export default function P2PChatOverviewPage() {
   const isPlayer = userProfile?.role === 'player';
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="space-y-6">
       <RequestNotificationPermission />
       <Card>
         <CardHeader>

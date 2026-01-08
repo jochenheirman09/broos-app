@@ -99,12 +99,13 @@ const CustomYAxisTick = (props: any) => {
 
 
 export function WellnessChart() {
-  const { user } = useUser();
+  const { user, userProfile } = useUser();
   const db = useFirestore();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+  // Guarded query
   const scoresQuery = useMemoFirebase(() => {
-    if (!user || !db) return null;
+    if (!user) return null; // Wait for user
     return query(
       collection(db, `users/${user.uid}/wellnessScores`),
       orderBy("date", "desc"),
@@ -190,7 +191,7 @@ export function WellnessChart() {
         <TrendingUp className="h-4 w-4" />
         <AlertTitle>Nog geen scores ingevuld</AlertTitle>
         <AlertDescription>
-          Praat met {user?.displayName ? ` ${user.displayName.split(' ')[0]}` : 'je buddy'} om je dashboard te vullen!
+          Praat met {userProfile?.buddyName || 'je buddy'} om je dashboard te vullen!
         </AlertDescription>
       </Alert>
     );

@@ -35,7 +35,7 @@ function P2PChatLoader({ chatId }: { chatId: string }) {
   
   if (chatError) {
     return (
-      <div className="container mx-auto py-8">
+      <div className="space-y-6">
         <Alert variant="destructive">
           <User className="h-4 w-4" /><AlertTitle>Fout</AlertTitle><AlertDescription>Kon de chatgegevens niet laden.</AlertDescription>
         </Alert>
@@ -45,7 +45,7 @@ function P2PChatLoader({ chatId }: { chatId: string }) {
 
   if (!chatData || !user || !chatData.participants.includes(user.uid)) {
        return (
-            <div className="container mx-auto py-8">
+            <div className="space-y-6">
                 <Alert variant="destructive">
                 <ShieldX className="h-4 w-4" /><AlertTitle>Geen Toegang</AlertTitle><AlertDescription>Je hebt geen toegang tot dit gesprek.</AlertDescription>
                 </Alert>

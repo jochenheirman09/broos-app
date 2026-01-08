@@ -21,6 +21,7 @@ import {
 import { EditTeamDialog } from "./edit-team-dialog";
 import { DeleteTeamDialog } from "./delete-team-dialog";
 import Link from "next/link";
+import { useUser } from "@/context/user-context";
 
 function TeamCard({
   clubId,
@@ -175,14 +176,15 @@ export function TeamList({
   onTeamChange: () => void;
 }) {
   const firestore = useFirestore();
+  const { userProfile } = useUser();
   
   // Defensive check: only create the query if clubId is valid.
   const teamsQuery = useMemoFirebase(
     () =>
-      firestore && clubId
+      firestore && clubId && userProfile?.role === 'responsible'
         ? query(collection(firestore, "clubs", clubId, "teams"), orderBy("name"))
         : null,
-    [firestore, clubId]
+    [firestore, clubId, userProfile]
   );
   const { data: teams, isLoading, error } = useCollection<Team>(teamsQuery);
 

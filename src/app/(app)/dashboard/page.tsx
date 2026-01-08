@@ -28,7 +28,7 @@ export default function DashboardPage() {
   
   console.log('[DashboardPage] Rendering DashboardContent.');
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <div className="space-y-6">
       <RequestNotificationPermission />
       <DashboardContent />
     </div>

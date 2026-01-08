@@ -8,7 +8,7 @@ import { ThemeToggle } from "../theme-toggle";
 import { Logo } from "./logo";
 import { Wordmark } from "./wordmark";
 import Link from "next/link";
-import { User, Info, AlertTriangle } from "lucide-react";
+import { User, Info } from "lucide-react";
 import { useState } from "react";
 import { ProfileSheet } from "./profile-sheet";
 
@@ -27,13 +27,11 @@ export function AppHeader() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-20 items-center">
-          <div className="mr-auto flex items-center space-x-3">
-            <Link href="/dashboard" className="flex items-center space-x-3">
-              <Logo />
-              <Wordmark>Broos 2.0</Wordmark>
-            </Link>
-          </div>
+        <div className="container mx-auto flex h-20 items-center justify-between px-4">
+          <Link href="/dashboard" className="flex items-center space-x-3">
+            <Logo />
+            <Wordmark>Broos 2.0</Wordmark>
+          </Link>
           <div className="flex items-center space-x-2">
             <ThemeToggle />
             <Link href="/about">
@@ -45,12 +43,12 @@ export function AppHeader() {
             {userProfile && (
               <Button
                 variant="ghost"
-                className="relative h-12 w-12 rounded-full"
+                className="relative h-11 w-11 rounded-full"
                 onClick={() => setIsProfileSheetOpen(true)}
               >
-                <Avatar className="h-12 w-12 border-2 border-primary/50">
+                <Avatar className="h-11 w-11 border-2 border-primary/50">
                   <AvatarImage src={userProfile.photoURL} />
-                  <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                  <AvatarFallback className="bg-primary/20 text-primary font-bold text-sm">
                     {userProfile.name ? (
                       getInitials(userProfile.name)
                     ) : (

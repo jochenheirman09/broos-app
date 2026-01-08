@@ -157,8 +157,8 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-        <Card className="h-[calc(100vh-10rem)] flex flex-col">
+    <div className="space-y-6">
+        <Card className="h-[calc(100vh-18rem)] flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center text-2xl">
               <MessageSquare className="h-6 w-6 mr-3" />

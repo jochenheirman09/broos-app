@@ -169,8 +169,8 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     }
 
   return (
-    <div className="container mx-auto py-8">
-      <Card className="h-[calc(100vh-10rem)] flex flex-col">
+    <div className="space-y-6">
+      <Card className="h-[calc(100vh-18rem)] flex flex-col">
         <CardHeader className="flex-row items-center gap-4">
           <Link href="/p2p-chat" passHref>
              <Button variant="ghost" size="icon" className="h-8 w-8">

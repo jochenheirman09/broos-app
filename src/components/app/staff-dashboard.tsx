@@ -16,44 +16,13 @@ import { AlertList } from "./alert-list";
 import Link from "next/link";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
-import { useMemo } from "react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, collectionGroup } from "firebase/firestore";
-import type { MyChat } from "@/lib/types";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 import { NotificationBadge } from "./notification-badge";
 
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
-  const { user, userProfile, loading } = useUser();
-  const db = useFirestore();
+  const { userProfile, loading } = useUser();
   const teamId = userProfile?.teamId;
-
-  // Query for P2P Chat unread messages
-  const myChatsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(collection(db, "users", user.uid, "myChats"));
-  }, [user, db]);
-
-  // Query for new alerts
-  const newAlertsQuery = useMemoFirebase(() => {
-    if (!userProfile?.clubId || !userProfile.teamId) return null;
-    return query(
-      collectionGroup(db, 'alerts'),
-      where('clubId', '==', userProfile.clubId),
-      where('teamId', '==', userProfile.teamId),
-      where('status', '==', 'new'),
-      where('alertType', '!=', 'Request for Contact'),
-    );
-  }, [db, userProfile]);
-
-  // Query for new staff updates
-  const newStaffUpdatesQuery = useMemoFirebase(() => {
-    if (!userProfile?.clubId || !userProfile.teamId) return null;
-    return query(
-        collection(db, `clubs/${userProfile.clubId}/teams/${userProfile.teamId}/staffUpdates`),
-    );
-  }, [db, userProfile]);
 
   if (loading) {
     return <div className="flex justify-center items-center h-64"><Spinner /></div>;
@@ -77,8 +46,6 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
     )
   }
 
-  const claimsReady = !!(userProfile && userProfile.role && userProfile.clubId && userProfile.teamId);
-
   return (
     <div className="space-y-6">
       <Card>
@@ -91,16 +58,16 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
                   </CardDescription>
               </div>
               <Link href="/archive/staff-updates" passHref>
-                  <Button variant="secondary" size="sm" className="flex items-center">
+                  <Button variant="secondary" size="sm" className="flex items-center relative">
                       <Archive className="mr-2 h-4 w-4" />
                       Bekijk Archief
-                      <NotificationBadge query={newStaffUpdatesQuery} />
+                      <NotificationBadge type="staffUpdates" />
                   </Button>
               </Link>
             </div>
         </CardHeader>
         <CardContent>
-          <StaffUpdates clubId={clubId} teamId={teamId} status="new" />
+          <StaffUpdates clubId={clubId} teamId={teamId} status="new" showDateInHeader={true} />
         </CardContent>
       </Card>
 
@@ -117,19 +84,15 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
                 </CardDescription>
               </div>
               <Link href="/alerts" passHref>
-                <Button variant="outline" className="w-full sm:w-auto flex items-center">
+                <Button variant="outline" className="w-full sm:w-auto flex items-center relative">
                     Bekijk Alle Alerts
-                    <NotificationBadge query={newAlertsQuery} />
+                    <NotificationBadge type="alerts" status="new" />
                 </Button>
               </Link>
           </div>
         </CardHeader>
         <CardContent>
-           {claimsReady ? (
-                <AlertList status="new" limit={5} />
-            ) : (
-                <div className="flex justify-center items-center h-20"><Spinner /></div>
-            )}
+            <AlertList status="new" limit={5} />
         </CardContent>
       </Card>
       
@@ -145,10 +108,10 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
         </CardHeader>
         <CardContent>
             <Link href="/p2p-chat" passHref>
-                <Button className="flex items-center">
+                <Button className="flex items-center relative">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Open Team Chat
-                    <NotificationBadge query={myChatsQuery} countField="unreadCounts" />
+                    <NotificationBadge type="messages" />
                 </Button>
             </Link>
         </CardContent>

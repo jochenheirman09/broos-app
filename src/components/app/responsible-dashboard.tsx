@@ -1,10 +1,6 @@
 
 "use client";
 
-import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
-import { doc, collection, query, collectionGroup, where } from "firebase/firestore";
-import type { Club, Team, MyChat } from "@/lib/types";
-import { Spinner } from "../ui/spinner";
 import {
   Card,
   CardContent,
@@ -15,11 +11,10 @@ import {
 import { Building, BookOpen, Users, AlertTriangle, Archive, MessageSquare } from "lucide-react";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
 import { Button } from "../ui/button";
 import Link from "next/link";
-import { useUser } from "@/context/user-context";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { AlertList } from "./alert-list";
@@ -27,40 +22,16 @@ import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 import { NotificationBadge } from "./notification-badge";
+import { useUser } from "@/context/user-context";
 
 
 function ClubManagement({ clubId }: { clubId: string }) {
-  const { userProfile, user } = useUser();
-  const db = useFirestore();
+  const { userProfile } = useUser();
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleTeamChange = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
   }, []);
-
-  const claimsReady = !!(userProfile && userProfile.role && userProfile.clubId);
-
-  // Queries for Notification Badges
-  const myChatsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(collection(db, "users", user.uid, "myChats"));
-  }, [user, db]);
-
-  const newAlertsQuery = useMemoFirebase(() => {
-    if (!clubId) return null;
-    return query(collectionGroup(db, 'alerts'), where('clubId', '==', clubId), where('status', '==', 'new'));
-  }, [db, clubId]);
-  
-  const newStaffUpdatesQuery = useMemoFirebase(() => {
-      if (!clubId) return null;
-      return query(collectionGroup(db, 'staffUpdates'), where('clubId', '==', clubId));
-  }, [db, clubId]);
-
-  const newClubUpdatesQuery = useMemoFirebase(() => {
-      if (!clubId) return null;
-      return query(collection(db, `clubs/${clubId}/clubUpdates`));
-  }, [db, clubId]);
-
 
   return (
     <>
@@ -77,16 +48,16 @@ function ClubManagement({ clubId }: { clubId: string }) {
               </CardDescription>
             </div>
              <Link href="/archive/club-updates" passHref>
-                <Button variant="secondary" size="sm" className="flex items-center">
+                <Button variant="secondary" size="sm" className="flex items-center relative">
                     <Archive className="mr-2 h-4 w-4" />
                     Bekijk Archief
-                    <NotificationBadge query={newClubUpdatesQuery} />
+                    <NotificationBadge type="clubUpdates" />
                 </Button>
             </Link>
           </div>
         </CardHeader>
         <CardContent>
-          <ClubUpdates clubId={clubId} status="new" />
+          <ClubUpdates clubId={clubId} status="new" showDateInHeader={true} />
         </CardContent>
       </Card>
 
@@ -100,16 +71,16 @@ function ClubManagement({ clubId }: { clubId: string }) {
                     </CardDescription>
                 </div>
                  <Link href="/archive/staff-updates" passHref>
-                    <Button variant="secondary" size="sm" className="flex items-center">
+                    <Button variant="secondary" size="sm" className="flex items-center relative">
                         <Archive className="mr-2 h-4 w-4" />
                         Bekijk Archief
-                        <NotificationBadge query={newStaffUpdatesQuery} />
+                         {userProfile?.role === 'staff' && <NotificationBadge type="staffUpdates" />}
                     </Button>
                  </Link>
             </div>
         </CardHeader>
         <CardContent>
-          <StaffUpdates clubId={clubId} status="new" />
+          <StaffUpdates clubId={clubId} status="new" showDateInHeader={true} />
         </CardContent>
       </Card>
 
@@ -124,19 +95,15 @@ function ClubManagement({ clubId }: { clubId: string }) {
               </CardTitle>
             </div>
             <Link href="/alerts" passHref>
-              <Button variant="outline" className="w-full sm:w-auto flex items-center">
+              <Button variant="outline" className="w-full sm:w-auto flex items-center relative">
                 Bekijk Alle Alerts
-                <NotificationBadge query={newAlertsQuery} />
+                <NotificationBadge type="alerts" status="new" />
               </Button>
             </Link>
           </div>
         </CardHeader>
         <CardContent>
-          {claimsReady ? (
-              <AlertList status="new" limit={5} />
-          ) : (
-              <div className="flex justify-center items-center h-20"><Spinner /></div>
-          )}
+            <AlertList status="new" limit={5} />
         </CardContent>
       </Card>
       
@@ -152,10 +119,10 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardHeader>
         <CardContent>
             <Link href="/p2p-chat" passHref>
-                <Button className="flex items-center">
+                <Button className="flex items-center relative">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Open Team Chat
-                    <NotificationBadge query={myChatsQuery} countField="unreadCounts" />
+                    <NotificationBadge type="messages" />
                 </Button>
             </Link>
         </CardContent>

@@ -1,4 +1,3 @@
-
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -274,7 +273,3 @@ export interface OnboardingOutput {
   siblings?: { name: string; age?: number }[];
   pets?: { name: string; type: string }[];
 }
-
-    
-
-    

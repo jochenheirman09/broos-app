@@ -62,6 +62,9 @@ function TeamMemberCard({ member }: { member: WithId<UserProfile> }) {
   );
 }
 
+// NOTE: This component is now being used via a server action `getTeamMembers`
+// and no longer directly queries Firestore, which was causing permission issues.
+// The logic remains similar but relies on a secure backend fetch.
 export default function TeamMembersPage({
   params,
 }: {

@@ -18,11 +18,8 @@ import { Button } from "../ui/button";
 import { Logo } from "./logo";
 import { ThemeToggle } from "../theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { ProfileSheet } from "./profile-sheet";
-import { useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query } from "firebase/firestore";
-import { RequestNotificationPermission } from "./request-notification-permission";
 import { NotificationBadge } from "./notification-badge";
 
 const navItems = [
@@ -35,9 +32,8 @@ const navItems = [
 
 export function PlayerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, userProfile } = useUser();
+  const { userProfile } = useUser();
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
-  const db = useFirestore();
 
   const getInitials = (name: string = "") => {
     return name
@@ -47,23 +43,15 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
       .toUpperCase();
   };
   
-  // Query for Team Chat Badge
-  const myChatsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(collection(db, "users", user.uid, "myChats"));
-  }, [user, db]);
-
   return (
     <>
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-20 items-center">
-            <div className="mr-auto flex items-center space-x-3">
-              <Link href="/dashboard" className="flex items-center space-x-3">
-                <Logo />
-                <Wordmark>Broos 2.0</Wordmark>
-              </Link>
-            </div>
+          <div className="container mx-auto flex h-20 items-center justify-between px-4">
+            <Link href="/dashboard" className="flex items-center space-x-3">
+              <Logo />
+              <Wordmark>Broos 2.0</Wordmark>
+            </Link>
             <div className="flex items-center space-x-2">
               <ThemeToggle />
               <Link href="/about">
@@ -94,11 +82,8 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 pb-24">
-           <div className="container mx-auto py-8">
-              <RequestNotificationPermission />
-              {children}
-            </div>
+        <main className="container mx-auto flex-1 py-8 pb-24">
+           {children}
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -118,7 +103,7 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="h-6 w-6" />
                   <span>{label}</span>
-                  {label === 'Team' && <NotificationBadge query={myChatsQuery} countField="unreadCounts" />}
+                  {label === 'Team' && <NotificationBadge type="messages" />}
                 </Link>
               );
             })}
