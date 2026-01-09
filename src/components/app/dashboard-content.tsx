@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
+import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
 export function DashboardContent() {
   const { userProfile, loading } = useUser();
