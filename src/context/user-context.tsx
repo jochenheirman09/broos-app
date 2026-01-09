@@ -97,6 +97,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         const autoRefreshToken = async () => {
             console.log('[UserProvider] autoRefreshToken useEffect triggered on client.');
 
+            // CRITICAL FIX: Do not run this logic until the user profile is actually loaded.
             if (!userProfile?.uid) {
                 console.log(`[UserProvider] autoRefreshToken skipped: No user profile loaded yet.`);
                 return;
@@ -104,10 +105,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
             if ('serviceWorker' in navigator) {
                 try {
+                    // Wait for the Service Worker to be ready to avoid race conditions.
                     await navigator.serviceWorker.ready;
                     console.log('[UserProvider] Service Worker is ready.');
                     
-                    // Small delay to ensure all services are stable.
+                    // Small delay to ensure all Firebase services are stable after initial load.
                     setTimeout(() => {
                         console.log('[UserProvider] Attempting to silently update FCM token.');
                         // Call the hook with `true` to indicate a silent, non-interactive check.
@@ -122,6 +124,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             }
         };
 
+        // This effect will re-run whenever userProfile.uid changes from undefined to a value.
         autoRefreshToken();
     }
   }, [userProfile?.uid, refreshToken]);

@@ -25,7 +25,6 @@ export async function sendNotification(
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
     const message: MulticastMessage = {
-        // Re-added for higher delivery priority, especially on iOS.
         notification: {
             title: title,
             body: body,
@@ -42,7 +41,7 @@ export async function sendNotification(
             payload: {
                 aps: {
                     'content-available': 1,
-                    sound: 'default',
+                    sound: 'default', // Using the default device sound for iOS
                     badge: 1,
                 },
             },
@@ -55,7 +54,9 @@ export async function sendNotification(
                 title: title,
                 body: body,
                 icon: '/icons/icon-192x192.png',
-                tag: id, // Use unique ID to prevent duplicates for the same event
+                badge: '/icons/icon-72x72.png', // A smaller icon for the badge
+                sound: '/sounds/default.mp3', // Path to a default sound file
+                tag: id, 
                 renotify: true,
             },
             fcmOptions: {

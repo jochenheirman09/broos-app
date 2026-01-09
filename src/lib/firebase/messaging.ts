@@ -50,7 +50,9 @@ export const useRequestNotificationPermission = () => {
             console.log(`${logPrefix} Permission request result: '${newPermission}'.`);
             if (newPermission !== 'granted') {
                 console.log(`${logPrefix} Permission to notify was not granted ('${newPermission}').`);
-                toast({ variant: 'destructive', title: 'Permissie geweigerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
+                if (!isSilent) {
+                    toast({ variant: 'destructive', title: 'Permissie geweigerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
+                }
                 return newPermission;
             }
         }
@@ -76,6 +78,7 @@ export const useRequestNotificationPermission = () => {
 
             if (currentToken) {
                 console.log(`${logPrefix} Token retrieved: ${currentToken.substring(0, 20)}...`);
+                // Send the token to your server to be saved
                 const result = await saveFcmToken(user.uid, currentToken);
                 if (result.success) {
                     console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved/synced.`);
