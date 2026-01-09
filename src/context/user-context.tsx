@@ -54,6 +54,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
+  const { requestPermission: refreshToken } = useRequestNotificationPermission();
 
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -88,6 +89,36 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       setClaimsReady(true); // No user, so no claims to wait for
     }
   }, [user, isAuthLoading]);
+
+  // Effect to silently update the FCM token on app load if permission is granted.
+  useEffect(() => {
+    const autoRefreshToken = async () => {
+      // Wait for user profile and ensure we are in a browser
+      if (!userProfile?.uid || typeof window === 'undefined') return;
+
+      if ('serviceWorker' in navigator) {
+        try {
+          // Wait for the Service Worker to be ready
+          await navigator.serviceWorker.ready;
+          
+          // Small delay (500ms) to ensure everything is stable
+          setTimeout(() => {
+            // The refreshToken function (from useRequestNotificationPermission)
+            // now handles the logic of checking permission and getting the token.
+            // Pass `true` to indicate it's a silent, automatic check.
+            console.log('[UserProvider] Attempting to silently update FCM token.');
+            refreshToken(true); 
+          }, 500); 
+
+        } catch (swErr) {
+          console.error("Service Worker not ready for auto-refresh:", swErr);
+        }
+      }
+    };
+
+    autoRefreshToken();
+  }, [userProfile?.uid, refreshToken]);
+
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));
 

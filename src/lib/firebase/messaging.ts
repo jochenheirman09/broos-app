@@ -19,17 +19,25 @@ export const useRequestNotificationPermission = () => {
     const requestPermission = useCallback(async (isSilent = true): Promise<NotificationPermission | "unsupported" | undefined> => {
         const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} |`;
         
+        console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
+
+        if (typeof window === 'undefined') {
+            console.log(`${logPrefix} Aborted: Not in a browser environment.`);
+            return;
+        }
+        
         if (!app || !user) {
             if (!isSilent) console.log(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
             return;
         }
+
         if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-            if (!isSilent) console.log(`${logPrefix} Notifications not supported by this browser.`);
+            if (!isSilent) console.error(`${logPrefix} Notifications not supported by this browser.`);
             return 'unsupported';
         }
         
         const currentPermission = Notification.permission;
-        console.log(`${logPrefix} Current permission state: '${currentPermission}'. Silent mode: ${isSilent}`);
+        console.log(`${logPrefix} Current permission state: '${currentPermission}'.`);
 
         if (currentPermission === 'granted') {
              console.log(`${logPrefix} Permission is already granted. Proceeding to get/refresh token...`);
@@ -57,7 +65,7 @@ export const useRequestNotificationPermission = () => {
             const { vapidKey } = await response.json();
 
             if (!vapidKey) {
-                throw new Error("VAPID key for notifications is missing.");
+                throw new Error("VAPID key for notifications is missing from server response.");
             }
             console.log(`${logPrefix} Successfully fetched VAPID key.`);
 
@@ -78,13 +86,13 @@ export const useRequestNotificationPermission = () => {
                     throw new Error(result.message);
                 }
             } else {
-                console.warn(`${logPrefix} No registration token available. Request permission to generate one.`);
+                console.warn(`${logPrefix} No registration token available. This usually means permission was just denied.`);
                 if (!isSilent) {
                     throw new Error('Kon geen registratietoken genereren. Probeer de pagina te vernieuwen.');
                 }
             }
         } catch (err: any) {
-            console.error(`${logPrefix} CRITICAL ERROR:`, err);
+            console.error(`${logPrefix} CRITICAL ERROR during token process:`, err);
             if (!isSilent) {
                 toast({ variant: 'destructive', title: 'Fout bij instellen notificaties', description: err.message });
             }

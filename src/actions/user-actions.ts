@@ -298,12 +298,14 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
  * exists to avoid unnecessary writes. This is the "Token Sync" best practice.
  */
 export async function saveFcmToken(userId: string, token: string): Promise<{ success: boolean; message: string }> {
+    const logPrefix = `[FCM Token Action] User: ${userId} |`;
+    console.log(`${logPrefix} Server action 'saveFcmToken' invoked with token: ${token.substring(0, 20)}...`);
+
     if (!userId || !token) {
+        console.error(`${logPrefix} Aborted: User ID and token are required.`);
         return { success: false, message: "Gebruikers-ID en token zijn vereist." };
     }
-
-    const logPrefix = `[FCM Token Action] User: ${userId} |`;
-    console.log(`${logPrefix} Syncing token...`);
+    
     const { adminDb } = await getFirebaseAdmin();
     const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
 
@@ -311,7 +313,7 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
         const doc = await tokenRef.get();
         
         if (!doc.exists) {
-            console.log(`${logPrefix} Token not found in DB. Creating new document.`);
+            console.log(`${logPrefix} Token does not exist in DB. Creating new document.`);
             await tokenRef.set({
                 token: token,
                 createdAt: FieldValue.serverTimestamp(),
@@ -321,10 +323,12 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
             console.log(`${logPrefix} Token already exists. Sync complete, no write needed.`);
+            // Optional: update a 'lastSeen' timestamp if you want to prune very old, unused tokens.
+            // await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {
-        console.error(`${logPrefix} Error saving token:`, error);
-        return { success: false, message: error.message || "Failed to save token." };
+        console.error(`${logPrefix} CRITICAL: Error saving token to Firestore:`, error);
+        return { success: false, message: error.message || "Failed to save token to database." };
     }
 }
