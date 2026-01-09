@@ -105,9 +105,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           setTimeout(() => {
             // The refreshToken function (from useRequestNotificationPermission)
             // now handles the logic of checking permission and getting the token.
-            // Pass `true` to indicate it is a silent, automatic action.
+            // Pass `false` to indicate it's not a manual user action.
             console.log('[UserProvider] Attempting to silently update FCM token.');
-            refreshToken(true); 
+            refreshToken(false); 
           }, 500); 
 
         } catch (swErr) {

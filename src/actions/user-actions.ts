@@ -294,31 +294,36 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
 }
 
 /**
- * Saves a user's FCM token to Firestore using the Admin SDK.
- * This is a secure server action.
+ * Saves a user's FCM token to Firestore. It first checks if the token already
+ * exists to avoid unnecessary writes. This is the "Token Sync" best practice.
  */
-export async function saveFcmToken(userId: string, token: string, isManualRefresh: boolean): Promise<{ success: boolean; message: string }> {
+export async function saveFcmToken(userId: string, token: string): Promise<{ success: boolean; message: string }> {
     if (!userId || !token) {
-        console.error("[FCM Token Action] Received invalid parameters.", { userId, token });
         return { success: false, message: "Gebruikers-ID en token zijn vereist." };
     }
 
-    console.log(`[FCM Token Action] SERVER: Saving token for user ${userId}. Manual: ${isManualRefresh}`);
+    console.log(`[FCM Token Action] Syncing token for user ${userId}.`);
     const { adminDb } = await getFirebaseAdmin();
     const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
 
     try {
-        await tokenRef.set({
-            token: token,
-            lastUpdated: FieldValue.serverTimestamp(),
-            platform: 'web',
-            manualRefresh: isManualRefresh
-        }, { merge: true });
-
-        console.log(`[FCM Token Action] SERVER: Successfully saved token for user ${userId}.`);
-        return { success: true, message: "Token successfully saved." };
+        const doc = await tokenRef.get();
+        
+        // Only write to the database if the token is new.
+        if (!doc.exists) {
+            await tokenRef.set({
+                token: token,
+                createdAt: FieldValue.serverTimestamp(),
+                platform: 'web',
+            });
+            console.log(`[FCM Token Action] Successfully saved NEW token for user ${userId}.`);
+            return { success: true, message: "Nieuw token succesvol opgeslagen." };
+        } else {
+            console.log(`[FCM Token Action] Token for user ${userId} already exists. Sync complete.`);
+            return { success: true, message: "Token is al up-to-date." };
+        }
     } catch (error: any) {
-        console.error(`[FCM Token Action] SERVER: Error saving token for user ${userId}:`, error);
+        console.error(`[FCM Token Action] Error saving token for user ${userId}:`, error);
         return { success: false, message: error.message || "Failed to save token." };
     }
 }

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,8 @@ export function NotificationTroubleshooter() {
     const handleManualTokenRefresh = async () => {
         setIsLoading(true);
         try {
-            const newPermission = await requestPermission(true); // true = it's a manual action
+            // Pass false to indicate it's a manual user action, not a silent one.
+            const newPermission = await requestPermission(false); 
             
             if (newPermission) {
                 setPermissionStatus(newPermission);
@@ -82,14 +83,14 @@ export function NotificationTroubleshooter() {
     };
     
     // Periodically check permission status in case it's changed in another tab
-    useState(() => {
+    useEffect(() => {
         const interval = setInterval(() => {
             if ("Notification" in window) {
                 setPermissionStatus(Notification.permission);
             }
         }, 5000);
         return () => clearInterval(interval);
-    });
+    }, []);
 
     if (permissionStatus === 'unsupported' || !user) {
         return null; 

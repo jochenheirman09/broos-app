@@ -47,7 +47,7 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
     <>
       <div className="flex flex-col min-h-screen bg-background">
         <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-20 items-center justify-between">
+          <div className="container mx-auto flex h-20 items-center justify-between px-4">
             <Link href="/dashboard" className="flex items-center space-x-3">
               <Logo />
               <Wordmark>Broos 2.0</Wordmark>
@@ -82,7 +82,7 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="container flex-1 py-8 pb-24">
+        <main className="container flex-1 py-8 pb-24 px-4">
            {children}
         </main>
 

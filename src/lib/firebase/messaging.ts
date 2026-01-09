@@ -1,23 +1,22 @@
 
-'use client';
+"use client";
 
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { useFirebaseApp } from '@/firebase';
-import { useUser } from '@/context/user-context';
-import { useEffect } from 'react';
-import { saveFcmToken } from '@/actions/user-actions';
-
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { useFirebaseApp } from "@/firebase";
+import { useUser } from "@/context/user-context";
+import { useEffect, useCallback } from "react";
+import { saveFcmToken } from "@/actions/user-actions";
 
 /**
  * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
- * This version reads the VAPID key from public environment variables.
+ * This version reads the VAPID key from a secure API route.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { user } = useUser();
 
-    const requestPermission = async (isManualAction = false): Promise<NotificationPermission | 'unsupported' | undefined> => {
-        const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Manual: ${isManualAction} |`;
+    const requestPermission = useCallback(async (isSilentAction = false): Promise<NotificationPermission | "unsupported" | undefined> => {
+        const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Silent: ${isSilentAction} |`;
         
         if (!app || !user) {
             console.log(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
@@ -32,7 +31,7 @@ export const useRequestNotificationPermission = () => {
         console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
         // Only actively ask for permission if the user initiated it and permission is default
-        if (isManualAction && currentPermission === 'default') {
+        if (!isSilentAction && currentPermission === 'default') {
             console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
             console.log(`${logPrefix} Permission request result: '${currentPermission}'.`);
@@ -60,7 +59,6 @@ export const useRequestNotificationPermission = () => {
                 const messaging = getMessaging(app);
                 console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
                 
-                // Ensure the service worker is ready before getting the token
                 const serviceWorkerRegistration = await navigator.serviceWorker.ready;
                 console.log(`${logPrefix} Service Worker is ready. Using it for token retrieval.`);
                 const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
@@ -68,12 +66,11 @@ export const useRequestNotificationPermission = () => {
                 if (currentToken) {
                     console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 20)}...`);
                     
-                    // Call the server action to save the token securely
                     console.log(`${logPrefix} Calling server action to save token.`);
-                    const result = await saveFcmToken(user.uid, currentToken, isManualAction);
+                    const result = await saveFcmToken(user.uid, currentToken);
                     
                     if (result.success) {
-                        console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved.`);
+                        console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved or already existed.`);
                     } else {
                         console.error(`${logPrefix} FAILED: Server action reported an error: ${result.message}`);
                         throw new Error(result.message);
@@ -81,17 +78,21 @@ export const useRequestNotificationPermission = () => {
 
                 } else {
                     console.warn(`${logPrefix} No registration token available. This may happen if the service worker registration fails.`);
-                    throw new Error('Kon geen registratietoken genereren. Controleer de console op service worker-fouten.');
+                    if (!isSilentAction) {
+                        throw new Error('Kon geen registratietoken genereren. Controleer de console op service worker-fouten.');
+                    }
                 }
             } catch (err: any) {
                 console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
-                throw err;
+                if (!isSilentAction) {
+                    throw err; // Re-throw to be caught by UI if it was a manual action
+                }
             }
         } else {
             console.log(`${logPrefix} Permission to notify was not granted ('${currentPermission}').`);
         }
         return currentPermission;
-    };
+    }, [app, user]);
     
     return { requestPermission };
 };
