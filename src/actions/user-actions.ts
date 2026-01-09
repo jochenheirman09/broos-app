@@ -318,13 +318,13 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
                 token: token,
                 createdAt: FieldValue.serverTimestamp(),
                 platform: 'web',
-            });
+            }, { merge: true });
             console.log(`${logPrefix} Successfully saved NEW token.`);
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
             console.log(`${logPrefix} Token already exists. Sync complete, no write needed.`);
             // Optional: update a 'lastSeen' timestamp if you want to prune very old, unused tokens.
-            // await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
+            await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {

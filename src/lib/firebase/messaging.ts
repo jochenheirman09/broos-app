@@ -67,7 +67,7 @@ export const useRequestNotificationPermission = () => {
             if (!vapidKey) {
                 throw new Error("VAPID key for notifications is missing from server response.");
             }
-            console.log(`${logPrefix} Successfully fetched VAPID key.`);
+            console.log(`${logPrefix} Successfully fetched VAPID key: ${vapidKey.substring(0,10)}...`);
 
             const messaging = getMessaging(app);
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;

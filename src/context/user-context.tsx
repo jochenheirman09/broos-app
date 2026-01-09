@@ -92,31 +92,38 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Effect to silently update the FCM token on app load if permission is granted.
   useEffect(() => {
-    const autoRefreshToken = async () => {
-      // Wait for user profile and ensure we are in a browser
-      if (!userProfile?.uid || typeof window === 'undefined') return;
+    // THIS IS THE CRITICAL FIX: Ensure this code ONLY runs in the browser.
+    if (typeof window !== 'undefined') {
+        const autoRefreshToken = async () => {
+            console.log('[UserProvider] autoRefreshToken useEffect triggered on client.');
 
-      if ('serviceWorker' in navigator) {
-        try {
-          // Wait for the Service Worker to be ready
-          await navigator.serviceWorker.ready;
-          
-          // Small delay (500ms) to ensure everything is stable
-          setTimeout(() => {
-            // The refreshToken function (from useRequestNotificationPermission)
-            // now handles the logic of checking permission and getting the token.
-            // Pass `true` to indicate it's a silent, automatic check.
-            console.log('[UserProvider] Attempting to silently update FCM token.');
-            refreshToken(true); 
-          }, 500); 
+            if (!userProfile?.uid) {
+                console.log(`[UserProvider] autoRefreshToken skipped: No user profile loaded yet.`);
+                return;
+            }
 
-        } catch (swErr) {
-          console.error("Service Worker not ready for auto-refresh:", swErr);
-        }
-      }
-    };
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.ready;
+                    console.log('[UserProvider] Service Worker is ready.');
+                    
+                    // Small delay to ensure all services are stable.
+                    setTimeout(() => {
+                        console.log('[UserProvider] Attempting to silently update FCM token.');
+                        // Call the hook with `true` to indicate a silent, non-interactive check.
+                        refreshToken(true); 
+                    }, 500); 
 
-    autoRefreshToken();
+                } catch (swErr) {
+                    console.error("[UserProvider] Service Worker not ready for auto-refresh:", swErr);
+                }
+            } else {
+                 console.log('[UserProvider] Service Worker not supported in this browser.');
+            }
+        };
+
+        autoRefreshToken();
+    }
   }, [userProfile?.uid, refreshToken]);
 
 
