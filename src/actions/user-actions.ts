@@ -302,28 +302,29 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
         return { success: false, message: "Gebruikers-ID en token zijn vereist." };
     }
 
-    console.log(`[FCM Token Action] Syncing token for user ${userId}.`);
+    const logPrefix = `[FCM Token Action] User: ${userId} |`;
+    console.log(`${logPrefix} Syncing token...`);
     const { adminDb } = await getFirebaseAdmin();
     const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
 
     try {
         const doc = await tokenRef.get();
         
-        // Only write to the database if the token is new.
         if (!doc.exists) {
+            console.log(`${logPrefix} Token not found in DB. Creating new document.`);
             await tokenRef.set({
                 token: token,
                 createdAt: FieldValue.serverTimestamp(),
                 platform: 'web',
             });
-            console.log(`[FCM Token Action] Successfully saved NEW token for user ${userId}.`);
+            console.log(`${logPrefix} Successfully saved NEW token.`);
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
-            console.log(`[FCM Token Action] Token for user ${userId} already exists. Sync complete.`);
+            console.log(`${logPrefix} Token already exists. Sync complete, no write needed.`);
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {
-        console.error(`[FCM Token Action] Error saving token for user ${userId}:`, error);
+        console.error(`${logPrefix} Error saving token:`, error);
         return { success: false, message: error.message || "Failed to save token." };
     }
 }

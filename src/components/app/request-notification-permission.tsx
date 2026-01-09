@@ -23,7 +23,7 @@ export function RequestNotificationPermission() {
     }, [user]);
 
     const handleRequestPermission = async () => {
-        const newPermission = await requestPermission(false); // false = don't run silently
+        const newPermission = await requestPermission(); // false = don't run silently
         if (newPermission) {
             setPermissionStatus(newPermission);
         }

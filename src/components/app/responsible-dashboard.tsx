@@ -23,6 +23,7 @@ import { ClubLogoManager } from "./club-logo-manager";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 import { NotificationBadge } from "./notification-badge";
 import { useUser } from "@/context/user-context";
+import { RequestNotificationPermission } from "./request-notification-permission";
 
 
 function ClubManagement({ clubId }: { clubId: string }) {
@@ -35,6 +36,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
   return (
     <>
+      <RequestNotificationPermission />
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-4">

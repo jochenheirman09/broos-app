@@ -6,93 +6,91 @@ import { useFirebaseApp } from "@/firebase";
 import { useUser } from "@/context/user-context";
 import { useEffect, useCallback } from "react";
 import { saveFcmToken } from "@/actions/user-actions";
+import { useToast } from "@/hooks/use-toast";
 
 /**
  * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
- * This version reads the VAPID key from a secure API route.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { user } = useUser();
+    const { toast } = useToast();
 
-    const requestPermission = useCallback(async (isSilentAction = false): Promise<NotificationPermission | "unsupported" | undefined> => {
-        const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} | Silent: ${isSilentAction} |`;
+    const requestPermission = useCallback(async (isSilent = true): Promise<NotificationPermission | "unsupported" | undefined> => {
+        const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} |`;
         
         if (!app || !user) {
-            console.log(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
+            if (!isSilent) console.log(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
             return;
         }
         if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-            console.log(`${logPrefix} Notifications not supported by this browser.`);
+            if (!isSilent) console.log(`${logPrefix} Notifications not supported by this browser.`);
             return 'unsupported';
         }
         
-        let currentPermission = Notification.permission;
-        console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
-        
-        // Only actively ask for permission if the user initiated it and permission is default
-        if (!isSilentAction && currentPermission === 'default') {
-            console.log(`${logPrefix} Actively requesting notification permission...`);
-            currentPermission = await Notification.requestPermission();
-            console.log(`${logPrefix} Permission request result: '${currentPermission}'.`);
-        }
-        
+        const currentPermission = Notification.permission;
+        console.log(`${logPrefix} Current permission state: '${currentPermission}'. Silent mode: ${isSilent}`);
+
         if (currentPermission === 'granted') {
-            console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
+             console.log(`${logPrefix} Permission is already granted. Proceeding to get/refresh token...`);
+        } else if (isSilent) {
+            console.log(`${logPrefix} Silent check: Permission not granted, so skipping request.`);
+            return currentPermission;
+        } else {
+            console.log(`${logPrefix} Actively requesting notification permission...`);
+            const newPermission = await Notification.requestPermission();
+            console.log(`${logPrefix} Permission request result: '${newPermission}'.`);
+            if (newPermission !== 'granted') {
+                console.log(`${logPrefix} Permission to notify was not granted ('${newPermission}').`);
+                toast({ variant: 'destructive', title: 'Permissie geweigerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
+                return newPermission;
+            }
+        }
             
-            try {
-                // Fetch the VAPID key securely from our API route
-                const response = await fetch('/api/fcm-vapid-key');
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`${logPrefix} Failed to fetch VAPID key. Status: ${response.status}. Body: ${errorText}`);
-                    throw new Error(`Failed to fetch VAPID key: ${response.statusText}`);
-                }
-                const { vapidKey } = await response.json();
+        try {
+            console.log(`${logPrefix} Fetching VAPID key from API...`);
+            const response = await fetch('/api/fcm-vapid-key');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to fetch VAPID key: ${response.statusText}. Body: ${errorText}`);
+            }
+            const { vapidKey } = await response.json();
 
-                if (!vapidKey) {
-                    console.error(`${logPrefix} CRITICAL: VAPID key not available from API. Check server logs for the API route.`);
-                    throw new Error("VAPID key for notifications ontbreekt in de applicatieconfiguratie.");
-                }
-                console.log(`${logPrefix} Successfully fetched VAPID key.`);
+            if (!vapidKey) {
+                throw new Error("VAPID key for notifications is missing.");
+            }
+            console.log(`${logPrefix} Successfully fetched VAPID key.`);
 
-                const messaging = getMessaging(app);
-                console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
-                
-                const serviceWorkerRegistration = await navigator.serviceWorker.ready;
-                console.log(`${logPrefix} Service Worker is ready. Using it for token retrieval.`);
-                const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
+            const messaging = getMessaging(app);
+            const serviceWorkerRegistration = await navigator.serviceWorker.ready;
+            console.log(`${logPrefix} Service worker ready. Requesting token...`);
+            const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
 
-                if (currentToken) {
-                    console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 20)}...`);
-                    
-                    console.log(`${logPrefix} Calling server action to save token.`);
-                    const result = await saveFcmToken(user.uid, currentToken);
-                    
-                    if (result.success) {
-                        console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved or already existed.`);
-                    } else {
-                        console.error(`${logPrefix} FAILED: Server action reported an error: ${result.message}`);
-                        throw new Error(result.message);
+            if (currentToken) {
+                console.log(`${logPrefix} Token retrieved: ${currentToken.substring(0, 20)}...`);
+                const result = await saveFcmToken(user.uid, currentToken);
+                if (result.success) {
+                    console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved/synced.`);
+                    if (!isSilent) {
+                        toast({ title: "Notificaties ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
                     }
-
                 } else {
-                    console.warn(`${logPrefix} No registration token available. This may happen if the service worker registration fails.`);
-                    if (!isSilentAction) {
-                        throw new Error('Kon geen registratietoken genereren. Controleer de console op service worker-fouten.');
-                    }
+                    throw new Error(result.message);
                 }
-            } catch (err: any) {
-                console.error(`${logPrefix} CRITICAL ERROR: An error occurred while retrieving or saving the token.`, err);
-                if (!isSilentAction) {
-                    throw err; // Re-throw to be caught by UI if it was a manual action
+            } else {
+                console.warn(`${logPrefix} No registration token available. Request permission to generate one.`);
+                if (!isSilent) {
+                    throw new Error('Kon geen registratietoken genereren. Probeer de pagina te vernieuwen.');
                 }
             }
-        } else {
-            console.log(`${logPrefix} Permission to notify was not granted ('${currentPermission}').`);
+        } catch (err: any) {
+            console.error(`${logPrefix} CRITICAL ERROR:`, err);
+            if (!isSilent) {
+                toast({ variant: 'destructive', title: 'Fout bij instellen notificaties', description: err.message });
+            }
         }
-        return currentPermission;
-    }, [app, user]);
+        return Notification.permission;
+    }, [app, user, toast]);
     
     return { requestPermission };
 };
