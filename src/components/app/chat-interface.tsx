@@ -157,8 +157,8 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="space-y-6">
-        <Card className="h-[calc(100vh-18rem)] flex flex-col">
+    <div className="flex flex-col flex-grow">
+        <Card className="flex flex-col flex-grow">
           <CardHeader>
             <CardTitle className="flex items-center text-2xl">
               <MessageSquare className="h-6 w-6 mr-3" />

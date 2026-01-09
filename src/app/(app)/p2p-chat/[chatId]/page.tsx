@@ -62,5 +62,9 @@ function P2PChatLoader({ chatId }: { chatId: string }) {
 export default function P2PChatPage({ params }: { params: { chatId: string } }) {
   const { chatId } = params;
   
-  return <P2PChatLoader chatId={chatId} />;
+  return (
+    <div className="flex flex-col flex-grow h-full">
+        <P2PChatLoader chatId={chatId} />
+    </div>
+  );
 }
