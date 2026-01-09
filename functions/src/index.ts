@@ -6,8 +6,6 @@ import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { Alert } from '../../src/lib/types';
 
-// TIJDELIJK: Comment de import uit die buiten de folder gaat
-// import { runAnalysisJob } from "../../src/actions/cron-actions";
 
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -51,19 +49,6 @@ async function acquireLock(lockName: string): Promise<boolean> {
     }
 }
 
-
-/**
- * 1. NIGHTLY ANALYSIS JOB
- * Tijdelijk uitgeschakeld om de rest te laten werken
- */
-export const nightlyAnalysis = onSchedule({
-    schedule: "0 3 * * *",
-    timeZone: "Europe/Brussels",
-}, async (event) => {
-    console.log("Nightly job trigger ontvangen (AI-job tijdelijk gepauzeerd voor deploy)");
-    // De aanroep naar runAnalysisJob() is hier tijdelijk verwijderd.
-    return;
-});
 
 /**
  * 2. MORNING SUMMARY (08:30)
@@ -162,25 +147,19 @@ export const onAlertCreated = functions.firestore
         console.log(`[onAlertCreated] Triggered for alert: ${alertRef.id}`);
 
         try {
-            let shouldSend = false;
-            const alertData = snapshot.data() as Alert;
-
-            // STAP 1: De transactie is alleen voor de "lock"
-            await db.runTransaction(async (transaction) => {
+            const shouldSend = await db.runTransaction(async (transaction) => {
                 const doc = await transaction.get(alertRef);
                 const data = doc.data();
                 if (data && data.notificationStatus !== 'sent') {
-                    console.log(`[onAlertCreated] Lock acquired for alert ${alertRef.id}. Setting status to 'sent'.`);
                     transaction.update(alertRef, { notificationStatus: 'sent' });
-                    shouldSend = true; 
-                } else {
-                    console.log(`[onAlertCreated] Notification for ${alertRef.id} already processed or data missing.`);
+                    return true; 
                 }
+                return false;
             });
 
-            // STAP 2: Buiten de transactie doen we het zware werk
             if (shouldSend) {
-                console.log(`[onAlertCreated] Preparing to send notification for alert ${alertRef.id}.`);
+                console.log(`[onAlertCreated] ✅ WINNER for alert ${alertRef.id}, preparing to send notification.`);
+                const alertData = snapshot.data() as Alert;
                 const { clubId, teamId } = context.params;
 
                 const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
@@ -230,6 +209,8 @@ export const onAlertCreated = functions.firestore
                 } else {
                     console.log(`[onAlertCreated] No tokens found for relevant staff/responsible users.`);
                 }
+            } else {
+                 console.log(`[onAlertCreated] ❌ Notification for alert ${alertRef.id} already handled. Skipping.`);
             }
 
         } catch (error) {
@@ -304,3 +285,5 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
+
+    

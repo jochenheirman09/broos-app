@@ -6,8 +6,6 @@ import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { Alert } from '../../src/lib/types';
 
-// TIJDELIJK: Comment de import uit die buiten de folder gaat
-// import { runAnalysisJob } from "../../src/actions/cron-actions";
 
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -52,18 +50,10 @@ async function acquireLock(lockName: string): Promise<boolean> {
 }
 
 
-/**
- * 1. NIGHTLY ANALYSIS JOB
- * Tijdelijk uitgeschakeld om de rest te laten werken
- */
-export const nightlyAnalysis = onSchedule({
-    schedule: "0 3 * * *",
-    timeZone: "Europe/Brussels",
-}, async (event) => {
-    console.log("Nightly job trigger ontvangen (AI-job tijdelijk gepauzeerd voor deploy)");
-    // De aanroep naar runAnalysisJob() is hier tijdelijk verwijderd.
-    return;
-});
+// NOTE: The nightly analysis job is now triggered via an HTTP request to the
+// Next.js server action endpoint `/api/cron`, not via this Cloud Function.
+// This function can be removed or repurposed.
+
 
 /**
  * 2. MORNING SUMMARY (08:30)
@@ -300,3 +290,7 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
+
+    
+
+    
