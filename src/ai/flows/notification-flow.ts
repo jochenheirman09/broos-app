@@ -73,7 +73,32 @@ export async function sendNotification(
 
       if (response.failureCount > 0) {
         console.warn(`[sendNotification] Failed to send to ${response.failureCount} tokens.`);
-        // Optional: Clean up invalid tokens based on error codes
+        const tokensToDelete: string[] = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            const errorCode = resp.error?.code;
+            // These error codes indicate that the token is no longer valid.
+            if (
+              errorCode === 'messaging/invalid-registration-token' ||
+              errorCode === 'messaging/registration-token-not-registered'
+            ) {
+              const badToken = tokens[idx];
+              tokensToDelete.push(badToken);
+              console.log(`[sendNotification] Scheduling token for deletion: ${badToken}`);
+            }
+          }
+        });
+
+        if (tokensToDelete.length > 0) {
+            // Asynchronously delete the invalid tokens from Firestore.
+            const batch = adminDb.batch();
+            tokensToDelete.forEach(token => {
+                const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
+                batch.delete(tokenRef);
+            });
+            await batch.commit();
+            console.log(`[sendNotification] Deleted ${tokensToDelete.length} invalid tokens from Firestore.`);
+        }
       }
 
       return { success: true, message: "Notification sent successfully." };

@@ -31,6 +31,7 @@ export const useRequestNotificationPermission = () => {
         let currentPermission = Notification.permission;
         console.log(`${logPrefix} Initial permission state: '${currentPermission}'.`);
         
+        // Only actively ask for permission if the user initiated it and permission is default
         if (isManualAction && currentPermission === 'default') {
             console.log(`${logPrefix} Actively requesting notification permission...`);
             currentPermission = await Notification.requestPermission();
@@ -41,6 +42,7 @@ export const useRequestNotificationPermission = () => {
             console.log(`${logPrefix} Permission is granted. Proceeding to get/refresh token...`);
             
             try {
+                // Fetch the VAPID key securely from our API route
                 const response = await fetch('/api/fcm-vapid-key');
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -57,6 +59,8 @@ export const useRequestNotificationPermission = () => {
 
                 const messaging = getMessaging(app);
                 console.log(`${logPrefix} Requesting token from Firebase Messaging...`);
+                
+                // Ensure the service worker is ready before getting the token
                 const serviceWorkerRegistration = await navigator.serviceWorker.ready;
                 console.log(`${logPrefix} Service Worker is ready. Using it for token retrieval.`);
                 const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
@@ -64,6 +68,7 @@ export const useRequestNotificationPermission = () => {
                 if (currentToken) {
                     console.log(`${logPrefix} Token retrieved successfully: ${currentToken.substring(0, 20)}...`);
                     
+                    // Call the server action to save the token securely
                     console.log(`${logPrefix} Calling server action to save token.`);
                     const result = await saveFcmToken(user.uid, currentToken, isManualAction);
                     
@@ -102,10 +107,12 @@ export const ForegroundMessageListener = () => {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
                     console.log('[Foreground Listener] Message received. ', payload);
+                    // Show a notification
                     new Notification(payload.notification?.title || 'New Message', {
                         body: payload.notification?.body,
                         icon: payload.notification?.icon
                     });
+                     // Update the app badge
                     if ('setAppBadge' in navigator && typeof navigator.setAppBadge === 'function') {
                         console.log('[Foreground Listener] Setting app badge.');
                         navigator.setAppBadge(1).catch(e => console.error('[Foreground Listener] Error setting app badge:', e));

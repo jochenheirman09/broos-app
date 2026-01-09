@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -9,7 +10,7 @@ import { WelcomeHeader } from "./welcome-header";
 import { Spinner } from "@/components/ui/spinner";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
-import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
+import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
 
 export function DashboardContent() {
   const { userProfile, loading } = useUser();
@@ -30,9 +31,9 @@ export function DashboardContent() {
           setTimeout(() => {
             // The refreshToken function (from useRequestNotificationPermission)
             // now handles the logic of checking permission and getting the token.
-            // Pass `true` to indicate a silent refresh.
+            // Pass `false` to indicate it's not a manual user action.
             console.log('[DashboardContent] Attempting to silently update FCM token.');
-            refreshToken(true); 
+            refreshToken(false); 
           }, 500); 
 
         } catch (swErr) {
@@ -56,6 +57,7 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
+      <RequestNotificationPermission />
       <WelcomeHeader />
       
       {role === 'player' && <PlayerDashboard />}

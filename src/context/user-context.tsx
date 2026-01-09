@@ -93,14 +93,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   // Effect to silently update the FCM token on app load if permission is granted.
   useEffect(() => {
     const autoRefreshToken = async () => {
+      // Wait for user profile and ensure we are in a browser
       if (!userProfile?.uid || typeof window === 'undefined') return;
 
       if ('serviceWorker' in navigator) {
         try {
+          // Wait for the Service Worker to be ready
           await navigator.serviceWorker.ready;
+          
+          // Small delay (500ms) to ensure everything is stable
           setTimeout(() => {
+            // The refreshToken function (from useRequestNotificationPermission)
+            // now handles the logic of checking permission and getting the token.
+            // Pass `false` to indicate it's not a manual user action.
             console.log('[UserProvider] Attempting to silently update FCM token.');
-            refreshToken(true); 
+            refreshToken(false); 
           }, 500); 
 
         } catch (swErr) {
