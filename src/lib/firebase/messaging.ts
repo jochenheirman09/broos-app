@@ -1,108 +1,99 @@
 
 "use client";
 
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { useFirebaseApp } from "@/firebase";
-import { useUser } from "@/context/user-context";
-import { useEffect, useCallback } from "react";
-import { saveFcmToken } from "@/actions/user-actions";
-import { useToast } from "@/hooks/use-toast";
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { useFirebaseApp } from '@/firebase';
+import { useCallback, useEffect } from 'react';
+import { saveFcmToken } from '@/actions/user-actions';
+import { useToast } from '@/hooks/use-toast';
 
 /**
- * A custom hook to manage Firebase Cloud Messaging permissions and tokens.
+ * A robust, reusable hook for handling FCM notification permission and token management.
+ * @returns An object containing the `requestPermission` function.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
-    const { user } = useUser();
     const { toast } = useToast();
 
-    const requestPermission = useCallback(async (isSilent = true): Promise<NotificationPermission | "unsupported" | undefined> => {
-        const logPrefix = `[FCM] User: ${user?.uid || 'anonymous'} |`;
-        
-        console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
+    /**
+     * Handles the entire flow of requesting permission and syncing the token.
+     * @param userId - The UID of the user to associate the token with.
+     * @param isSilent - If true, logs less and won't show success toasts.
+     * @returns The permission status granted by the user.
+     */
+    const requestPermission = useCallback(async (userId: string, isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
+        const logPrefix = `[FCM] User: ${userId} |`;
+        if (!isSilent) console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
 
-        if (typeof window === 'undefined') {
-            console.log(`${logPrefix} Aborted: Not in a browser environment.`);
+        if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
+            if (!isSilent) console.warn(`${logPrefix} Notifications not supported in this environment.`);
+            return 'denied';
+        }
+
+        if (!app || !userId) {
+            if (!isSilent) console.error(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
             return;
         }
-        
-        if (!app || !user) {
-            if (!isSilent) console.log(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
-            return;
-        }
 
-        if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-            if (!isSilent) console.error(`${logPrefix} Notifications not supported by this browser.`);
-            return 'unsupported';
-        }
-        
+        // 1. Check Current Permission
         const currentPermission = Notification.permission;
-        console.log(`${logPrefix} Current permission state: '${currentPermission}'.`);
-
-        if (currentPermission === 'granted') {
-             console.log(`${logPrefix} Permission is already granted. Proceeding to get/refresh token...`);
-        } else if (isSilent) {
-            console.log(`${logPrefix} Silent check: Permission not granted ('${currentPermission}'), so skipping request.`);
-            return currentPermission;
-        } else {
-            console.log(`${logPrefix} Actively requesting notification permission...`);
-            const newPermission = await Notification.requestPermission();
-            console.log(`${logPrefix} Permission request result: '${newPermission}'.`);
-            if (newPermission !== 'granted') {
-                console.log(`${logPrefix} Permission to notify was not granted ('${newPermission}').`);
-                if (!isSilent) {
-                    toast({ variant: 'destructive', title: 'Permissie geweigerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
-                }
-                return newPermission;
-            }
+        if (!isSilent) console.log(`${logPrefix} Current permission state: '${currentPermission}'.`);
+        if (currentPermission === 'denied' && !isSilent) {
+             toast({ variant: 'destructive', title: 'Permissie Geblokkeerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
+             return 'denied';
         }
-            
+
+        // 2. Request Permission if needed
+        let finalPermission = currentPermission;
+        if (currentPermission === 'default') {
+             finalPermission = await Notification.requestPermission();
+             if (!isSilent) console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
+             if (finalPermission !== 'granted') {
+                 if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geweigerd' });
+                 return finalPermission;
+             }
+        }
+        
+        // This check is now separate. If permission is granted (either now or previously), we proceed.
+        if (finalPermission !== 'granted') {
+          return finalPermission;
+        }
+
+        // 3. Get VAPID Key
+        const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+        console.log(`%c[FCM] 🔑 VAPID KEY CHECK: ${vapidKey ? "Aanwezig" : "ONTBREEKT (Undefined)"}`, `color: ${vapidKey ? 'green' : 'red'}; font-weight: bold;`);
+        if (!vapidKey) {
+            console.error(`%c${logPrefix} CRITICAL: VAPID key not found. Ensure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.`, 'color: red; font-weight: bold;');
+            if (!isSilent) toast({ variant: 'destructive', title: 'Configuratiefout', description: 'Client configuration for notifications is missing.' });
+            return;
+        }
+        
+        // 4. Get Token and Save
         try {
-            console.log(`${logPrefix} Fetching VAPID key from API...`);
-            const response = await fetch('/api/fcm-vapid-key');
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to fetch VAPID key: ${response.statusText}. Body: ${errorText}`);
-            }
-            const { vapidKey } = await response.json();
-
-            if (!vapidKey) {
-                throw new Error("VAPID key for notifications is missing from server response.");
-            }
-            console.log(`${logPrefix} Successfully fetched VAPID key: ${vapidKey}`);
-
             const messaging = getMessaging(app);
+            if (!isSilent) console.log(`${logPrefix} Waiting for Service Worker to be ready...`);
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
-            console.log(`${logPrefix} Service worker ready. Requesting token with VAPID key...`);
-            const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
+            if (!isSilent) console.log(`${logPrefix} Service Worker is ready. Attempting to get token...`);
+
+            const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
 
             if (currentToken) {
-                console.log(`${logPrefix} Token retrieved: ${currentToken}`);
-                // Send the token to your server to be saved
-                const result = await saveFcmToken(user.uid, currentToken);
-                if (result.success) {
-                    console.log(`${logPrefix} SUCCESS: Server action confirmed token was saved/synced.`);
-                    if (!isSilent) {
-                        toast({ title: "Notificaties ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
-                    }
-                } else {
-                    throw new Error(result.message);
-                }
+                if (!isSilent) console.log(`${logPrefix} Token generated: ${currentToken.substring(0, 20)}...`);
+                // Call the server action to save the token
+                await saveFcmToken(userId, currentToken);
+                if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {
-                console.warn(`${logPrefix} No registration token available. This usually means permission was just denied or the service worker is not active.`);
-                if (!isSilent) {
-                    throw new Error('Kon geen registratietoken genereren. Probeer de pagina te vernieuwen.');
-                }
+                throw new Error("Kon geen notificatie-token genereren. Probeer de pagina te vernieuwen.");
             }
         } catch (err: any) {
-            console.error(`${logPrefix} CRITICAL ERROR during token process:`, err);
-            if (!isSilent) {
-                toast({ variant: 'destructive', title: 'Fout bij instellen notificaties', description: err.message });
-            }
+            console.error(`%c${logPrefix} 🔥 ERROR during token flow:`, 'color: red; font-weight: bold;', err);
+            if (!isSilent) toast({ variant: 'destructive', title: 'Fout bij Inschakelen', description: err.message });
         }
-        return Notification.permission;
-    }, [app, user, toast]);
-    
+        
+        return finalPermission;
+
+    }, [app, toast]);
+
     return { requestPermission };
 };
 
@@ -116,22 +107,27 @@ export const ForegroundMessageListener = () => {
             try {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
-                    console.log('[Foreground Listener] Message received. ', payload);
-                    // Show a notification
-                    new Notification(payload.notification?.title || 'New Message', {
+                    console.log('[FCM] Foreground message received. ', payload);
+                    
+                    // Construct and show the notification manually
+                    const notification = new Notification(payload.notification?.title || 'Nieuw Bericht', {
                         body: payload.notification?.body,
-                        icon: payload.notification?.icon
+                        icon: payload.notification?.icon,
+                        data: payload.data // Pass along the data payload
                     });
-                     // Update the app badge
-                    if ('setAppBadge' in navigator && typeof navigator.setAppBadge === 'function') {
-                        console.log('[Foreground Listener] Setting app badge.');
-                        navigator.setAppBadge(1).catch(e => console.error('[Foreground Listener] Error setting app badge:', e));
+
+                    // Handle notification click
+                    notification.onclick = (event) => {
+                        event.preventDefault(); // Prevent the browser from focusing the Notification's tab
+                        const link = payload.data?.link || '/';
+                        window.open(link, '_blank');
+                        notification.close();
                     }
                 });
 
                 return () => unsubscribe();
             } catch (error) {
-                console.warn('Firebase Messaging not available in this environment:', error);
+                console.warn('[FCM] Messaging not available in this environment:', error);
             }
         }
     }, [app]);

@@ -17,5 +17,5 @@ env:
     secret: GEMINI_API_KEY
   - variable: FIREBASE_ADMIN_SERVICE_ACCOUNT
     secret: FIREBASE_ADMIN_SERVICE_ACCOUNT
-  - variable: FIREBASE_VAPID_KEY # This makes the key available to the backend server at runtime
+  - variable: NEXT_PUBLIC_FIREBASE_VAPID_KEY # This makes the key available to the browser at runtime
     secret: FIREBASE_VAPID_KEY

@@ -21,7 +21,6 @@ import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 import { NotificationBadge } from "./notification-badge";
-import { RequestNotificationPermission } from "./request-notification-permission";
 
 function ProfileIncompleteAlert() {
   return (
@@ -59,7 +58,6 @@ export function PlayerDashboard() {
   return (
     <>
       <div className="space-y-6">
-        <RequestNotificationPermission />
         <Card>
           <CardHeader>
             <CardTitle>Recent Welzijnsoverzicht</CardTitle>

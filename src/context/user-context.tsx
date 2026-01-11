@@ -54,7 +54,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
-  const { requestPermission: refreshToken } = useRequestNotificationPermission();
+  const { requestPermission } = useRequestNotificationPermission();
 
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -77,7 +77,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           setClaimsReady(true);
         } catch (error) {
            console.error("[UserProvider] Failed to refresh token:", error);
-           setClaimsReady(true);
+           setClaimsReady(true); // Proceed even if refresh fails, might be offline
         }
       }
     };
@@ -85,46 +85,33 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     if (!isAuthLoading && user) {
       syncClaims();
     } else if (!isAuthLoading && !user) {
-      setClaimsReady(true);
+      setClaimsReady(true); // No user, so no claims to wait for
     }
   }, [user, isAuthLoading]);
 
   // Effect to silently update the FCM token on app load if permission is granted.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // This effect runs when the essential loading states change.
+    const autoRefreshToken = () => {
+      console.log('[UserProvider] autoRefreshToken: Checking conditions...');
 
-    const autoRefreshToken = async () => {
-        console.log('[UserProvider] autoRefreshToken: Checking conditions...');
-        
-        // This effect now depends on `isProfileLoading`. It will re-run when it changes.
-        if (isProfileLoading) {
-            console.log('[UserProvider] autoRefreshToken: Skipped, profile is still loading.');
-            return;
-        }
-
-        if (!userProfile?.uid) {
-            console.log(`[UserProvider] autoRefreshToken: Skipped, no valid user profile loaded.`);
-            return;
-        }
-
-        if ('serviceWorker' in navigator) {
-            try {
-                await navigator.serviceWorker.ready;
-                console.log('[UserProvider] Service Worker is ready. Triggering silent token refresh.');
-                // Pass `true` for a silent check
-                refreshToken(true); 
-            } catch (swErr) {
-                console.error("[UserProvider] Service Worker not ready for auto-refresh:", swErr);
-            }
-        } else {
-             console.log('[UserProvider] Service Worker not supported in this browser.');
-        }
+      if (isAuthLoading || isProfileLoading) {
+        console.log('[UserProvider] autoRefreshToken: Skipped, auth or profile is still loading.');
+        return;
+      }
+      if (!userProfile?.uid) {
+        console.log('[UserProvider] autoRefreshToken: Skipped, no valid user profile loaded.');
+        return;
+      }
+      
+      console.log('[UserProvider] autoRefreshToken: Conditions met. Proceeding with silent token sync.');
+      // The requestPermission hook is now smart enough to handle this silently.
+      // Passing true for `isSilent` ensures no toasts are shown for this automatic check.
+      requestPermission(userProfile.uid, true); 
     };
 
     autoRefreshToken();
-    // CRITICAL FIX: This effect now runs whenever the loading state of the profile changes.
-    // When isProfileLoading goes from true to false, and we have a userProfile, it will run.
-  }, [userProfile, isProfileLoading, refreshToken]);
+  }, [isAuthLoading, isProfileLoading, userProfile, requestPermission]);
 
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));

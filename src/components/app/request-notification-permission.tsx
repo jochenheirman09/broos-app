@@ -4,46 +4,51 @@
 import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { BellRing, Check } from "lucide-react";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
+import { BellRing, Check } from "lucide-react";
+import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
 
 export function RequestNotificationPermission() {
     const { user } = useUser();
+    const [isLoading, setIsLoading] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported">("default");
     const { requestPermission } = useRequestNotificationPermission();
 
+    // Effect to check initial permission status on mount
     useEffect(() => {
-        if (!user) return; // Only run if user is logged in
-        if ("Notification" in window) {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
             setPermissionStatus(Notification.permission);
         } else {
             setPermissionStatus("unsupported");
         }
-    }, [user]);
+    }, []);
 
     const handleRequestPermission = async () => {
-        const newPermission = await requestPermission(); // false = don't run silently
+        if (!user) return;
+        setIsLoading(true);
+        // Call the hook to handle the full permission and token flow
+        const newPermission = await requestPermission(user.uid, false); 
         if (newPermission) {
             setPermissionStatus(newPermission);
         }
+        setIsLoading(false);
     };
 
     // Don't show the banner if permission is already granted, denied, or not supported.
-    if (permissionStatus === 'granted' || permissionStatus === 'unsupported' || permissionStatus === 'denied') {
-        return null;
+    if (permissionStatus !== 'default' || !user) {
+        return null; 
     }
 
-    // Only show the banner if the permission state is 'default' (i.e., user hasn't been asked yet).
     return (
         <Alert className="mb-6 bg-primary/10 border-primary/50 text-primary-foreground">
             <BellRing className="h-4 w-4 !text-primary" />
             <AlertTitle className="text-primary/90">Blijf op de hoogte</AlertTitle>
             <AlertDescription className="text-primary/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                <span>Wil je een herinnering ontvangen voor je dagelijkse check-in of nieuwe chatberichten? Schakel meldingen in.</span>
-               <Button onClick={handleRequestPermission} className="bg-primary/80 text-primary-foreground hover:bg-primary/70 shrink-0">
-                    <Check className="mr-2 h-4 w-4" />
-                    Meldingen Inschakelen
+               <Button onClick={handleRequestPermission} disabled={isLoading} className="bg-primary/80 text-primary-foreground hover:bg-primary/70 shrink-0">
+                    {isLoading ? <Spinner size="small" className="mr-2" /> : <Check className="mr-2 h-4 w-4" />}
+                    {isLoading ? 'Bezig...' : 'Meldingen Inschakelen'}
                 </Button>
             </AlertDescription>
         </Alert>

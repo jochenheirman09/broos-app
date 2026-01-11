@@ -18,8 +18,6 @@ import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 import { NotificationBadge } from "./notification-badge";
-import { RequestNotificationPermission } from "./request-notification-permission";
-
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
   const { userProfile, loading } = useUser();
@@ -49,7 +47,6 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
 
   return (
     <div className="space-y-6">
-      <RequestNotificationPermission />
       <Card>
         <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-4">

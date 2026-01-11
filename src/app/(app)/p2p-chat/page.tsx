@@ -15,7 +15,6 @@ import { ExistingChatsList } from "@/components/app/p2p-chat/existing-chats-list
 import { useUser } from "@/context/user-context";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
 
 
 export default function P2PChatOverviewPage() {
@@ -24,7 +23,6 @@ export default function P2PChatOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <RequestNotificationPermission />
       <Card>
         <CardHeader>
           <div className="flex flex-wrap justify-between items-start gap-4">

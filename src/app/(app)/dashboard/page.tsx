@@ -6,7 +6,6 @@ import { useUser } from "@/context/user-context";
 import { Spinner } from "@/components/ui/spinner";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
-import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
 
 export default function DashboardPage() {
   const { userProfile, loading } = useUser();
@@ -29,7 +28,6 @@ export default function DashboardPage() {
   console.log('[DashboardPage] Rendering DashboardContent.');
   return (
     <div className="space-y-6">
-      <RequestNotificationPermission />
       <DashboardContent />
     </div>
   );

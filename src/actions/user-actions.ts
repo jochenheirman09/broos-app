@@ -1,5 +1,4 @@
-
-'use server';
+"use server";
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
@@ -320,15 +319,16 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
                 lastSeen: FieldValue.serverTimestamp(),
                 platform: 'web',
             }, { merge: true });
-            console.log(`${logPrefix} Successfully saved NEW token.`);
+            console.log(`${logPrefix} ✅ Successfully saved NEW token.`);
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
             console.log(`${logPrefix} Token already exists. Updating 'lastSeen' timestamp.`);
             await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
+             console.log(`${logPrefix} ✅ Successfully synced existing token.`);
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {
-        console.error(`${logPrefix} CRITICAL: Error saving token to Firestore:`, error);
+        console.error(`${logPrefix} 🔥 CRITICAL: Error saving token to Firestore:`, error);
         return { success: false, message: error.message || "Failed to save token to database." };
     }
 }

@@ -11,51 +11,27 @@ import { BellRing, Wrench, AlertTriangle, CheckCircle, Info, Send } from "lucide
 import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
 import { sendTestNotification } from "@/actions/notification-actions";
-import { Separator } from "../ui/separator";
 
 export function NotificationTroubleshooter() {
     const { user } = useUser();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [isTestLoading, setIsTestLoading] = useState(false);
-    const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported" | "timeout">(
+    const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported">(
         () => (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "unsupported"
     );
 
     const { requestPermission } = useRequestNotificationPermission();
 
-    const handleManualTokenRefresh = async () => {
+    const handleManualPermissionRequest = async () => {
+        if (!user) return;
         setIsLoading(true);
-        try {
-            // Pass false to indicate it's a manual user action, not a silent one.
-            const newPermission = await requestPermission(false); 
-            
-            if (newPermission) {
-                setPermissionStatus(newPermission);
-            }
-
-            if (newPermission === 'granted') {
-                 toast({
-                    title: "Token Vernieuwd!",
-                    description: "Je notificatie-token is succesvol vernieuwd en opgeslagen.",
-                });
-            } else if (newPermission === 'denied') {
-                toast({
-                    variant: "destructive",
-                    title: "Permissie Geblokkeerd",
-                    description: "Je moet meldingen voor deze site handmatig inschakelen in je browserinstellingen.",
-                });
-            }
-        } catch (error: any) {
-            console.error("Manual token refresh failed:", error);
-            toast({
-                variant: "destructive",
-                title: "Fout",
-                description: `Kon token niet vernieuwen: ${error.message}`,
-            });
-        } finally {
-            setIsLoading(false);
+        // Call with isSilent = false to show toasts on success/failure
+        const newPermission = await requestPermission(user.uid, false); 
+        if (newPermission) {
+            setPermissionStatus(newPermission);
         }
+        setIsLoading(false);
     };
 
     const handleSendTestNotification = async () => {
@@ -135,9 +111,9 @@ export function NotificationTroubleshooter() {
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                    <Button onClick={handleManualTokenRefresh} disabled={isLoading || permissionStatus === 'denied'} className="w-full">
+                    <Button onClick={handleManualPermissionRequest} disabled={isLoading || permissionStatus === 'denied'} className="w-full">
                         {isLoading && <Spinner size="small" className="mr-2" />}
-                        {isLoading ? "Bezig..." : "Forceer Token Vernieuwing"}
+                        {isLoading ? "Bezig..." : permissionStatus === 'granted' ? "Vernieuw Token" : "Vraag Toestemming"}
                     </Button>
 
                     <Button onClick={handleSendTestNotification} disabled={isTestLoading || permissionStatus !== 'granted'} variant="secondary" className="w-full">
