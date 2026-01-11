@@ -2,11 +2,9 @@
 
 const withPWA = require('next-pwa')({
   dest: 'public',
-  // Point next-pwa to our custom service worker file.
-  swSrc: 'src/app/firebase-messaging-sw.js', 
-  sw: 'sw.js', // This is the output file in the public directory
   register: true,
   skipWaiting: true,
+  exclude: [/firebase-messaging-sw\.js$/], // Exclude the firebase-messaging-sw.js file from PWA processing.
   disable: process.env.NODE_ENV === 'development',
 });
 
