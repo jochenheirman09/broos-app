@@ -42,7 +42,7 @@ export const useRequestNotificationPermission = () => {
         if (currentPermission === 'granted') {
              console.log(`${logPrefix} Permission is already granted. Proceeding to get/refresh token...`);
         } else if (isSilent) {
-            console.log(`${logPrefix} Silent check: Permission not granted, so skipping request.`);
+            console.log(`${logPrefix} Silent check: Permission not granted ('${currentPermission}'), so skipping request.`);
             return currentPermission;
         } else {
             console.log(`${logPrefix} Actively requesting notification permission...`);
@@ -69,15 +69,15 @@ export const useRequestNotificationPermission = () => {
             if (!vapidKey) {
                 throw new Error("VAPID key for notifications is missing from server response.");
             }
-            console.log(`${logPrefix} Successfully fetched VAPID key: ${vapidKey.substring(0,10)}...`);
+            console.log(`${logPrefix} Successfully fetched VAPID key: ${vapidKey}`);
 
             const messaging = getMessaging(app);
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
-            console.log(`${logPrefix} Service worker ready. Requesting token...`);
+            console.log(`${logPrefix} Service worker ready. Requesting token with VAPID key...`);
             const currentToken = await getToken(messaging, { serviceWorkerRegistration, vapidKey });
 
             if (currentToken) {
-                console.log(`${logPrefix} Token retrieved: ${currentToken.substring(0, 20)}...`);
+                console.log(`${logPrefix} Token retrieved: ${currentToken}`);
                 // Send the token to your server to be saved
                 const result = await saveFcmToken(user.uid, currentToken);
                 if (result.success) {
@@ -89,7 +89,7 @@ export const useRequestNotificationPermission = () => {
                     throw new Error(result.message);
                 }
             } else {
-                console.warn(`${logPrefix} No registration token available. This usually means permission was just denied.`);
+                console.warn(`${logPrefix} No registration token available. This usually means permission was just denied or the service worker is not active.`);
                 if (!isSilent) {
                     throw new Error('Kon geen registratietoken genereren. Probeer de pagina te vernieuwen.');
                 }

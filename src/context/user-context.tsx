@@ -72,13 +72,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const syncClaims = async () => {
       if (user) {
         try {
-          // Force refresh the ID token to get the latest custom claims
           const tokenResult = await getIdTokenResult(user, true);
           console.log("[UserProvider] Token refreshed. Claims:", tokenResult.claims);
           setClaimsReady(true);
         } catch (error) {
            console.error("[UserProvider] Failed to refresh token:", error);
-           setClaimsReady(true); // Proceed even if refresh fails, might be offline
+           setClaimsReady(true);
         }
       }
     };
@@ -86,48 +85,46 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     if (!isAuthLoading && user) {
       syncClaims();
     } else if (!isAuthLoading && !user) {
-      setClaimsReady(true); // No user, so no claims to wait for
+      setClaimsReady(true);
     }
   }, [user, isAuthLoading]);
 
   // Effect to silently update the FCM token on app load if permission is granted.
   useEffect(() => {
-    // THIS IS THE CRITICAL FIX: Ensure this code ONLY runs in the browser.
-    if (typeof window !== 'undefined') {
-        const autoRefreshToken = async () => {
-            console.log('[UserProvider] autoRefreshToken useEffect triggered on client.');
+    if (typeof window === 'undefined') return;
 
-            // CRITICAL FIX: Do not run this logic until the user profile is actually loaded.
-            if (!userProfile?.uid) {
-                console.log(`[UserProvider] autoRefreshToken skipped: No user profile loaded yet.`);
-                return;
+    const autoRefreshToken = async () => {
+        console.log('[UserProvider] autoRefreshToken: Checking conditions...');
+        
+        // This effect now depends on `isProfileLoading`. It will re-run when it changes.
+        if (isProfileLoading) {
+            console.log('[UserProvider] autoRefreshToken: Skipped, profile is still loading.');
+            return;
+        }
+
+        if (!userProfile?.uid) {
+            console.log(`[UserProvider] autoRefreshToken: Skipped, no valid user profile loaded.`);
+            return;
+        }
+
+        if ('serviceWorker' in navigator) {
+            try {
+                await navigator.serviceWorker.ready;
+                console.log('[UserProvider] Service Worker is ready. Triggering silent token refresh.');
+                // Pass `true` for a silent check
+                refreshToken(true); 
+            } catch (swErr) {
+                console.error("[UserProvider] Service Worker not ready for auto-refresh:", swErr);
             }
+        } else {
+             console.log('[UserProvider] Service Worker not supported in this browser.');
+        }
+    };
 
-            if ('serviceWorker' in navigator) {
-                try {
-                    // Wait for the Service Worker to be ready to avoid race conditions.
-                    await navigator.serviceWorker.ready;
-                    console.log('[UserProvider] Service Worker is ready.');
-                    
-                    // Small delay to ensure all Firebase services are stable after initial load.
-                    setTimeout(() => {
-                        console.log('[UserProvider] Attempting to silently update FCM token.');
-                        // Call the hook with `true` to indicate a silent, non-interactive check.
-                        refreshToken(true); 
-                    }, 500); 
-
-                } catch (swErr) {
-                    console.error("[UserProvider] Service Worker not ready for auto-refresh:", swErr);
-                }
-            } else {
-                 console.log('[UserProvider] Service Worker not supported in this browser.');
-            }
-        };
-
-        // This effect will re-run whenever userProfile.uid changes from undefined to a value.
-        autoRefreshToken();
-    }
-  }, [userProfile?.uid, refreshToken]);
+    autoRefreshToken();
+    // CRITICAL FIX: This effect now runs whenever the loading state of the profile changes.
+    // When isProfileLoading goes from true to false, and we have a userProfile, it will run.
+  }, [userProfile, isProfileLoading, refreshToken]);
 
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));

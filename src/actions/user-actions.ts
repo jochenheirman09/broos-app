@@ -298,8 +298,8 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
  * exists to avoid unnecessary writes. This is the "Token Sync" best practice.
  */
 export async function saveFcmToken(userId: string, token: string): Promise<{ success: boolean; message: string }> {
-    const logPrefix = `[FCM Token Action] User: ${userId} |`;
-    console.log(`${logPrefix} Server action 'saveFcmToken' invoked with token: ${token.substring(0, 20)}...`);
+    const logPrefix = `[Server Action - saveFcmToken] User: ${userId} |`;
+    console.log(`${logPrefix} Invoked with token: ${token.substring(0, 20)}...`);
 
     if (!userId || !token) {
         console.error(`${logPrefix} Aborted: User ID and token are required.`);
@@ -317,13 +317,13 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
             await tokenRef.set({
                 token: token,
                 createdAt: FieldValue.serverTimestamp(),
+                lastSeen: FieldValue.serverTimestamp(),
                 platform: 'web',
             }, { merge: true });
             console.log(`${logPrefix} Successfully saved NEW token.`);
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
-            console.log(`${logPrefix} Token already exists. Sync complete, no write needed.`);
-            // Optional: update a 'lastSeen' timestamp if you want to prune very old, unused tokens.
+            console.log(`${logPrefix} Token already exists. Updating 'lastSeen' timestamp.`);
             await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
             return { success: true, message: "Token is al up-to-date." };
         }
