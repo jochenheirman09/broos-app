@@ -46,6 +46,7 @@ export const useRequestNotificationPermission = () => {
         // 2. Request Permission if needed
         let finalPermission = currentPermission;
         if (currentPermission === 'default') {
+             // This part should only be triggered by a direct user action (click)
              finalPermission = await Notification.requestPermission();
              if (!isSilent) console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
              if (finalPermission !== 'granted') {
@@ -61,7 +62,6 @@ export const useRequestNotificationPermission = () => {
 
         // 3. Get VAPID Key
         const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-        console.log(`%c[FCM] 🔑 VAPID KEY CHECK: ${vapidKey ? "Aanwezig" : "ONTBREEKT (Undefined)"}`, `color: ${vapidKey ? 'green' : 'red'}; font-weight: bold;`);
         if (!vapidKey) {
             console.error(`%c${logPrefix} CRITICAL: VAPID key not found. Ensure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.`, 'color: red; font-weight: bold;');
             if (!isSilent) toast({ variant: 'destructive', title: 'Configuratiefout', description: 'Client configuration for notifications is missing.' });
@@ -71,15 +71,12 @@ export const useRequestNotificationPermission = () => {
         // 4. Get Token and Save
         try {
             const messaging = getMessaging(app);
-            if (!isSilent) console.log(`${logPrefix} Waiting for Service Worker to be ready...`);
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
-            if (!isSilent) console.log(`${logPrefix} Service Worker is ready. Attempting to get token...`);
-
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
 
             if (currentToken) {
-                if (!isSilent) console.log(`${logPrefix} Token generated: ${currentToken.substring(0, 20)}...`);
-                // Call the server action to save the token
+                if (!isSilent) console.log(`${logPrefix} Token synced: ${currentToken.substring(0, 20)}...`);
+                // The server action now handles checking if the token exists before writing.
                 await saveFcmToken(userId, currentToken);
                 if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {

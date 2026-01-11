@@ -89,29 +89,23 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, isAuthLoading]);
 
-  // Effect to silently update the FCM token on app load if permission is granted.
+  // Effect to silently update the FCM token on app load if permission is already granted.
   useEffect(() => {
-    // This effect runs when the essential loading states change.
-    const autoRefreshToken = () => {
-      console.log('[UserProvider] autoRefreshToken: Checking conditions...');
-
-      if (isAuthLoading || isProfileLoading) {
-        console.log('[UserProvider] autoRefreshToken: Skipped, auth or profile is still loading.');
-        return;
+    const autoTokenSync = () => {
+      if (!isAuthLoading && userProfile?.uid && typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          console.log('[UserProvider] Permission already granted. Attempting silent token sync.');
+          // The requestPermission hook is smart enough to handle this silently.
+          // Passing true for `isSilent` ensures no toasts are shown for this automatic check.
+          requestPermission(userProfile.uid, true); 
+        } else {
+          console.log(`[UserProvider] Skipping auto token sync. Permission is '${Notification.permission}'.`);
+        }
       }
-      if (!userProfile?.uid) {
-        console.log('[UserProvider] autoRefreshToken: Skipped, no valid user profile loaded.');
-        return;
-      }
-      
-      console.log('[UserProvider] autoRefreshToken: Conditions met. Proceeding with silent token sync.');
-      // The requestPermission hook is now smart enough to handle this silently.
-      // Passing true for `isSilent` ensures no toasts are shown for this automatic check.
-      requestPermission(userProfile.uid, true); 
     };
 
-    autoRefreshToken();
-  }, [isAuthLoading, isProfileLoading, userProfile, requestPermission]);
+    autoTokenSync();
+  }, [isAuthLoading, userProfile, requestPermission]);
 
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));

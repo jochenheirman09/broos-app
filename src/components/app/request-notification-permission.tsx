@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -27,7 +26,7 @@ export function RequestNotificationPermission() {
     const handleRequestPermission = async () => {
         if (!user) return;
         setIsLoading(true);
-        // Call the hook to handle the full permission and token flow
+        // Call with isSilent = false to show toasts on success/failure
         const newPermission = await requestPermission(user.uid, false); 
         if (newPermission) {
             setPermissionStatus(newPermission);
