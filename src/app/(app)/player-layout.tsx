@@ -12,16 +12,15 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Wordmark } from "@/components/app/wordmark";
+import { Wordmark } from "./wordmark";
 import { useUser } from "@/context/user-context";
-import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/app/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "../ui/button";
+import { Logo } from "./logo";
+import { ThemeToggle } from "../theme-toggle";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { useState } from "react";
-import { ProfileSheet } from "@/components/app/profile-sheet";
-import { RequestNotificationPermission } from "@/components/app/request-notification-permission";
-import { NotificationBadge } from "@/components/app/notification-badge";
+import { ProfileSheet } from "./profile-sheet";
+import { NotificationBadge } from "./notification-badge";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
@@ -46,9 +45,9 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
   
   return (
     <>
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="flex flex-col h-screen bg-background">
         <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-20 items-center justify-between">
+          <div className="container mx-auto flex h-20 items-center justify-between px-4">
             <Link href="/dashboard" className="flex items-center space-x-3">
               <Logo />
               <Wordmark>Broos 2.0</Wordmark>
@@ -83,11 +82,8 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 pb-24">
-           <div className="container mx-auto py-8">
-              <RequestNotificationPermission />
-              {children}
-            </div>
+        <main className="container flex-grow flex flex-col py-8 overflow-hidden pb-24 px-4">
+           {children}
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">

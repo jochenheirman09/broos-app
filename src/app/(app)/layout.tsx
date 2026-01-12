@@ -88,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <AppHeader />
-      <main className="container mx-auto flex-1 py-8 px-4">
+      <main className="container mx-auto flex-1 flex flex-col py-8 px-4 overflow-hidden">
           {children}
       </main>
       <Toaster />

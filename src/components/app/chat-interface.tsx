@@ -73,7 +73,6 @@ export function ChatInterface() {
     setRetryErrorMessage(null);
     
     try {
-      // The server action is now much simpler.
       const result: BuddyResponse = await chatWithBuddy(user.uid, buddyInput);
 
       if (result.error && result.response) {
@@ -82,8 +81,6 @@ export function ChatInterface() {
         return false;
       }
       
-      // The user and assistant messages are now saved by the server action.
-      // The useCollection hook will update the UI automatically.
       return true;
 
     } catch (error: any) {
@@ -157,69 +154,65 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex flex-col flex-grow">
-        <Card className="flex flex-col flex-grow">
-          <CardHeader>
-            <CardTitle className="flex items-center text-2xl">
-              <MessageSquare className="h-6 w-6 mr-3" />
-              Chat met {buddyName}
-            </CardTitle>
-            <CardDescription>Begin hier je gesprek met je persoonlijke AI-buddy.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-grow flex flex-col overflow-hidden p-0">
-            <div className="flex flex-col h-full">
-              <ScrollArea className="flex-grow">
-                <ScrollViewport ref={viewportRef} className="h-full">
-                  <div className="px-4">
-                    {messages?.map((message) => (
-                      <ChatMessage key={message.id} message={message} />
-                    ))}
-                    {isLoading && (
-                      <div className="flex items-start gap-3 my-4 justify-start">
-                        <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
-                        <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
-                          <Spinner size="small" />
-                          <span className="text-muted-foreground italic">{buddyName} denkt na...</span>
-                        </div>
-                      </div>
-                    )}
-                    {lastFailedMessage && !isLoading && (
-                      <div className="flex items-start gap-3 my-4 justify-start">
-                        <BuddyAvatar className="h-10 w-10 border-2 border-destructive" />
-                        <div className="bg-destructive/10 rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex flex-col items-start gap-2">
-                            <p className="text-destructive/90">{retryErrorMessage || "Kon het laatste bericht niet verwerken."}</p>
-                            <Button variant="destructive" size="sm" onClick={handleRetry}>
-                                <RotateCw className="h-4 w-4 mr-2" />
-                                Opnieuw proberen
-                            </Button>
-                        </div>
-                      </div>
-                    )}
+    <Card className="flex flex-col flex-grow h-full overflow-hidden">
+      <CardHeader>
+        <CardTitle className="flex items-center text-2xl">
+          <MessageSquare className="h-6 w-6 mr-3" />
+          Chat met {buddyName}
+        </CardTitle>
+        <CardDescription>Begin hier je gesprek met je persoonlijke AI-buddy.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex-grow flex flex-col p-0 overflow-hidden">
+        <ScrollArea className="flex-grow">
+          <ScrollViewport ref={viewportRef} className="h-full">
+            <div className="px-4 py-2">
+              {messages?.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              {isLoading && (
+                <div className="flex items-start gap-3 my-4 justify-start">
+                  <BuddyAvatar className="h-10 w-10 border-2 border-primary" />
+                  <div className="bg-muted rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex items-center gap-2">
+                    <Spinner size="small" />
+                    <span className="text-muted-foreground italic">{buddyName} denkt na...</span>
                   </div>
-                </ScrollViewport>
-              </ScrollArea>
-              <div className="p-4 border-t">
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <Input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Typ je bericht..."
-                    autoComplete="off"
-                    disabled={isLoading || (!messages)}
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={isLoading || !input.trim() || (!messages)}
-                  >
-                    <SendHorizonal className="h-5 w-5" />
-                  </Button>
-                </form>
-              </div>
+                </div>
+              )}
+              {lastFailedMessage && !isLoading && (
+                <div className="flex items-start gap-3 my-4 justify-start">
+                  <BuddyAvatar className="h-10 w-10 border-2 border-destructive" />
+                  <div className="bg-destructive/10 rounded-2xl rounded-tl-none px-4 py-3 shadow-clay-card flex flex-col items-start gap-2">
+                      <p className="text-destructive/90">{retryErrorMessage || "Kon het laatste bericht niet verwerken."}</p>
+                      <Button variant="destructive" size="sm" onClick={handleRetry}>
+                          <RotateCw className="h-4 w-4 mr-2" />
+                          Opnieuw proberen
+                      </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </ScrollViewport>
+        </ScrollArea>
+        <div className="p-4 border-t">
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Typ je bericht..."
+              autoComplete="off"
+              disabled={isLoading || (!messages)}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={isLoading || !input.trim() || (!messages)}
+            >
+              <SendHorizonal className="h-5 w-5" />
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

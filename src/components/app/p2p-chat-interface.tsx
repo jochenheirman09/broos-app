@@ -108,11 +108,12 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
   }, [user, chatId]);
 
   useEffect(() => {
-    // Scroll to bottom when new messages arrive.
     if (viewportRef.current) {
-      viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior: 'smooth' });
+      viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior: 'auto' });
     }
-    // Mark as read when messages are loaded or change.
+  }, [messages, isSubmitting]);
+
+  useEffect(() => {
     handleMarkAsRead();
   }, [messages, handleMarkAsRead]);
 
@@ -123,13 +124,10 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     const localFormContent = data.content;
     form.reset();
     
-    // Generate a unique ID for the message on the client.
     const messageId = uuidv4();
 
-    // Fire-and-forget the server action. UI updates will come via the listener.
     sendP2PMessage(chatId, user.uid, localFormContent, messageId).catch(err => {
       console.error("Failed to send message:", err);
-      // Optionally, revert the input field and show a toast
       form.setValue('content', localFormContent);
     });
   };
@@ -169,58 +167,54 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
     }
 
   return (
-    <div className="flex flex-col flex-grow">
-      <Card className="flex flex-col flex-grow">
-        <CardHeader className="flex-row items-center gap-4">
-          <Link href="/p2p-chat" passHref>
-             <Button variant="ghost" size="icon" className="h-8 w-8">
-                <ArrowLeft />
-             </Button>
-          </Link>
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={chatAvatarUrl} />
-            <AvatarFallback className="bg-muted-foreground/20 font-bold">
-              {chatAvatarFallback}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <CardTitle className="text-xl">{chatName}</CardTitle>
-            <p className="text-sm text-muted-foreground truncate max-w-xs">{subTitle}</p>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-grow flex flex-col overflow-hidden p-0">
-          <div className="flex flex-col h-full">
-            <ScrollArea className="flex-grow">
-              <ScrollViewport ref={viewportRef} className="h-full">
-                <div className="px-4">
-                  {messages?.map((message) => (
-                    <ChatMessage key={message.id} message={message} currentUserId={user!.uid} chatData={chatData} />
-                  ))}
-                  {isSubmitting && (
-                    <div className="flex items-center gap-2 justify-end my-2 text-muted-foreground text-sm">
-                      <Spinner size="small" />
-                      <span>Verzenden...</span>
-                    </div>
-                  )}
+    <Card className="flex flex-col flex-grow h-full overflow-hidden">
+      <CardHeader className="flex-row items-center gap-4 shrink-0">
+        <Link href="/p2p-chat" passHref>
+           <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ArrowLeft />
+           </Button>
+        </Link>
+        <Avatar className="h-12 w-12">
+          <AvatarImage src={chatAvatarUrl} />
+          <AvatarFallback className="bg-muted-foreground/20 font-bold">
+            {chatAvatarFallback}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <CardTitle className="text-xl">{chatName}</CardTitle>
+          <p className="text-sm text-muted-foreground truncate max-w-xs">{subTitle}</p>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-grow flex flex-col p-0 overflow-hidden">
+        <ScrollArea className="flex-grow">
+          <ScrollViewport ref={viewportRef} className="h-full">
+            <div className="px-4 py-2">
+              {messages?.map((message) => (
+                <ChatMessage key={message.id} message={message} currentUserId={user!.uid} chatData={chatData} />
+              ))}
+              {isSubmitting && (
+                <div className="flex items-center gap-2 justify-end my-2 text-muted-foreground text-sm">
+                  <Spinner size="small" />
+                  <span>Verzenden...</span>
                 </div>
-              </ScrollViewport>
-            </ScrollArea>
-            <div className="p-4 border-t">
-              <form onSubmit={form.handleSubmit(handleSendMessage)} className="flex gap-2">
-                <Input
-                  {...form.register('content')}
-                  placeholder="Typ je bericht..."
-                  autoComplete="off"
-                  disabled={isSubmitting}
-                />
-                <Button type="submit" size="icon" disabled={isSubmitting || !form.watch('content')?.trim()}>
-                  {isSubmitting ? <Spinner size="small" /> : <SendHorizonal className="h-5 w-5" />}
-                </Button>
-              </form>
+              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </ScrollViewport>
+        </ScrollArea>
+        <div className="p-4 border-t shrink-0">
+          <form onSubmit={form.handleSubmit(handleSendMessage)} className="flex gap-2">
+            <Input
+              {...form.register('content')}
+              placeholder="Typ je bericht..."
+              autoComplete="off"
+              disabled={isSubmitting}
+            />
+            <Button type="submit" size="icon" disabled={isSubmitting || !form.watch('content')?.trim()}>
+              {isSubmitting ? <Spinner size="small" /> : <SendHorizonal className="h-5 w-5" />}
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
