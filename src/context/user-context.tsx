@@ -91,13 +91,18 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Effect to silently update the FCM token on app load if permission is already granted.
   useEffect(() => {
+    // This effect runs when the user profile has been loaded.
     const autoTokenSync = () => {
       if (!isAuthLoading && userProfile?.uid && typeof window !== 'undefined' && 'Notification' in window) {
+        // If permission is already granted, we can try to get the token silently.
         if (Notification.permission === 'granted') {
           console.log('[UserProvider] Permission already granted. Attempting silent token sync.');
           // The requestPermission hook is smart enough to handle this silently.
-          // Passing true for `isSilent` ensures no toasts are shown for this automatic check.
-          requestPermission(userProfile.uid, true); 
+          // Pass true for `isSilent` to ensure no toasts are shown for this automatic check.
+          const timer = setTimeout(() => {
+            requestPermission(userProfile.uid, true);
+          }, 1000); // Give the browser 1 second to settle before syncing.
+          return () => clearTimeout(timer);
         } else {
           console.log(`[UserProvider] Skipping auto token sync. Permission is '${Notification.permission}'.`);
         }

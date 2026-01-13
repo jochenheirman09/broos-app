@@ -46,6 +46,10 @@ export const useRequestNotificationPermission = () => {
         // 2. Request Permission if needed
         let finalPermission = currentPermission;
         if (currentPermission === 'default') {
+             if (isSilent) {
+                console.log(`${logPrefix} Permission is 'default'. Skipping silent request.`);
+                return 'default';
+             }
              // This part should only be triggered by a direct user action (click)
              finalPermission = await Notification.requestPermission();
              if (!isSilent) console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
@@ -71,7 +75,15 @@ export const useRequestNotificationPermission = () => {
         // 4. Get Token and Save
         try {
             const messaging = getMessaging(app);
+            // Wait for the service worker to be ready AND active.
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
+            
+            if (!serviceWorkerRegistration.active) {
+                console.warn(`${logPrefix} Service Worker is ready but not active yet. Aborting token retrieval for now.`);
+                // This can happen on first load. The next app load or a manual click will succeed.
+                return;
+            }
+            
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
 
             if (currentToken) {
