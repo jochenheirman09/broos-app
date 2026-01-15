@@ -22,50 +22,48 @@ export default function P2PChatOverviewPage() {
   const isPlayer = userProfile?.role === 'player';
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap justify-between items-start gap-4">
-            <div className="flex-grow">
-              <CardTitle className="flex items-center text-2xl">
-                <Users className="h-6 w-6 mr-3" />
-                Team Chat
-              </CardTitle>
-              <CardDescription>
-                Bekijk je bestaande gesprekken of start een nieuw gesprek met je teamleden.
-              </CardDescription>
-            </div>
-            {!isPlayer && (
-                 <Link href="/dashboard" passHref>
-                    <Button variant="outline" className="w-full sm:w-auto">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Terug naar Dashboard
-                    </Button>
-                 </Link>
-            )}
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap justify-between items-start gap-4">
+          <div className="flex-grow">
+            <CardTitle className="flex items-center text-2xl">
+              <Users className="h-6 w-6 mr-3" />
+              Team Chat
+            </CardTitle>
+            <CardDescription>
+              Bekijk je bestaande gesprekken of start een nieuw gesprek met je teamleden.
+            </CardDescription>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="existing">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
-              <TabsTrigger value="existing">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Bestaande Gesprekken
-              </TabsTrigger>
-              <TabsTrigger value="new">
-                <Users className="mr-2 h-4 w-4" />
-                Nieuw Gesprek
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="existing" className="mt-6">
-              <ExistingChatsList />
-            </TabsContent>
-            <TabsContent value="new" className="mt-6">
-                <NewChat />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
+          {!isPlayer && (
+                <Link href="/dashboard" passHref>
+                  <Button variant="outline" className="w-full sm:w-auto">
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Terug naar Dashboard
+                  </Button>
+                </Link>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="existing">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
+            <TabsTrigger value="existing">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Bestaande Gesprekken
+            </TabsTrigger>
+            <TabsTrigger value="new">
+              <Users className="mr-2 h-4 w-4" />
+              Nieuw Gesprek
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="existing" className="mt-6">
+            <ExistingChatsList />
+          </TabsContent>
+          <TabsContent value="new" className="mt-6">
+              <NewChat />
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }

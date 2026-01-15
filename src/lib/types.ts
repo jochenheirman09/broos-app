@@ -1,3 +1,4 @@
+
 export type UserRole = "player" | "staff" | "responsible";
 export type Gender = "male" | "female";
 
@@ -230,6 +231,8 @@ export interface WellnessAnalysisInput {
     userMessage: string;
     chatHistory?: string;
     retrievedDocs?: any;
+    today?: string; // e.g., '2024-05-21'
+    dayName?: DayOfWeek; // e.g., 'tuesday'
     todayActivity?: string;
     currentTime?: string;
     familySituation?: string;
@@ -241,6 +244,7 @@ export interface WellnessAnalysisInput {
     personalDetails?: string;
     isGameDay?: boolean;
     game?: Partial<Game>;
+    missingTopics?: (keyof WellnessScore)[];
 }
 
 export interface FullWellnessAnalysisOutput {

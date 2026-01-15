@@ -33,6 +33,8 @@ import { doc, setDoc } from "firebase/firestore";
 import type { UserRole, Gender } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
+import Link from "next/link";
+
 
 const roles: UserRole[] = ["player", "staff", "responsible"];
 const genders: { value: Gender; labelPlayer: string; labelAdult: string }[] = [
@@ -58,6 +60,7 @@ const formSchema = z
     acceptedTerms: z.literal<boolean>(true, {
       errorMap: () => ({ message: "Je moet akkoord gaan met de voorwaarden." }),
     }),
+    acceptedDPA: z.boolean().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Wachtwoorden komen niet overeen.",
@@ -66,7 +69,12 @@ const formSchema = z
   .refine((data) => (data.role === 'responsible') || (data.teamCode && data.teamCode.length > 0), {
     message: "Team uitnodigingscode is vereist voor spelers en staf.",
     path: ["teamCode"],
+  })
+  .refine((data) => (data.role !== 'responsible') || (data.acceptedDPA === true), {
+      message: "Als clubbeheerder moet je akkoord gaan met de verwerkersovereenkomst.",
+      path: ["acceptedDPA"],
   });
+
 
 
 export function RegisterForm() {
@@ -89,6 +97,7 @@ export function RegisterForm() {
       role: selectedRole || undefined,
       teamCode: "",
       acceptedTerms: false,
+      acceptedDPA: false,
     },
   });
 
@@ -311,21 +320,21 @@ export function RegisterForm() {
               <div className="space-y-1 leading-none">
                 <FormLabel>
                   Ik ga akkoord met de{" "}
-                  <a
+                  <Link
                     href="/terms-and-conditions"
                     target="_blank"
                     className="text-primary hover:underline"
                   >
                     algemene voorwaarden
-                  </a>{" "}
+                  </Link>{" "}
                   en het{" "}
-                  <a
+                  <Link
                     href="/privacy-policy"
                     target="_blank"
                     className="text-primary hover:underline"
                   >
                     privacybeleid
-                  </a>
+                  </Link>
                   .
                 </FormLabel>
                 <FormMessage />
@@ -333,6 +342,37 @@ export function RegisterForm() {
             </FormItem>
           )}
         />
+        
+        {watchedRole === 'responsible' && (
+           <FormField
+              control={form.control}
+              name="acceptedDPA"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 shadow-clay-inset bg-accent/10">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Als clubverantwoordelijke ga ik namens de club akkoord met de{" "}
+                      <Link
+                        href="/dpa"
+                        target="_blank"
+                        className="text-primary hover:underline"
+                      >
+                        Verwerkersovereenkomst (DPA)
+                      </Link>
+                      .
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+        )}
         
         <Button
           type="submit"

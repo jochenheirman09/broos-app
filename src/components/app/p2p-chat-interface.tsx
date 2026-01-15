@@ -168,9 +168,9 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
 
   return (
     <Card className="flex flex-col flex-grow h-full overflow-hidden">
-      <CardHeader className="flex-row items-center gap-4 shrink-0">
+      <CardHeader className="flex-row items-center gap-4 shrink-0 border-b p-3">
         <Link href="/p2p-chat" passHref>
-           <Button variant="ghost" size="icon" className="h-8 w-8">
+           <Button variant="ghost" size="icon" className="h-10 w-10">
               <ArrowLeft />
            </Button>
         </Link>
@@ -180,13 +180,14 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
             {chatAvatarFallback}
           </AvatarFallback>
         </Avatar>
-        <div>
-          <CardTitle className="text-xl">{chatName}</CardTitle>
-          <p className="text-sm text-muted-foreground truncate max-w-xs">{subTitle}</p>
+        <div className="min-w-0">
+          <CardTitle className="text-xl truncate">{chatName}</CardTitle>
+          <p className="text-sm text-muted-foreground truncate">{subTitle}</p>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow flex flex-col p-0 overflow-hidden">
-        <ScrollArea className="flex-grow">
+      
+      <CardContent className="flex-grow p-0 flex flex-col overflow-hidden">
+        <ScrollArea className="flex-grow h-0">
           <ScrollViewport ref={viewportRef} className="h-full">
             <div className="px-4 py-2">
               {messages?.map((message) => (
@@ -201,7 +202,9 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
             </div>
           </ScrollViewport>
         </ScrollArea>
-        <div className="p-4 border-t shrink-0">
+      </CardContent>
+      
+      <div className="p-4 border-t shrink-0 bg-background">
           <form onSubmit={form.handleSubmit(handleSendMessage)} className="flex gap-2">
             <Input
               {...form.register('content')}
@@ -214,7 +217,6 @@ export function P2PChatInterface({ chatId, chatData }: P2PChatInterfaceProps) {
             </Button>
           </form>
         </div>
-      </CardContent>
     </Card>
   );
 }

@@ -24,55 +24,26 @@ export default function TermsAndConditionsPage() {
         <CardContent className="prose dark:prose-invert max-w-none">
           <h2>Inleiding</h2>
           <p>
-            Dit is een placeholder voor uw algemene voorwaarden. Het is van
-            cruciaal belang dat u dit vervangt door een volledig, juridisch
-            getoetst document.
+            Welkom bij Broos 2.0. Door deze applicatie te gebruiken, gaat u akkoord met deze voorwaarden.
           </p>
+           <p className="font-bold text-destructive">
+            LET OP: Dit is een concepttekst en dient als placeholder. Raadpleeg een jurist om ervoor te zorgen dat uw algemene voorwaarden volledig en juridisch bindend zijn.
+          </p>
+          
+          <h2>1. Gebruik van de Dienst</h2>
+            <p>Broos 2.0 is een hulpmiddel voor mentaal welzijn, geen medisch of therapeutisch apparaat. De AI-buddy is ontworpen als ondersteunende partner en is geen vervanging voor professionele psychologische of medische hulp. Beslissingen die u neemt op basis van interacties met de AI zijn uw eigen verantwoordelijkheid.</p>
 
-          <h2>Belangrijke Punten om op te nemen:</h2>
-          <ul>
-            <li>
-              <strong>Definitie van de Dienst:</strong> Beschrijf wat de Broos
-              2.0-app doet: een AI-gestuurde buddy voor het mentaal welzijn van
-              jonge sporters.
-            </li>
-            <li>
-              <strong>Toestemming voor minderjarigen:</strong> Neem een clausule
-              op die expliciet vermeldt dat gebruikers onder de 16 jaar
-              toestemming van hun ouders of wettelijke voogd nodig hebben om de
-              app te gebruiken. Dit dekt u juridisch in voor de toekomstige
-              implementatie van een ouderlijk toestemmingsmechanisme.
-            </li>
-            <li>
-              <strong>Gebruiksregels:</strong> Verbied misbruik van de app, het
-              invoeren van illegale of schadelijke content, en het proberen te
-              hacken van de service.
-            </li>
-            <li>
-              <strong>Rol van de AI:</strong> Maak duidelijk dat de AI-buddy
-              een ondersteunend hulpmiddel is en geen vervanging voor
-              professionele medische of psychologische hulp.
-            </li>
-            <li>
-              <strong>Beperking van Aansprakelijkheid:</strong> Vrijwaar uw
-              bedrijf van aansprakelijkheid voor beslissingen die gebruikers
-              nemen op basis van de interacties met de AI.
-            </li>
-            <li>
-              <strong>Intellectueel Eigendom:</strong> Stel dat de app, de
-              merknaam en alle door de AI gegenereerde content (zoals 'weetjes'
-              en samenvattingen) eigendom zijn van uw bedrijf.
-            </li>
-            <li>
-              <strong>Beëindiging van het account:</strong> Beschrijf onder
-              welke omstandigheden een account kan worden opgeschort of
-              verwijderd (bijv. bij misbruik).
-            </li>
-          </ul>
-          <p className="font-bold text-destructive">
-            Raadpleeg een jurist om ervoor te zorgen dat uw algemene voorwaarden
-            juridisch waterdicht zijn en aansluiten bij uw bedrijfsmodel.
-          </p>
+          <h2>2. Toestemming voor Minderjarigen</h2>
+            <p>Indien u jonger bent dan 16 jaar, bevestigt u door gebruik te maken van deze app dat u toestemming heeft van een ouder of wettelijke voogd. Wij behouden ons het recht voor om mechanismen te implementeren om deze toestemming te verifiëren.</p>
+          
+          <h2>3. Intellectueel Eigendom</h2>
+            <p>Alle content, de merknaam "Broos 2.0", de software, en de door de AI gegenereerde inzichten en samenvattingen zijn intellectueel eigendom van de makers van deze applicatie en mogen niet zonder toestemming worden gekopieerd of verspreid.</p>
+
+          <h2>4. Gedragsregels</h2>
+            <p>U stemt ermee in de applicatie niet te gebruiken voor illegale doeleinden, het lastigvallen van anderen, of het proberen te omzeilen van de beveiligingsmaatregelen. Misbruik kan leiden tot onmiddellijke beëindiging van uw account.</p>
+
+            <h2>5. Beperking van Aansprakelijkheid</h2>
+            <p>De makers van Broos 2.0 zijn niet aansprakelijk voor enige directe of indirecte schade die voortvloeit uit het gebruik of de onmogelijkheid tot gebruik van de applicatie.</p>
         </CardContent>
       </Card>
     </div>

@@ -45,7 +45,7 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
   
   return (
     <>
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="flex flex-col h-screen bg-background">
         <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto flex h-20 items-center justify-between px-4">
             <Link href="/dashboard" className="flex items-center space-x-3">
@@ -82,7 +82,8 @@ export function PlayerLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="container flex-1 py-8 pb-24 px-4">
+        {/* This main element now correctly lets its children manage their own height and scrolling */}
+        <main className="container mx-auto flex-grow flex flex-col py-8 pb-24 overflow-y-auto">
            {children}
         </main>
 

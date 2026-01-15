@@ -1,9 +1,10 @@
+
 'use server';
 
 import { getFirebaseAdmin } from '@/ai/genkit';
 import { runOnboardingFlow } from '@/ai/flows/onboarding-flow';
 import { runWellnessAnalysisFlow } from '@/ai/flows/wellness-analysis-flow';
-import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, Game } from '@/lib/types';
+import type { UserProfile, WellnessAnalysisInput, ScheduleActivity, Game, WellnessScore } from '@/lib/types';
 import { GenkitError } from 'genkit';
 import { getDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -47,6 +48,8 @@ export async function chatWithBuddy(
     const now = new Date();
     const today = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const currentTime = formatInTimeZone(now, timeZone, 'HH:mm');
+    const dayName = dayMapping[getDay(now)] as keyof UserProfile['schedule'];
+
 
     const isSystemStartMessage = input.userMessage === 'Start het gesprek voor vandaag.';
     if (!isSystemStartMessage) {
@@ -62,7 +65,7 @@ export async function chatWithBuddy(
     }
     const userProfile = userDoc.data() as UserProfile;
 
-    const dayName = dayMapping[getDay(now)];
+    // Determine today's activity
     let todayActivity: ScheduleActivity | 'individual' = 'rest';
     let isGameDay = false;
     let game: Partial<Game> = {};
@@ -88,20 +91,46 @@ export async function chatWithBuddy(
         const gameDoc = await gameDocRef.get();
         if (gameDoc.exists) game = gameDoc.data() as Game;
     }
+
+    // Determine which wellness topics are still missing for today
+    const wellnessDoc = await userRef.collection('wellnessScores').doc(today).get();
+    const wellnessData = wellnessDoc.data() as WellnessScore | undefined;
+    const allTopics: (keyof WellnessScore)[] = ['mood', 'stress', 'rest', 'motivation', 'familyLife', 'school', 'hobbys', 'food'];
     
+    const missingTopics = allTopics.filter(topic => {
+      // Also check for legacy 'sleep' key when checking for 'rest'
+      if (topic === 'rest' && wellnessData) {
+          return wellnessData.rest === undefined && (wellnessData as any).sleep === undefined;
+      }
+      return !wellnessData || wellnessData[topic] === undefined;
+    });
+
+
+    // Get chat history
     const messagesSnapshot = await userRef.collection('chats').doc(today).collection('messages').orderBy('sortOrder', 'asc').get();
     const chatHistory = messagesSnapshot.docs.map(doc => `${doc.data().role}: ${doc.data().content}`).join('\n');
     const isFirstInteraction = messagesSnapshot.docs.length <= 1;
     console.log(`[Chat Action] History fetched. Is first interaction: ${isFirstInteraction}`);
 
-    const enrichedInput: WellnessAnalysisInput = { ...input, currentTime, chatHistory, todayActivity, isGameDay, game };
+    // Enrich the input with all necessary context
+    const enrichedInput: WellnessAnalysisInput = { 
+        ...input, 
+        currentTime,
+        today,
+        dayName,
+        chatHistory, 
+        todayActivity, 
+        isGameDay, 
+        game,
+        missingTopics: missingTopics.length > 0 ? missingTopics : undefined,
+    };
 
     let result;
     if (!userProfile.onboardingCompleted) {
       console.log('[Chat Action] Routing to onboarding flow.');
       result = await runOnboardingFlow(userRef, userProfile, enrichedInput, isFirstInteraction);
     } else {
-      console.log('[Chat Action] Routing to wellness analysis flow.');
+      console.log(`[Chat Action] Routing to wellness analysis flow. Missing topics: ${missingTopics.join(', ')}`);
       result = await runWellnessAnalysisFlow(userRef, userProfile, enrichedInput);
     }
     
@@ -109,6 +138,7 @@ export async function chatWithBuddy(
     await saveAssistantResponse(userId, today, result.response);
     console.log("[Chat Action] Assistant response saved.");
     
+    // Trigger background analysis with the full history
     const finalChatHistory = chatHistory + `\nuser: ${input.userMessage}\nassistant: ${result.response}`;
     analyzeAndSaveChatData(userId, finalChatHistory).catch(err => {
         console.error(`[Chat Action] Background analysis failed for user ${userId}:`, err);

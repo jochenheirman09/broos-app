@@ -16,10 +16,20 @@ const OnboardingOutputSchema = z.object({
     summary: z.string().optional().describe("Een beknopte samenvatting (1-2 zinnen) van de input van de gebruiker, alleen als isTopicComplete waar is."),
 });
 
+const OnboardingPromptInputSchema = z.object({
+  userMessage: z.string(),
+  currentTopic: z.string(),
+  chatHistory: z.string().optional(),
+  currentTime: z.string(),
+  today: z.string(),
+  dayName: z.string(),
+});
+
+
 const onboardingBuddyPromptPromise = aiPromise.then(ai => ai.definePrompt({
-    name: 'onboardingBuddyPrompt_v6_stable',
+    name: 'onboardingBuddyPrompt_v7_timefix',
     model: googleAI.model('gemini-2.5-flash'),
-    input: { schema: z.any() },
+    input: { schema: OnboardingPromptInputSchema },
     output: { schema: OnboardingOutputSchema },
     prompt: `
         Je bent een empathische AI-psycholoog voor een jonge atleet.
@@ -27,6 +37,7 @@ const onboardingBuddyPromptPromise = aiPromise.then(ai => ai.definePrompt({
         Je antwoord ('response') MOET in het Nederlands zijn.
 
         HUIDIG ONDERWERP: '{{{currentTopic}}}'.
+        CONTEXT: Tijd: {{{currentTime}}}, Dag: {{{dayName}}}, Datum: {{{today}}}.
 
         TAAK:
         1.  **Houd het gesprek luchtig en informeel.** Stel een open vraag over het onderwerp.
@@ -64,7 +75,15 @@ export async function runOnboardingFlow(
         return { response: "Het lijkt erop dat we elkaar al kennen! Waar wil je het vandaag over hebben?", isTopicComplete: true, summary: "Onboarding was al voltooid." };
     }
     
-    const onboardingInput: OnboardingInput = { ...input, currentTopic: nextTopic };
+    // Ensure all necessary fields are passed to the prompt
+    const onboardingInput: z.infer<typeof OnboardingPromptInputSchema> = {
+        userMessage: input.userMessage,
+        currentTopic: nextTopic,
+        chatHistory: input.chatHistory,
+        currentTime: input.currentTime!,
+        today: input.today!,
+        dayName: input.dayName!,
+    };
     
     const { output } = await onboardingBuddyPrompt(onboardingInput);
 

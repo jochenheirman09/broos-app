@@ -118,14 +118,14 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
     });
 
     const analysisPrompt = ai.definePrompt({
-        name: 'chatDataExtractorPrompt_v6_final',
+        name: 'chatDataExtractorPrompt_v7_explicit',
         model: googleAI.model('gemini-2.5-flash'),
         input: { schema: z.object({ chatHistory: z.string() }) },
         output: { schema: AnalysisOutputSchema },
         prompt: `
             Je bent een data-analist. Analyseer het volgende gesprek en extraheer de data.
             - **Samenvatting:** Geef een korte samenvatting van het hele gesprek.
-            - **Welzijnsscores:** Leid scores (1-5) en redenen af voor de 8 welzijnsthema's. VRAAG NOOIT OM EEN SCORE. Een hoog stress-cijfer betekent WEINIG stress.
+            - **Welzijnsscores:** Leid scores (1-5) en redenen af voor ALLE volgende welzijnsthema's op basis van het HELE gesprek: Stemming, Stress, Rust, Motivatie, Thuis, School, Hobby's, Voeding. Vul ALLEEN de velden in waar je informatie over hebt gevonden. Een hoog stress-cijfer betekent WEINIG stress.
             - **Alerts (STRIKT):** Genereer ALLEEN een alert bij DUIDELIJKE rode vlaggen. Een slechte dag of "het ging niet goed" is GEEN alert.
                 - **Contactverzoek:** Als de speler expliciet vraagt om met een vertrouwenspersoon te praten (bv. "ja, ik wil praten"), creëer een 'Request for Contact' alert. De 'triggeringMessage' MOET de letterlijke vraag van de speler zijn. Zet 'shareWithStaff' op 'true'.
                 - **Andere Alerts:** Zoek naar expliciete vermeldingen van:
@@ -159,20 +159,23 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
             const wellnessDocRef = userDocRef.collection('wellnessScores').doc(today);
             const wellnessDoc = await transaction.get(wellnessDocRef);
             
-            if (wellnessDoc.exists) {
+            if (wellnessDoc.exists && wellnessDoc.data()?.summary) { // Also check if a summary exists to confirm it's not a partial doc
                 console.log(`[Analysis Service] Transaction Aborted: Data for user ${userId} on ${today} already analyzed.`);
                 return; // Abort if data already exists for today.
             }
 
             // --- Proceed with all writes within the transaction ---
-
+            
+            // For wellness and chat, we use merge: true to avoid overwriting fields
+            // that might be set by other processes, even though this transaction should be the main source.
             if (output.summary) {
                 const chatDocRef = userDocRef.collection('chats').doc(today);
                 transaction.set(chatDocRef, { summary: output.summary, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
             if (output.wellnessScores && Object.keys(output.wellnessScores).length > 0) {
-                transaction.set(wellnessDocRef, { ...output.wellnessScores, date: today, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+                 transaction.set(wellnessDocRef, { ...output.wellnessScores, summary: output.summary, date: today, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
             }
+
             if (output.gameUpdate && Object.keys(output.gameUpdate).length > 0) {
                 const gameDocRef = userDocRef.collection('games').doc(today);
                 transaction.set(gameDocRef, { ...output.gameUpdate, date: today, userId, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
@@ -182,14 +185,11 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
                 const userData = userDoc.data() as UserProfile | undefined;
                 if (userData?.clubId && userData?.teamId) {
                     
-                    // Create a unique hash for the alert to prevent duplicates of the exact same message on the same day.
                     const alertHash = createHash('md5').update(userId + today + output.alert.triggeringMessage).digest('hex');
                     const alertDocRef = adminDb.collection('clubs').doc(userData.clubId).collection('teams').doc(userData.teamId).collection('alerts').doc(alertHash);
-
                     const isRequestForContact = output.alert.alertType === 'Request for Contact';
                     const shareWithStaff = isRequestForContact ? false : (output.alert.shareWithStaff ?? false);
 
-                    // Set the alert data, which will only happen if the document doesn't exist (part of the transaction's purpose)
                     transaction.set(alertDocRef, {
                         ...output.alert,
                         id: alertDocRef.id,
@@ -212,5 +212,3 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
         console.error(`[Analysis Service] CRITICAL: Failed to analyze and save data for user ${userId}:`, error);
     }
 }
-
-    

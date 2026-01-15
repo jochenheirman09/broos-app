@@ -155,15 +155,15 @@ export function ChatInterface() {
 
   return (
     <Card className="flex flex-col flex-grow h-full overflow-hidden">
-      <CardHeader>
+      <CardHeader className="shrink-0">
         <CardTitle className="flex items-center text-2xl">
           <MessageSquare className="h-6 w-6 mr-3" />
           Chat met {buddyName}
         </CardTitle>
         <CardDescription>Begin hier je gesprek met je persoonlijke AI-buddy.</CardDescription>
       </CardHeader>
-      <CardContent className="flex-grow flex flex-col p-0 overflow-hidden">
-        <ScrollArea className="flex-grow">
+      <CardContent className="flex-grow p-0 flex flex-col overflow-hidden">
+        <ScrollArea className="flex-grow h-0">
           <ScrollViewport ref={viewportRef} className="h-full">
             <div className="px-4 py-2">
               {messages?.map((message) => (
@@ -193,7 +193,8 @@ export function ChatInterface() {
             </div>
           </ScrollViewport>
         </ScrollArea>
-        <div className="p-4 border-t">
+      </CardContent>
+      <div className="p-4 border-t bg-background shrink-0">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <Input
               value={input}
@@ -211,7 +212,6 @@ export function ChatInterface() {
             </Button>
           </form>
         </div>
-      </CardContent>
     </Card>
   );
 }

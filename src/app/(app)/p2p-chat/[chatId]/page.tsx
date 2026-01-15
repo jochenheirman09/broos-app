@@ -1,4 +1,3 @@
-
 'use client';
 
 import { use } from 'react';
@@ -56,9 +55,7 @@ function P2PChatLoader({ chatId }: { chatId: string }) {
 export default function P2PChatPage({ params }: { params: { chatId: string } }) {
   const { chatId } = params;
   
-  return (
-    <div className="flex flex-col flex-grow h-full">
-        <P2PChatLoader chatId={chatId} />
-    </div>
-  );
+  // Removed the container div. The P2PChatLoader will now be a direct child
+  // of the main layout, which handles padding and centering.
+  return <P2PChatLoader chatId={chatId} />;
 }

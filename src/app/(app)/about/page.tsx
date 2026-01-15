@@ -17,9 +17,10 @@ import {
   Users,
   AlertTriangle,
   ArrowLeft,
+  ShieldCheck,
 } from "lucide-react";
 import { useUser } from "@/context/user-context";
-import packageJson from "../../../../package.json"; // Import package.json
+import packageJson from "../../../../package.json";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -27,7 +28,6 @@ export default function AboutPage() {
   const { userProfile } = useUser();
   const buddyName = userProfile?.buddyName || "Broos";
   const appVersion = packageJson.version;
-  // Lees de commit hash uit de environment variables
   const commitHash = process.env.NEXT_PUBLIC_GIT_COMMIT_SHA;
 
   const features = [
@@ -35,7 +35,7 @@ export default function AboutPage() {
       icon: <Sparkles className="h-8 w-8 text-primary" />,
       title: `Je Persoonlijke AI Buddy (${buddyName})`,
       description:
-        `${buddyName} is een empathische psycholoog, gespecialiseerd in het welzijn van jonge atleten. Hij voert natuurlijke, ondersteunende gesprekken om je te helpen reflecteren op je dag.`,
+        `${buddyName} is een empathische applicatie, gedreven door AI en ondersteund door specifieke psychologische documentatie, gespecialiseerd in het welzijn van jonge atleten.`,
     },
     {
       icon: <HeartPulse className="h-8 w-8 text-primary" />,
@@ -50,16 +50,22 @@ export default function AboutPage() {
         `${buddyName} houdt rekening met jouw schema, zoals trainingen en wedstrijden, om relevante en tijdige vragen te stellen. Het voelt als een echt gesprek, geen interview.`,
     },
     {
-      icon: <Users className="h-8 w-8 text-primary" />,
-      title: "Veilige Ruimte",
+      icon: <ShieldCheck className="h-8 w-8 text-green-500" />,
+      title: "Jouw Data, Jouw Controle",
       description:
-        `Alle gesprekken zijn vertrouwelijk. ${buddyName} creëert een veilige, niet-oordelende omgeving waar je vrijuit kunt praten over wat je bezighoudt.`,
+        "Gesprekken zijn 100% privé. Niemand kan ze lezen. Stafleden zien alleen anonieme teamgemiddelden (bv. 'de gemiddelde slaapscore was 3/5'). Voor het delen van details over een specifieke alert wordt ALTIJD je expliciete toestemming gevraagd.",
+    },
+    {
+      icon: <Users className="h-8 w-8 text-primary" />,
+      title: "Veilige & Private Ruimte",
+      description:
+        "Jouw gesprekken met Broos zijn 100% privé. Niemand anders binnen de club, ook niet de staf, kan deze gesprekken inzien. Jouw data is van jou.",
     },
     {
       icon: <AlertTriangle className="h-8 w-8 text-destructive" />,
-      title: "Alert Systeem",
+      title: "Alert Systeem met Toestemming",
       description:
-        `Als ${buddyName} alarmerende signalen opvangt in je gesprek, zoals extreme negativiteit of serieuze problemen, wordt er discreet een melding gemaakt naar de clubstaf zodat ze je kunnen ondersteunen.`,
+        `Als ${buddyName} een ernstig signaal opvangt, zal het ALTIJD eerst jouw toestemming vragen voordat er een discrete melding wordt gemaakt naar de clubstaf. Jij behoudt de controle.`,
     },
   ];
 

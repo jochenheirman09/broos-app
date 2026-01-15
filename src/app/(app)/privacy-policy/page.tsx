@@ -24,59 +24,67 @@ export default function PrivacyPolicyPage() {
         <CardContent className="prose dark:prose-invert max-w-none">
           <h2>Inleiding</h2>
           <p>
-            Dit is een placeholder voor uw privacybeleid. Het is van cruciaal
-            belang dat u dit vervangt door een volledig, juridisch getoetst
-            document, vooral omdat u gegevens van minderjarigen verwerkt.
+            Welkom bij Broos 2.0. Wij hechten het grootste belang aan de privacy en veiligheid van onze gebruikers, in het bijzonder minderjarigen. Dit beleid legt uit welke gegevens we verzamelen, waarom we dat doen, en hoe we die beschermen.
+          </p>
+           <p className="font-bold text-destructive">
+            LET OP: Dit is een concepttekst en dient als placeholder. Raadpleeg een jurist om ervoor te zorgen dat uw privacybeleid volledig voldoet aan de GDPR en andere relevante wetgeving voordat u de applicatie live zet.
           </p>
 
-          <h2>Belangrijke Punten om op te nemen:</h2>
+          <h2>1. Welke gegevens verzamelen wij?</h2>
           <ul>
             <li>
-              <strong>Welke gegevens worden verzameld:</strong> Wees specifiek.
-              Noem e-mail, naam, geboortedatum, team/club-ID, en de inhoud van
-              chats met de AI-buddy.
+              <strong>Accountgegevens:</strong> Naam, e-mailadres, geboortedatum, rol (speler, staf, etc.), en team/club-affiliatie.
             </li>
             <li>
-              <strong>Doel van de gegevensverzameling:</strong> Leg uit waarom u
-              deze gegevens nodig heeft: voor accountbeheer, om de AI-buddy te
-              laten functioneren, voor welzijnsanalyse en om stafleden te
-              alarmeren bij serieuze problemen.
+              <strong>Gespreksdata:</strong> De inhoud van de gesprekken die u voert met uw AI-buddy. Deze data is strikt vertrouwelijk.
             </li>
-            <li>
-              <strong>Gegevens van minderjarigen:</strong> Beschrijf uw
-              procedures voor het verwerken van gegevens van gebruikers onder de
-              16 jaar, inclusief de noodzaak van ouderlijke toestemming.
+             <li>
+              <strong>Welzijnsdata:</strong> Gegevens die de AI afleidt uit gesprekken, zoals scores voor stemming, stress, en slaap. Deze worden gebruikt voor uw persoonlijke dashboard.
             </li>
-            <li>
-              <strong>Delen van gegevens:</strong> Maak duidelijk dat
-              persoonlijke chatdata vertrouwelijk is, maar dat geaggregeerde,
-              anonieme trends en specifieke, ernstige alerts gedeeld kunnen
-              worden met clubpersoneel.
-            </li>
-            <li>
-              <strong>Bewaartermijnen:</strong> Definieer hoe lang u
-              verschillende soorten gegevens bewaart (bijv. accountgegevens tot
-              verwijdering, chatlogs voor 1 jaar).
-            </li>
-            <li>
-              <strong>Beveiliging:</strong> Beschrijf de technische maatregelen
-              die u neemt om de gegevens te beveiligen (bv. versleuteling,
-              beveiligde servers via Firebase).
-            </li>
-            <li>
-              <strong>Rechten van de gebruiker (GDPR):</strong> Leg uit hoe
-              gebruikers (of hun ouders) hun gegevens kunnen inzien, corrigeren
-              of laten verwijderen.
-            </li>
-            <li>
-              <strong>Contactgegevens:</strong> Vermeld een duidelijk
-              contactpunt voor privacygerelateerde vragen.
+             <li>
+              <strong>Technische data:</strong> Anonieme data over app-gebruik om de service te verbeteren.
             </li>
           </ul>
-          <p className="font-bold text-destructive">
-            Raadpleeg een jurist om ervoor te zorgen dat uw privacybeleid
-            volledig voldoet aan de GDPR en andere relevante wetgeving.
-          </p>
+
+          <h2>2. Waarom verzamelen wij deze gegevens?</h2>
+          <ul>
+            <li>
+              Om uw account te beheren en u toegang te geven tot de juiste functionaliteiten (speler- of stafdashboard).
+            </li>
+            <li>
+              Om de AI-buddy in staat te stellen een persoonlijk en contextbewust gesprek met u te voeren.
+            </li>
+            <li>
+              Om u persoonlijke inzichten en visualisaties te tonen op uw dashboard.
+            </li>
+             <li>
+              Om geaggregeerde, anonieme rapportages te genereren voor clubstaf, zonder individuele data te onthullen.
+            </li>
+             <li>
+              Om een alert-systeem te voeden dat, na uw expliciete toestemming, de staf kan waarschuwen bij ernstige welzijnsproblemen.
+            </li>
+          </ul>
+
+          <h2>3. Delen van Gegevens</h2>
+            <p>Uw privacy is onze prioriteit. We delen uw data als volgt:</p>
+            <ul>
+                <li><strong>Strikt Vertrouwelijk:</strong> Uw persoonlijke chatgesprekken worden met niemand gedeeld.</li>
+                <li><strong>Met Toestemming:</strong> In het geval van een serieuze alert (bv. meldingen over mentale gezondheid), zal de AI u ALTIJD expliciet vragen of de details van dat specifieke bericht gedeeld mogen worden met de bevoegde clubstaf. Zonder uw "ja", wordt er alleen een anonieme melding gemaakt.</li>
+                <li><strong>Anoniem & Geaggregeerd:</strong> Voor team- en clubrapportages worden alleen gemiddelden en trends gebruikt (bv. "het gemiddelde stressniveau van het team was 3.5/5"). Individuele scores zijn nooit herleidbaar.</li>
+            </ul>
+
+          <h2>4. Gegevens van Minderjarigen</h2>
+            <p>Wij zijn ons ervan bewust dat we gegevens van minderjarigen verwerken. We vereisen dat gebruikers onder de 16 jaar toestemming hebben van een ouder of wettelijke voogd om deze app te gebruiken, zoals beschreven in onze Algemene Voorwaarden.</p>
+
+           <h2>5. Uw Rechten (GDPR)</h2>
+            <p>U heeft het recht om:</p>
+            <ul>
+                <li>Uw gegevens in te zien.</li>
+                <li>Uw gegevens te corrigeren.</li>
+                <li>Uw gegevens volledig te laten verwijderen (het recht op vergetelheid).</li>
+            </ul>
+            <p>Neem contact met ons op via [uw-contact-email] om gebruik te maken van deze rechten.</p>
+
         </CardContent>
       </Card>
     </div>

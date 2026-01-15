@@ -89,27 +89,43 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, isAuthLoading]);
 
-  // Effect to silently update the FCM token on app load if permission is already granted.
+  // Robust "Silent Sync" for FCM tokens, now with visibility change listener.
   useEffect(() => {
-    // This effect runs when the user profile has been loaded.
-    const autoTokenSync = () => {
-      if (!isAuthLoading && userProfile?.uid && typeof window !== 'undefined' && 'Notification' in window) {
-        // If permission is already granted, we can try to get the token silently.
-        if (Notification.permission === 'granted') {
-          console.log('[UserProvider] Permission already granted. Attempting silent token sync.');
-          // The requestPermission hook is smart enough to handle this silently.
-          // Pass true for `isSilent` to ensure no toasts are shown for this automatic check.
-          const timer = setTimeout(() => {
-            requestPermission(userProfile.uid, true);
-          }, 1000); // Give the browser 1 second to settle before syncing.
-          return () => clearTimeout(timer);
-        } else {
-          console.log(`[UserProvider] Skipping auto token sync. Permission is '${Notification.permission}'.`);
-        }
+    // 1. Guard Clause: Don't do anything if we don't have the necessary info yet.
+    if (isAuthLoading || !userProfile?.uid) return;
+
+    // 2. Define the core sync logic.
+    const silentTokenSync = () => {
+      // Check if permission has *already* been granted. Don't ask for it here.
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        console.log("🔄 Auto-sync: Permission is granted. Attempting silent token sync.");
+        // The hook handles the rest: waiting for SW, getting token, saving to DB.
+        // We pass `true` for isSilent to suppress success toasts.
+        requestPermission(userProfile.uid, true);
+      } else {
+        console.log("ℹ️ Auto-sync: Conditions not met (permission not granted or still loading).");
       }
     };
 
-    autoTokenSync();
+    // 3. Define the event handler for when the app becomes visible.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("📱 App became visible, re-running silent token sync...");
+        silentTokenSync();
+      }
+    };
+
+    // 4. Initial Run + Event Listener Setup
+    // Give the browser a moment to settle after initial load before the first run.
+    const timer = setTimeout(silentTokenSync, 1500);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 5. Cleanup
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    
   }, [isAuthLoading, userProfile, requestPermission]);
 
 

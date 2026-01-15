@@ -131,13 +131,13 @@ export function WellnessChart() {
           let value = scoreDoc[key as keyof WellnessScore] as number | undefined;
           let reason = scoreDoc[`${key}Reason` as keyof WellnessScore] as string | undefined;
 
-          // Handle 'rest' vs 'sleep' legacy data
+          // Handle 'rest' vs 'sleep' legacy data. 'rest' is the new standard.
           if (key === 'rest' && !value && scoreDoc.sleep) {
             value = scoreDoc.sleep;
             reason = scoreDoc.sleepReason;
           }
 
-          if (value !== undefined && value !== 0) {
+          if (value !== undefined && value !== null && value !== 0) {
             latestValue = value;
             latestReason = reason;
             latestDate = scoreDoc.date;
@@ -146,7 +146,7 @@ export function WellnessChart() {
         }
       }
 
-      const isPlaceholder = !latestValue || latestValue === 0;
+      const isPlaceholder = latestValue === undefined || latestValue === null || latestValue === 0;
       const displayValue = isPlaceholder ? 3 : Number(latestValue);
       const lastUpdatedFormatted = latestDate ? format(new Date(`${latestDate}T00:00:00`), 'EEE', { locale: nl }) : undefined;
 
