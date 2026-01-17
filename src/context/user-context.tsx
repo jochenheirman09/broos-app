@@ -91,37 +91,43 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Robust "Silent Sync" for FCM tokens, now with visibility change listener.
   useEffect(() => {
+    console.log('[Token Sync Effect] Running effect...');
     // 1. Guard Clause: Don't do anything if we don't have the necessary info yet.
-    if (isAuthLoading || !userProfile?.uid) return;
+    if (isAuthLoading || !userProfile?.uid) {
+      console.log(`[Token Sync Effect] Skipping: isAuthLoading=${isAuthLoading}, userProfile=${!!userProfile?.uid}`);
+      return;
+    }
 
     // 2. Define the core sync logic.
     const silentTokenSync = () => {
       // Check if permission has *already* been granted. Don't ask for it here.
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        console.log("🔄 Auto-sync: Permission is granted. Attempting silent token sync.");
+        console.log("🔄 [Token Sync Effect] Auto-sync: Permission is granted. Attempting silent token sync.");
         // The hook handles the rest: waiting for SW, getting token, saving to DB.
         // We pass `true` for isSilent to suppress success toasts.
         requestPermission(userProfile.uid, true);
       } else {
-        console.log("ℹ️ Auto-sync: Conditions not met (permission not granted or still loading).");
+        console.log(`ℹ️ [Token Sync Effect] Auto-sync: Conditions not met (permission=${Notification.permission}).`);
       }
     };
 
     // 3. Define the event handler for when the app becomes visible.
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log("📱 App became visible, re-running silent token sync...");
+        console.log("📱 [Token Sync Effect] App became visible, re-running silent token sync...");
         silentTokenSync();
       }
     };
 
     // 4. Initial Run + Event Listener Setup
+    console.log('[Token Sync Effect] Setting up initial timer and visibility listener.');
     // Give the browser a moment to settle after initial load before the first run.
     const timer = setTimeout(silentTokenSync, 1500);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     // 5. Cleanup
     return () => {
+      console.log('[Token Sync Effect] Cleaning up timer and listener.');
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

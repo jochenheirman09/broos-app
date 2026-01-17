@@ -316,14 +316,16 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
                 lastSeen: FieldValue.serverTimestamp(),
                 platform: 'web',
             });
+            console.log(`${logPrefix} ✅ Successfully CREATED token document.`);
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
             console.log(`${logPrefix} Token exists. Updating 'lastSeen' timestamp.`);
             await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
+            console.log(`${logPrefix} ✅ Successfully UPDATED token document.`);
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {
-        console.error(`${logPrefix} 🔥 CRITICAL: Error saving token to Firestore:`, error);
+        console.error(`[Server Action - saveFcmToken] 🔥 CRITICAL: Error saving token to Firestore:`, error);
         return { success: false, message: error.message || "Failed to save token to database." };
     }
 }

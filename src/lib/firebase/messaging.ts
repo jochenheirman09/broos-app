@@ -23,23 +23,23 @@ export const useRequestNotificationPermission = () => {
      */
     const requestPermission = useCallback(async (userId: string, isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
         const logPrefix = `[FCM] User: ${userId} |`;
-        if (!isSilent) console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
+        console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
 
         if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
-            if (!isSilent) console.warn(`${logPrefix} Notifications not supported in this environment.`);
+            console.warn(`${logPrefix} Notifications not supported in this environment.`);
             return 'denied';
         }
 
         if (!app || !userId) {
-            if (!isSilent) console.error(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
+            console.error(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
             return;
         }
 
         // 1. Check Current Permission
         const currentPermission = Notification.permission;
-        if (!isSilent) console.log(`${logPrefix} Current permission state: '${currentPermission}'.`);
-        if (currentPermission === 'denied' && !isSilent) {
-             toast({ variant: 'destructive', title: 'Permissie Geblokkeerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
+        console.log(`${logPrefix} Current permission state: '${currentPermission}'.`);
+        if (currentPermission === 'denied') {
+             if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geblokkeerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
              return 'denied';
         }
 
@@ -50,9 +50,9 @@ export const useRequestNotificationPermission = () => {
                 console.log(`${logPrefix} Permission is 'default'. Skipping silent request.`);
                 return 'default';
              }
-             // This part should only be triggered by a direct user action (click)
+             console.log(`${logPrefix} Requesting browser permission...`);
              finalPermission = await Notification.requestPermission();
-             if (!isSilent) console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
+             console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
              if (finalPermission !== 'granted') {
                  if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geweigerd' });
                  return finalPermission;
@@ -60,6 +60,7 @@ export const useRequestNotificationPermission = () => {
         }
         
         if (finalPermission !== 'granted') {
+          console.log(`${logPrefix} Final permission is not 'granted'. Aborting.`);
           return finalPermission;
         }
 
@@ -73,6 +74,7 @@ export const useRequestNotificationPermission = () => {
         
         // 4. Get Token and Save
         try {
+            console.log(`${logPrefix} Permission granted. Proceeding to get token...`);
             const messaging = getMessaging(app);
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
             
@@ -80,15 +82,17 @@ export const useRequestNotificationPermission = () => {
                 console.warn(`${logPrefix} Service Worker is ready but not active yet. Aborting token retrieval.`);
                 return;
             }
+            console.log(`${logPrefix} Service Worker is active. Calling getToken().`);
             
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
 
             if (currentToken) {
-                if (!isSilent) console.log(`${logPrefix} Token synced: ${currentToken.substring(0, 20)}...`);
+                console.log(`${logPrefix} Token received: ${currentToken.substring(0, 20)}...`);
                 await saveFcmToken(userId, currentToken);
                 if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {
-                throw new Error("Kon geen notificatie-token genereren. Probeer de pagina te vernieuwen.");
+                // This is a common issue, especially on mobile, if the SW isn't fully ready.
+                throw new Error("Kon geen notificatie-token genereren. De Service Worker is mogelijk nog niet volledig actief. Probeer de pagina te vernieuwen.");
             }
         } catch (err: any) {
             console.error(`%c${logPrefix} 🔥 ERROR during token flow:`, 'color: red; font-weight: bold;', err);
