@@ -59,7 +59,6 @@ export const useRequestNotificationPermission = () => {
              }
         }
         
-        // This check is now separate. If permission is granted (either now or previously), we proceed.
         if (finalPermission !== 'granted') {
           return finalPermission;
         }
@@ -75,12 +74,10 @@ export const useRequestNotificationPermission = () => {
         // 4. Get Token and Save
         try {
             const messaging = getMessaging(app);
-            // Wait for the service worker to be ready AND active.
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
             
             if (!serviceWorkerRegistration.active) {
-                console.warn(`${logPrefix} Service Worker is ready but not active yet. Aborting token retrieval for now.`);
-                // This can happen on first load. The next app load or a manual click will succeed.
+                console.warn(`${logPrefix} Service Worker is ready but not active yet. Aborting token retrieval.`);
                 return;
             }
             
@@ -88,7 +85,6 @@ export const useRequestNotificationPermission = () => {
 
             if (currentToken) {
                 if (!isSilent) console.log(`${logPrefix} Token synced: ${currentToken.substring(0, 20)}...`);
-                // The server action now handles checking if the token exists before writing.
                 await saveFcmToken(userId, currentToken);
                 if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {
@@ -118,18 +114,16 @@ export const ForegroundMessageListener = () => {
                 const unsubscribe = onMessage(messaging, (payload) => {
                     console.log('[FCM] Foreground message received. ', payload);
                     
-                    // Construct and show the notification manually
-                    const notification = new Notification(payload.notification?.title || 'Nieuw Bericht', {
+                    const notification = new Notification(payload.notification?.title || 'New Message', {
                         body: payload.notification?.body,
                         icon: payload.notification?.icon,
-                        data: payload.data // Pass along the data payload
+                        data: payload.data
                     });
 
-                    // Handle notification click
                     notification.onclick = (event) => {
-                        event.preventDefault(); // Prevent the browser from focusing the Notification's tab
+                        event.preventDefault();
                         const link = payload.data?.link || '/';
-                        window.open(link, '_blank');
+                        window.open(link, '_self');
                         notification.close();
                     }
                 });

@@ -1,3 +1,4 @@
+
 "use server";
 import { getFirebaseAdmin } from "@/ai/genkit";
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
@@ -271,8 +272,6 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
       throw new Error("Je hebt geen toegang tot de leden van dit team.");
   }
 
-  // This query will fail on the client if there's no index on 'teamId'.
-  // However, it should work fine from the Admin SDK on the server.
   const membersQuery = adminDb.collection('users').where('teamId', '==', teamId);
   const snapshot = await membersQuery.get();
   
@@ -281,9 +280,6 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
     return [];
   }
 
-  // Post-filter to ensure all returned members are from the requester's club.
-  // This is a redundant security check as Firestore rules should enforce this,
-  // but it's good practice for server actions.
   const members = snapshot.docs
     .map(doc => ({ ...doc.data() as UserProfile, id: doc.id }))
     .filter(member => member.clubId === requesterProfile.clubId);
@@ -293,8 +289,9 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
 }
 
 /**
- * Saves a user's FCM token to Firestore. It first checks if the token already
- * exists to avoid unnecessary writes. This is the "Token Sync" best practice.
+ * Saves a user's FCM token to Firestore. This server action is idempotent:
+ * it creates the token document if it doesn't exist, and updates the `lastSeen`
+ * timestamp if it does.
  */
 export async function saveFcmToken(userId: string, token: string): Promise<{ success: boolean; message: string }> {
     const logPrefix = `[Server Action - saveFcmToken] User: ${userId} |`;
@@ -312,19 +309,17 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
         const doc = await tokenRef.get();
         
         if (!doc.exists) {
-            console.log(`${logPrefix} Token does not exist in DB. Creating new document.`);
+            console.log(`${logPrefix} Token does not exist. Creating new document.`);
             await tokenRef.set({
                 token: token,
                 createdAt: FieldValue.serverTimestamp(),
                 lastSeen: FieldValue.serverTimestamp(),
                 platform: 'web',
-            }, { merge: true });
-            console.log(`${logPrefix} ✅ Successfully saved NEW token.`);
+            });
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
-            console.log(`${logPrefix} Token already exists. Updating 'lastSeen' timestamp.`);
+            console.log(`${logPrefix} Token exists. Updating 'lastSeen' timestamp.`);
             await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
-             console.log(`${logPrefix} ✅ Successfully synced existing token.`);
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {

@@ -1,31 +1,53 @@
+
 // public/firebase-messaging-sw.js
 
-// 1. Import the v8 compatibility scripts (most stable for this environment)
 importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
 importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
 
-// 2. Initialize with your HARDCODED config values
-// IMPORTANT: Do not use process.env here. The service worker runs in a different context.
-firebase.initializeApp({
-  apiKey: "AIzaSyBVOId-CRlTD6oKqvZ0CxKSFxObOoHEHd8",
-  authDomain: "studio-5690519872-e0869.firebaseapp.com",
-  projectId: "studio-5690519872-e0869",
-  storageBucket: "studio-5690519872-e0869.appspot.com",
-  messagingSenderId: "796529432751",
-  appId: "1:796529432751:web:da147b13f407d67aaf9c5a"
+let isInitialized = false;
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'FIREBASE_CONFIG' && !isInitialized) {
+    firebase.initializeApp(event.data.firebaseConfig);
+    const messaging = firebase.messaging();
+    isInitialized = true;
+    console.log('[SW] Firebase Initialized.');
+
+    messaging.onBackgroundMessage((payload) => {
+      console.log('[SW] Received background message: ', payload);
+      
+      const notificationTitle = payload.notification?.title || 'New Message';
+      const notificationOptions = {
+        body: payload.notification?.body,
+        icon: payload.notification?.icon || '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        data: { link: payload.data?.link || '/' } // Pass link data
+      };
+
+      self.registration.showNotification(notificationTitle, notificationOptions);
+    });
+  }
 });
 
-const messaging = firebase.messaging();
+self.addEventListener('notificationclick', (event) => {
+    console.log('[SW] Notification clicked. Data:', event.notification.data);
+    event.notification.close();
 
-// 3. Handle background messages (required for FCM)
-messaging.onBackgroundMessage(function(payload) {
-  console.log('[firebase-messaging-sw.js] Background message received ', payload);
-  
-  const notificationTitle = payload.notification.title || "Nieuw bericht";
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/icons/icon-192x192.png'
-  };
+    const link = event.notification.data?.link || '/';
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    // This looks for an existing window and focuses it, or opens a new one.
+    event.waitUntil(
+        clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+            if (clientList.length > 0) {
+                let client = clientList[0];
+                for (let i = 0; i < clientList.length; i++) {
+                    if (clientList[i].focused) {
+                        client = clientList[i];
+                    }
+                }
+                return client.focus().then(c => c.navigate(link));
+            }
+            return clients.openWindow(link);
+        })
+    );
 });

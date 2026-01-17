@@ -1,3 +1,4 @@
+
 "use client";
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -35,10 +36,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       // CRITICAL FIX: Send Firebase config to the Service Worker after it's ready.
       navigator.serviceWorker.ready.then((registration) => {
         console.log('[AppProviders] Service Worker is ready. Posting FIREBASE_CONFIG.');
-        registration.active?.postMessage({
-          type: 'FIREBASE_CONFIG',
-          firebaseConfig: firebaseConfig
-        });
+        if (registration.active) {
+            registration.active.postMessage({
+                type: 'FIREBASE_CONFIG',
+                firebaseConfig: firebaseConfig
+            });
+        }
       }).catch(err => console.error("Service Worker ready error:", err));
     }
   }, []);
