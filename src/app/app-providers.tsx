@@ -12,28 +12,32 @@ import { useEffect } from "react";
 export function AppProviders({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
-    // This effect ensures the PWA service worker (for offline caching) is registered.
-    if (
-      typeof window !== 'undefined' &&
-      'serviceWorker' in navigator 
-    ) {
+    // This effect handles PWA service worker registration and updates.
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       const wb = (window as any).workbox;
+
       if (wb) {
-         wb.addEventListener('waiting', () => {
-          console.log('[PWA] A new version is available. Activating...');
+        // This listener is crucial. When a new SW is installed, it waits.
+        // We receive this event and tell it to take over immediately.
+        wb.addEventListener('waiting', () => {
+          console.log('[PWA] A new service worker is waiting. Telling it to activate.');
           wb.messageSkipWaiting();
         });
-
-        wb.addEventListener('controlling', () => {
-          console.log('[PWA] New service worker has taken control. Reloading page.');
-          window.location.reload();
-        });
         
+        // Register the service worker. This also implicitly checks for updates.
         wb.register();
         console.log('[PWA] Service worker registered by workbox.');
       }
+
+      // This is the core fix. When the new service worker finally takes control,
+      // we force a page reload to get the latest client-side code and prevent
+      // errors from mismatched server action IDs.
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('[PWA] Controller has changed. Reloading page to get latest version.');
+        window.location.reload();
+      });
       
-      // CRITICAL FIX: Send Firebase config to the Service Worker after it's ready.
+      // CRITICAL: Send Firebase config to the Service Worker after it's ready.
       navigator.serviceWorker.ready.then((registration) => {
         console.log('[AppProviders] Service Worker is ready. Posting FIREBASE_CONFIG.');
         if (registration.active) {
