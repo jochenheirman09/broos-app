@@ -1,5 +1,17 @@
-
 // public/firebase-messaging-sw.js
+
+// Force the new service worker to activate immediately.
+self.addEventListener('install', (event) => {
+  console.log('[SW] New version installing...');
+  self.skipWaiting();
+});
+
+// Take control of all open clients (tabs, windows) as soon as the new SW activates.
+self.addEventListener('activate', (event) => {
+  console.log('[SW] New version activating...');
+  event.waitUntil(clients.claim());
+});
+
 
 importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
 importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
