@@ -93,47 +93,42 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const logPrefix = '👁️ [Visibility Sync Effect]';
 
-    // 1. Guard Clause: Don't run if essential data is missing.
     if (!userProfile?.uid) {
         console.log(`${logPrefix} Skipping: userProfile.uid is not available.`);
         return;
     }
     
-    // 2. The core sync logic.
     const performSync = async () => {
         console.log(`${logPrefix} Triggered. Document visible: ${document.visibilityState === 'visible'}.`);
+        if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
+            return;
+        }
+
         try {
             console.log(`${logPrefix} Waiting for Service Worker to be ready...`);
             await navigator.serviceWorker.ready;
             console.log(`${logPrefix} Service Worker is ready.`);
             
-            // The `requestPermission` hook now contains all the logic to get and save the token silently.
-            // It will check for 'granted' permission internally. We pass `true` for isSilent.
+            // Pass `true` for isSilent. The hook will now correctly do nothing if permission is 'default'.
             await requestPermission(userProfile.uid, true);
         } catch (err) {
             console.error(`${logPrefix} CRITICAL: Failed during sync operation:`, err);
         }
     };
+    
+    const initialSyncTimeout = setTimeout(performSync, 2000);
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', performSync);
+    
+    console.log(`${logPrefix} Initialized with a 2s delay and added visibility/focus listeners.`);
 
-    // 3. Define the event handler for when the app becomes visible.
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
             performSync();
         }
     };
 
-    // 4. Initial run and event listener setup.
-    // Small delay to prevent race conditions on initial app load.
-    const initialSyncTimeout = setTimeout(performSync, 2000);
-    
-    // Listen for when the tab/PWA becomes visible again.
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    // As a fallback, also listen for when the window regains focus.
-    window.addEventListener('focus', performSync);
-    
-    console.log(`${logPrefix} Initialized with a 2s delay and added visibility/focus listeners.`);
-
-    // 5. Cleanup function.
     return () => {
         console.log(`${logPrefix} Cleaning up timeout and listeners.`);
         clearTimeout(initialSyncTimeout);
