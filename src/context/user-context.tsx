@@ -116,18 +116,18 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
     
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            performSync();
+        }
+    };
+    
     const initialSyncTimeout = setTimeout(performSync, 2000);
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', performSync);
     
     console.log(`${logPrefix} Initialized with a 2s delay and added visibility/focus listeners.`);
-
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-            performSync();
-        }
-    };
 
     return () => {
         console.log(`${logPrefix} Cleaning up timeout and listeners.`);
