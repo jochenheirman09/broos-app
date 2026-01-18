@@ -278,7 +278,7 @@ export async function getChatPartnersData(userId: string): Promise<{ teams: With
   const userRef = adminDb.collection('users').doc(userId);
   const userDoc = await userRef.get();
 
-  if (!userDoc.exists) { 
+  if (!userDoc.exists()) { 
     throw new GenkitError({ status: 'NOT_FOUND', message: 'Current user profile not found.' });
   }
   const userProfile = userDoc.data() as UserProfile;
