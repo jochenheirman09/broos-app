@@ -364,44 +364,4 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   return members;
 }
 
-/**
- * Saves a user's FCM token to Firestore. This server action is idempotent:
- * it creates the token document if it doesn't exist, and updates the `lastSeen`
- * timestamp if it does.
- */
-export async function saveFcmToken(userId: string, token: string): Promise<{ success: boolean; message: string }> {
-    const logPrefix = `[Server Action - saveFcmToken] User: ${userId} |`;
-    console.log(`${logPrefix} 🚀 Invoked with token: ${token.substring(0, 20)}...`);
-
-    if (!userId || !token) {
-        console.error(`${logPrefix} ❌ Aborted: User ID and token are required.`);
-        return { success: false, message: "Gebruikers-ID en token zijn vereist." };
-    }
     
-    const { adminDb } = await getFirebaseAdmin();
-    const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
-
-    try {
-        const doc = await tokenRef.get();
-        
-        if (!doc.exists) {
-            console.log(`${logPrefix} ℹ️ Token does not exist. Creating new document.`);
-            await tokenRef.set({
-                token: token,
-                createdAt: FieldValue.serverTimestamp(),
-                lastSeen: FieldValue.serverTimestamp(),
-                platform: 'web',
-            });
-            console.log(`${logPrefix} ✅ Successfully CREATED token document.`);
-            return { success: true, message: "Nieuw token succesvol opgeslagen." };
-        } else {
-            console.log(`${logPrefix} ℹ️ Token exists. Updating 'lastSeen' timestamp.`);
-            await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
-            console.log(`${logPrefix} ✅ Successfully UPDATED token document.`);
-            return { success: true, message: "Token is al up-to-date." };
-        }
-    } catch (error: any) {
-        console.error(`${logPrefix} 🔥 CRITICAL: Error saving token to Firestore:`, error);
-        return { success: false, message: error.message || "Failed to save token to database." };
-    }
-}

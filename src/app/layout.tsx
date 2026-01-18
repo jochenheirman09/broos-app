@@ -37,35 +37,9 @@ export default function RootLayout({
         <AppProviders>
           {children}
         </AppProviders>
-        <script dangerouslySetInnerHTML={{ __html: `
-          (function() {
-            console.log("☢️ Hardcore Sync Triggered");
-            
-            // Functie die we direct aan het window hangen
-            window.forceTokenSync = async function() {
-              alert("PWA Force Sync gestart...");
-              try {
-                const reg = await navigator.serviceWorker.getRegistration();
-                if (!reg) {
-                  alert("Fout: Geen Service Worker gevonden!");
-                  return;
-                }
-                // Roep een globale functie aan of doe de fetch direct
-                console.log("Service worker ready", reg);
-              } catch (e) {
-                alert("Fout bij sync: " + e.message);
-              }
-            };
-
-            // Forceer uitvoering bij ELKE paginalaad, ongeacht React
-            if (document.readyState === 'complete') {
-              window.forceTokenSync();
-            } else {
-              window.addEventListener('load', window.forceTokenSync);
-            }
-          })();
-        ` }} />
       </body>
     </html>
   );
 }
+
+    

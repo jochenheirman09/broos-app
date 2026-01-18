@@ -4,7 +4,6 @@
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useFirebaseApp } from '@/firebase';
 import { useCallback, useEffect } from 'react';
-import { saveFcmToken } from '@/actions/user-actions';
 import { useToast } from '@/hooks/use-toast';
 
 /**
@@ -95,8 +94,19 @@ export const useRequestNotificationPermission = () => {
 
             if (currentToken) {
                 console.log(`${logPrefix} ✅ Token received: ${currentToken.substring(0, 20)}...`);
-                await saveFcmToken(userId, currentToken);
-                console.log(`${logPrefix} ✅ Server action 'saveFcmToken' called successfully.`);
+                
+                const response = await fetch('/api/save-fcm-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: userId, token: currentToken })
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to save token via API.');
+                }
+                
+                console.log(`${logPrefix} ✅ API call to save token successful.`);
                 if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {
                 throw new Error("Kon geen notificatie-token genereren. De Service Worker is mogelijk nog niet volledig actief. Probeer de pagina te vernieuwen.");
@@ -148,3 +158,5 @@ export const ForegroundMessageListener = () => {
     
     return null; // This component does not render anything
 }
+
+    
