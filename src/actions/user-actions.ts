@@ -23,6 +23,82 @@ const generateCode = (length = 8) => {
  * SERVER ACTION to create a club and set admin claims.
  * This is a secure, server-only operation.
  */
+export async function createClubWithLogo(userId: string, clubName: string, logoDataURL?: string): Promise<{ success: boolean; message: string; }> {
+    if (!userId || !clubName) {
+        return { success: false, message: "Gebruikers-ID en clubnaam zijn vereist." };
+    }
+    const { adminDb, adminAuth } = await getFirebaseAdmin();
+    const clubRef = adminDb.collection("clubs").doc();
+
+    try {
+        const batch = adminDb.batch();
+        batch.set(clubRef, {
+            name: clubName,
+            ownerId: userId,
+            id: clubRef.id,
+            invitationCode: generateCode(),
+            ...(logoDataURL && { logoURL: logoDataURL }),
+        });
+        batch.update(adminDb.collection("users").doc(userId), { clubId: clubRef.id });
+        await batch.commit();
+
+        await adminAuth.setCustomUserClaims(userId, { clubId: clubRef.id, role: 'responsible' });
+        
+        return { success: true, message: `Club '${clubName}' succesvol aangemaakt.` };
+    } catch (error: any) {
+        console.error("[Club Action] Fout bij aanmaken club met logo:", error);
+        return { success: false, message: error.message || "Kon de club niet aanmaken." };
+    }
+}
+
+/**
+ * Updates an existing club's logo by saving the new logo as a base64 data URL.
+ * @param clubId The ID of the club to update.
+ * @param logoDataURL The new base64-encoded logo data URL.
+ * @returns An object indicating success or failure.
+ */
+export async function updateClubLogo(clubId: string, logoDataURL: string): Promise<{ success: boolean; message: string; }> {
+    if (!clubId || !logoDataURL) {
+        return { success: false, message: "Club ID en logo zijn vereist." };
+    }
+    const { adminDb } = await getFirebaseAdmin();
+    const clubRef = adminDb.collection("clubs").doc(clubId);
+
+    try {
+        await clubRef.update({ logoURL: logoDataURL });
+        return { success: true, message: "Clublogo succesvol bijgewerkt." };
+    } catch (error: any) {
+        console.error("[Club Action] Fout bij het bijwerken van clublogo:", error);
+        return { success: false, message: error.message || "Kon het clublogo niet bijwerken." };
+    }
+}
+
+
+export async function generateClubInvitationCode(clubId: string): Promise<{ success: boolean; message: string; }> {
+    if (!clubId) {
+        return { success: false, message: "Club ID is required." };
+    }
+
+    console.log(`[Club Action] Generating new invitation code for club ${clubId}`);
+    const { adminDb } = await getFirebaseAdmin();
+    const clubRef = adminDb.collection("clubs").doc(clubId);
+
+    const newCode = generateCode();
+
+    try {
+        await clubRef.update({ invitationCode: newCode });
+        console.log(`[Club Action] Successfully updated invitation code for club ${clubId}.`);
+        return { success: true, message: "Nieuwe code succesvol gegenereerd." };
+    } catch (error: any) {
+        console.error(`[Club Action] Error generating new code for club ${clubId}:`, error);
+        return { success: false, message: "Kon geen nieuwe code genereren." };
+    }
+}
+
+/**
+ * SERVER ACTION to create a club and set admin claims.
+ * This is a secure, server-only operation.
+ */
 export async function createClubAndSetClaims(userId: string, clubName: string, logoDataURL?: string): Promise<{ success: boolean; message: string; }> {
     if (!userId || !clubName) {
         return { success: false, message: "User ID and club name are required." };
@@ -295,10 +371,10 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
  */
 export async function saveFcmToken(userId: string, token: string): Promise<{ success: boolean; message: string }> {
     const logPrefix = `[Server Action - saveFcmToken] User: ${userId} |`;
-    console.log(`${logPrefix} Invoked with token: ${token.substring(0, 20)}...`);
+    console.log(`${logPrefix} 🚀 Invoked with token: ${token.substring(0, 20)}...`);
 
     if (!userId || !token) {
-        console.error(`${logPrefix} Aborted: User ID and token are required.`);
+        console.error(`${logPrefix} ❌ Aborted: User ID and token are required.`);
         return { success: false, message: "Gebruikers-ID en token zijn vereist." };
     }
     
@@ -309,7 +385,7 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
         const doc = await tokenRef.get();
         
         if (!doc.exists) {
-            console.log(`${logPrefix} Token does not exist. Creating new document.`);
+            console.log(`${logPrefix} ℹ️ Token does not exist. Creating new document.`);
             await tokenRef.set({
                 token: token,
                 createdAt: FieldValue.serverTimestamp(),
@@ -319,13 +395,13 @@ export async function saveFcmToken(userId: string, token: string): Promise<{ suc
             console.log(`${logPrefix} ✅ Successfully CREATED token document.`);
             return { success: true, message: "Nieuw token succesvol opgeslagen." };
         } else {
-            console.log(`${logPrefix} Token exists. Updating 'lastSeen' timestamp.`);
+            console.log(`${logPrefix} ℹ️ Token exists. Updating 'lastSeen' timestamp.`);
             await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
             console.log(`${logPrefix} ✅ Successfully UPDATED token document.`);
             return { success: true, message: "Token is al up-to-date." };
         }
     } catch (error: any) {
-        console.error(`[Server Action - saveFcmToken] 🔥 CRITICAL: Error saving token to Firestore:`, error);
+        console.error(`${logPrefix} 🔥 CRITICAL: Error saving token to Firestore:`, error);
         return { success: false, message: error.message || "Failed to save token to database." };
     }
 }

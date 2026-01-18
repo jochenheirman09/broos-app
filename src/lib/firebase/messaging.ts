@@ -26,20 +26,21 @@ export const useRequestNotificationPermission = () => {
         console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
 
         if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
-            console.warn(`${logPrefix} Notifications not supported in this environment.`);
+            console.warn(`${logPrefix} ❌ Notifications not supported in this environment.`);
             return 'denied';
         }
 
         if (!app || !userId) {
-            console.error(`${logPrefix} Request skipped: Firebase App not ready or user not logged in.`);
+            console.error(`${logPrefix} ❌ Request skipped: Firebase App not ready or user not logged in.`);
             return;
         }
 
         // 1. Check Current Permission
         const currentPermission = Notification.permission;
-        console.log(`${logPrefix} Current permission state: '${currentPermission}'.`);
+        console.log(`${logPrefix} ℹ️ Current permission state: '${currentPermission}'.`);
         if (currentPermission === 'denied') {
              if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geblokkeerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
+             console.warn(`${logPrefix} 🛑 Permission is 'denied'. User must change browser settings.`);
              return 'denied';
         }
 
@@ -47,51 +48,54 @@ export const useRequestNotificationPermission = () => {
         let finalPermission = currentPermission;
         if (currentPermission === 'default') {
              if (isSilent) {
-                console.log(`${logPrefix} Permission is 'default'. Skipping silent request.`);
+                console.log(`${logPrefix} 🤫 Permission is 'default'. Skipping silent request as user has not yet interacted.`);
                 return 'default';
              }
-             console.log(`${logPrefix} Requesting browser permission...`);
+             console.log(`${logPrefix} 👉 Requesting browser permission...`);
              finalPermission = await Notification.requestPermission();
              console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
              if (finalPermission !== 'granted') {
                  if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geweigerd' });
+                 console.log(`${logPrefix} ❌ Permission was not granted.`);
                  return finalPermission;
              }
         }
         
         if (finalPermission !== 'granted') {
-          console.log(`${logPrefix} Final permission is not 'granted'. Aborting.`);
+          console.log(`${logPrefix} 🛑 Final permission is not 'granted'. Aborting token retrieval.`);
           return finalPermission;
         }
 
         // 3. Get VAPID Key
         const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
         if (!vapidKey) {
-            console.error(`%c${logPrefix} CRITICAL: VAPID key not found. Ensure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.`, 'color: red; font-weight: bold;');
+            console.error(`%c${logPrefix} 🔥 CRITICAL: VAPID key not found. Ensure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.`, 'color: red; font-weight: bold;');
             if (!isSilent) toast({ variant: 'destructive', title: 'Configuratiefout', description: 'Client configuration for notifications is missing.' });
             return;
         }
         
         // 4. Get Token and Save
         try {
-            console.log(`${logPrefix} Permission granted. Proceeding to get token...`);
+            console.log(`${logPrefix} ✅ Permission granted. Proceeding to get token...`);
             const messaging = getMessaging(app);
+            console.log(`${logPrefix} ⏳ Waiting for service worker to be ready...`);
             const serviceWorkerRegistration = await navigator.serviceWorker.ready;
             
             if (!serviceWorkerRegistration.active) {
-                console.warn(`${logPrefix} Service Worker is ready but not active yet. Aborting token retrieval.`);
+                console.warn(`${logPrefix} ⚠️ Service Worker is ready but not active yet. Aborting token retrieval for now.`);
                 return;
             }
-            console.log(`${logPrefix} Service Worker is active. Calling getToken().`);
+            console.log(`${logPrefix} ✅ Service Worker is active. Calling getToken().`);
             
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
 
             if (currentToken) {
-                console.log(`${logPrefix} Token received: ${currentToken.substring(0, 20)}...`);
+                console.log(`${logPrefix} ✅ Token received: ${currentToken.substring(0, 20)}...`);
+                // Calling the server action to save the token
                 await saveFcmToken(userId, currentToken);
+                console.log(`${logPrefix} ✅ Server action 'saveFcmToken' called successfully.`);
                 if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {
-                // This is a common issue, especially on mobile, if the SW isn't fully ready.
                 throw new Error("Kon geen notificatie-token genereren. De Service Worker is mogelijk nog niet volledig actief. Probeer de pagina te vernieuwen.");
             }
         } catch (err: any) {

@@ -89,50 +89,58 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, isAuthLoading]);
 
-  // Robust "Silent Sync" for FCM tokens, now with visibility change listener.
+  // Robust "Silent Sync" for FCM tokens, using visibilitychange and focus events.
   useEffect(() => {
-    console.log('[Token Sync Effect] Running effect...');
-    // 1. Guard Clause: Don't do anything if we don't have the necessary info yet.
-    if (isAuthLoading || !userProfile?.uid) {
-      console.log(`[Token Sync Effect] Skipping: isAuthLoading=${isAuthLoading}, userProfile=${!!userProfile?.uid}`);
-      return;
-    }
+    const logPrefix = '👁️ [Visibility Sync Effect]';
 
-    // 2. Define the core sync logic.
-    const silentTokenSync = () => {
-      // Check if permission has *already* been granted. Don't ask for it here.
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        console.log("🔄 [Token Sync Effect] Auto-sync: Permission is granted. Attempting silent token sync.");
-        // The hook handles the rest: waiting for SW, getting token, saving to DB.
-        // We pass `true` for isSilent to suppress success toasts.
-        requestPermission(userProfile.uid, true);
-      } else {
-        console.log(`ℹ️ [Token Sync Effect] Auto-sync: Conditions not met (permission=${Notification.permission}).`);
-      }
+    // 1. Guard Clause: Don't run if essential data is missing.
+    if (!userProfile?.uid) {
+        console.log(`${logPrefix} Skipping: userProfile.uid is not available.`);
+        return;
+    }
+    
+    // 2. The core sync logic.
+    const performSync = async () => {
+        console.log(`${logPrefix} Triggered. Document visible: ${document.visibilityState === 'visible'}.`);
+        try {
+            console.log(`${logPrefix} Waiting for Service Worker to be ready...`);
+            await navigator.serviceWorker.ready;
+            console.log(`${logPrefix} Service Worker is ready.`);
+            
+            // The `requestPermission` hook now contains all the logic to get and save the token silently.
+            // It will check for 'granted' permission internally. We pass `true` for isSilent.
+            await requestPermission(userProfile.uid, true);
+        } catch (err) {
+            console.error(`${logPrefix} CRITICAL: Failed during sync operation:`, err);
+        }
     };
 
     // 3. Define the event handler for when the app becomes visible.
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log("📱 [Token Sync Effect] App became visible, re-running silent token sync...");
-        silentTokenSync();
-      }
+        if (document.visibilityState === 'visible') {
+            performSync();
+        }
     };
 
-    // 4. Initial Run + Event Listener Setup
-    console.log('[Token Sync Effect] Setting up initial timer and visibility listener.');
-    // Give the browser a moment to settle after initial load before the first run.
-    const timer = setTimeout(silentTokenSync, 1500);
+    // 4. Initial run and event listener setup.
+    // Small delay to prevent race conditions on initial app load.
+    const initialSyncTimeout = setTimeout(performSync, 2000);
+    
+    // Listen for when the tab/PWA becomes visible again.
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    // As a fallback, also listen for when the window regains focus.
+    window.addEventListener('focus', performSync);
     
-    // 5. Cleanup
+    console.log(`${logPrefix} Initialized with a 2s delay and added visibility/focus listeners.`);
+
+    // 5. Cleanup function.
     return () => {
-      console.log('[Token Sync Effect] Cleaning up timer and listener.');
-      clearTimeout(timer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+        console.log(`${logPrefix} Cleaning up timeout and listeners.`);
+        clearTimeout(initialSyncTimeout);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', performSync);
     };
-    
-  }, [isAuthLoading, userProfile, requestPermission]);
+  }, [userProfile?.uid, requestPermission]);
 
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));
