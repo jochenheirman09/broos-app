@@ -14,11 +14,6 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const LOCK_TIMEOUT_SECONDS = 5 * 60; // 5 minutes
 
-/**
- * Attempts to acquire a distributed lock.
- * @param lockName The name of the lock to acquire.
- * @returns A promise that resolves to true if the lock was acquired, false otherwise.
- */
 async function acquireLock(lockName: string): Promise<boolean> {
     const lockRef = db.collection('_locks').doc(lockName);
     try {
@@ -28,16 +23,13 @@ async function acquireLock(lockName: string): Promise<boolean> {
                 const lockData = lockDoc.data();
                 const lockTime = lockData?.timestamp.toDate();
                 const now = new Date();
-                // Check if the lock has expired
                 if (now.getTime() - lockTime.getTime() > LOCK_TIMEOUT_SECONDS * 1000) {
                     console.log(`[LOCK] Stale lock '${lockName}' found. Overriding.`);
                     transaction.set(lockRef, { timestamp: FieldValue.serverTimestamp() });
                 } else {
-                    // Lock is still active
                     throw new Error(`Lock '${lockName}' is currently held.`);
                 }
             } else {
-                // Lock does not exist, acquire it
                 transaction.set(lockRef, { timestamp: FieldValue.serverTimestamp() });
             }
         });
@@ -50,14 +42,6 @@ async function acquireLock(lockName: string): Promise<boolean> {
 }
 
 
-// NOTE: The nightly analysis job is now triggered via an HTTP request to the
-// Next.js server action endpoint `/api/cron`, not via this Cloud Function.
-// This function can be removed or repurposed.
-
-
-/**
- * 2. MORNING SUMMARY (08:30)
- */
 export const morningSummary = onSchedule({
     schedule: "30 8 * * *",
     timeZone: "Europe/Brussels",
@@ -77,12 +61,11 @@ export const morningSummary = onSchedule({
 
             const role = userData.role;
             const notificationPayload = {
-                notification: {
-                    title: role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten",
-                    body: "Er staan nieuwe updates voor je klaar in de Broos app."
-                },
                 data: {
-                    link: '/dashboard'
+                    title: role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten",
+                    body: "Er staan nieuwe updates voor je klaar in de Broos app.",
+                    link: '/dashboard',
+                    tag: `morning_summary_${userDoc.id}`
                 },
                 webpush: {
                     fcmOptions: {
@@ -100,9 +83,6 @@ export const morningSummary = onSchedule({
 });
 
 
-/**
- * 3. DAILY CHECK-IN REMINDER (17:00)
- */
 export const dailyCheckInReminder = onSchedule({
     schedule: "0 17 * * *",
     timeZone: "Europe/Brussels",
@@ -120,12 +100,11 @@ export const dailyCheckInReminder = onSchedule({
             if (tokens.length > 0) {
                 await admin.messaging().sendEachForMulticast({
                     tokens,
-                    notification: {
-                        title: "Check-in met Broos!",
-                        body: `Hey ${playerDoc.data().name || 'buddy'}, je buddy wacht op je!`
-                    },
                     data: {
-                        link: '/chat'
+                        title: "Check-in met Broos!",
+                        body: `Hey ${playerDoc.data().name || 'buddy'}, je buddy wacht op je!`,
+                        link: '/chat',
+                        tag: `daily_checkin_${playerDoc.id}`
                     },
                     webpush: {
                         fcmOptions: {
@@ -141,10 +120,6 @@ export const dailyCheckInReminder = onSchedule({
 });
 
 
-/**
- * 4. ON ALERT CREATED (v1) - Real-time and Idempotent
- * This function now uses a transaction to ensure a notification is sent only once.
- */
 export const onAlertCreated = functions.firestore
     .document('clubs/{clubId}/teams/{teamId}/alerts/{alertId}')
     .onCreate(async (snapshot, context) => {
@@ -165,7 +140,7 @@ export const onAlertCreated = functions.firestore
             if (shouldSend) {
                 console.log(`[onAlertCreated] ✅ WINNER for alert ${alertRef.id}, preparing to send notification.`);
                 const alertData = snapshot.data() as Alert;
-                const { clubId, teamId } = context.params;
+                const { clubId, teamId, alertId } = context.params;
 
                 const staffQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'staff').where('teamId', '==', teamId);
                 const responsibleQuery = db.collection('users').where('clubId', '==', clubId).where('role', '==', 'responsible');
@@ -194,17 +169,16 @@ export const onAlertCreated = functions.firestore
 
                 if (tokensToSend.length > 0) {
                      const notificationPayload = {
-                        notification: {
-                            title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
-                            body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar."
-                        },
                         data: {
+                            title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
+                            body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar.",
                             link: "/alerts",
                             type: "ALERT",
-                            alertId: context.params.alertId
+                            alertId: alertId,
+                            tag: `alert_${alertId}`,
+                            badge: "1"
                         },
                          webpush: {
-                            notification: { badge: "1" },
                             fcmOptions: { link: "/alerts" }
                         }
                     };
@@ -223,9 +197,6 @@ export const onAlertCreated = functions.firestore
         }
     });
 
-/**
- * HELPER: Fetches all valid FCM tokens for a user from their subcollection.
- */
 async function getTokensForUser(userId: string): Promise<string[]> {
     const snap = await admin.firestore().collection('users').doc(userId).collection('fcmTokens').get();
     if (snap.empty) {
@@ -235,9 +206,6 @@ async function getTokensForUser(userId: string): Promise<string[]> {
 }
 
 
-/**
- * Triggered na registratie om clubId, teamId en rol in te stellen.
- */
 export const setInitialUserClaims = functions.auth.user().onCreate(async (user: functions.auth.UserRecord) => {    
     const uid = user.uid;
 
@@ -290,7 +258,3 @@ export const setInitialUserClaims = functions.auth.user().onCreate(async (user: 
         return null;
     }
 });
-
-    
-
-    

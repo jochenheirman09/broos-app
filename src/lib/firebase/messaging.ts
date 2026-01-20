@@ -1,4 +1,5 @@
-"use client";
+
+'use client';
 
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useFirebaseApp } from '@/firebase';
@@ -41,7 +42,6 @@ export const useRequestNotificationPermission = () => {
                 currentPermission = await Notification.requestPermission();
             }
 
-            // If permission is not granted, exit. Show a toast only if it was a manual attempt.
             if (currentPermission !== 'granted') {
                 console.warn(`${logPrefix} Permission not granted, was '${currentPermission}'.`);
                 if (isManualTrigger) {
@@ -50,23 +50,22 @@ export const useRequestNotificationPermission = () => {
                 return false;
             }
 
-            // Step 2: Permission is granted, explicitly register the service worker to get a registration object.
-            console.log(`${logPrefix} ✅ Permission granted. Explicitly registering SW...`);
+            console.log(`${logPrefix} ✅ Permission granted. Registering SW...`);
+            // THE FIX: Explicitly register the correct service worker file.
             const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log(`${logPrefix} ✅ SW registered with scope: ${registration.scope}. Calling getToken().`);
+            console.log(`${logPrefix} ✅ SW Registered, scope: ${registration.scope}. Calling getToken().`);
 
-            // Step 3: Proceed to get the token, passing the explicit registration.
             const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
             if (!vapidKey) throw new Error("VAPID key ontbreekt in de configuratie.");
 
             const messaging = getMessaging(app);
+            // Pass the specific registration to getToken to avoid ambiguity.
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
 
             if (!currentToken) throw new Error("Kon geen FCM-token genereren. De Service Worker is mogelijk niet actief.");
             
             console.log(`${logPrefix} ✅ Token received: ${currentToken.substring(0,20)}...`);
             
-            // Step 4: Send the token to your server to be saved.
             console.log(`${logPrefix} 📲 Sending token to server via API route...`);
             const response = await fetch('/api/save-fcm-token', {
                 method: 'POST',

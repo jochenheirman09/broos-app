@@ -18,6 +18,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
+import { getMessaging, getToken, deleteToken } from "firebase/messaging";
+
 
 interface UserContextType {
   user: FirebaseUser | null;
@@ -51,6 +53,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const { user, isUserLoading: isAuthLoading } = useFirebaseUser();
   const firestore = useFirestore();
   const auth = useAuth();
+  const app = useFirebaseApp();
   const router = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -92,30 +95,23 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Automatic silent sync and background refresh listener
   useEffect(() => {
-    // This function will be triggered on load and when the app gains focus.
     const silentSync = () => {
       console.log("👁️ [Visibility Sync Effect] Triggered.");
       if (user) {
-        // We call requestPermission with `isManualTrigger` as false.
-        // It will only try to get a token if permission is already 'granted'.
-        // It will NOT show a prompt.
         requestPermission(user, false);
       } else {
         console.log("👁️ [Visibility Sync Effect] Skipping: no user.");
       }
     };
-
-    // Use a small delay on initial load to ensure the service worker is ready.
+    
     const initialSyncTimeout = setTimeout(() => {
       console.log("👁️ [Visibility Sync Effect] Initializing with a 2s delay.");
       silentSync();
     }, 2000);
 
-    // Set up listeners for app visibility
     window.addEventListener('visibilitychange', silentSync);
     window.addEventListener('focus', silentSync);
 
-    // Return a cleanup function
     return () => {
       clearTimeout(initialSyncTimeout);
       window.removeEventListener('visibilitychange', silentSync);
@@ -169,10 +165,43 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     setIsLoggingOut(true);
     setClaimsReady(false);
+    
+    // --- New Logout Logic ---
+    const logPrefix = `[Logout] User: ${user?.uid} |`;
+    if (user && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        console.log(`${logPrefix} Attempting to get current token to disassociate.`);
+        const messaging = getMessaging(app);
+        const currentToken = await getToken(messaging, {
+            vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        });
+
+        if (currentToken) {
+          console.log(`${logPrefix} Found token. Sending to remove endpoint...`);
+          // Fire-and-forget the removal call. Don't block logout if this fails.
+          fetch('/api/remove-fcm-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.uid, token: currentToken }),
+          }).catch(err => console.error(`${logPrefix} Failed to send token for removal:`, err));
+
+          // Also delete the token from the client instance to be safe
+          await deleteToken(messaging);
+          console.log(`${logPrefix} Client token instance deleted.`);
+        } else {
+            console.log(`${logPrefix} No token found on client, nothing to remove.`);
+        }
+      } catch (error) {
+        console.error(`${logPrefix} Error disassociating FCM token:`, error);
+      }
+    }
+    // --- End New Logout Logic ---
+    
     await auth.signOut();
     router.push("/");
     setIsLoggingOut(false);
   };
+
 
   const forceRefetchUser = useCallback(() => {
     forceRefetch();

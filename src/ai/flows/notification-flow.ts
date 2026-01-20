@@ -24,15 +24,15 @@ export async function sendNotification(
     const tokens = tokensSnapshot.docs.map(doc => (doc.data() as FcmToken).token);
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
+    // Use a data-only payload. The service worker will construct the notification.
     const message: MulticastMessage = {
-        notification: {
-            title: title,
-            body: body,
-        },
         data: {
-            title: title || '',
-            body: body || '',
+            title: title || 'Nieuw bericht',
+            body: body || 'Je hebt een nieuw bericht.',
             link: link || '/',
+            tag: id || `broos-message-${Date.now()}`, // Unique tag for idempotency
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-72x72.png',
         },
         android: {
             priority: 'high',
@@ -41,7 +41,7 @@ export async function sendNotification(
             payload: {
                 aps: {
                     'content-available': 1,
-                    sound: 'default', // Using the default device sound for iOS
+                    sound: 'default',
                     badge: 1,
                 },
             },
@@ -50,15 +50,6 @@ export async function sendNotification(
             },
         },
         webpush: {
-            notification: {
-                title: title,
-                body: body,
-                icon: '/icons/icon-192x192.png',
-                badge: '/icons/icon-72x72.png', // A smaller icon for the badge
-                sound: '/sounds/default.mp3', // Path to a default sound file
-                tag: id, 
-                renotify: true,
-            },
             fcmOptions: {
                 link: link || '/',
             },
@@ -66,7 +57,7 @@ export async function sendNotification(
         tokens: tokens,
     };
     
-    console.log('[sendNotification] FCM Payload:', JSON.stringify(message, null, 2));
+    console.log('[sendNotification] FCM Data-Only Payload:', JSON.stringify(message, null, 2));
 
     try {
       const response = await adminMessaging.sendEachForMulticast(message);
@@ -78,7 +69,6 @@ export async function sendNotification(
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
             const errorCode = resp.error?.code;
-            // These error codes indicate that the token is no longer valid.
             if (
               errorCode === 'messaging/invalid-registration-token' ||
               errorCode === 'messaging/registration-token-not-registered'
@@ -91,7 +81,6 @@ export async function sendNotification(
         });
 
         if (tokensToDelete.length > 0) {
-            // Asynchronously delete the invalid tokens from Firestore.
             const batch = adminDb.batch();
             tokensToDelete.forEach(token => {
                 const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
