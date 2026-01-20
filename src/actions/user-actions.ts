@@ -363,5 +363,3 @@ export async function getTeamMembers(requesterId: string, teamId: string): Promi
   console.log(`[User Action] Found ${members.length} members for team ${teamId}.`);
   return members;
 }
-
-    

@@ -5,6 +5,7 @@ import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useFirebaseApp } from '@/firebase';
 import { useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/user-context';
 
 /**
  * A robust, reusable hook for handling FCM notification permission and token management.
@@ -12,35 +13,35 @@ import { useToast } from '@/hooks/use-toast';
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
+    const { user } = useUser();
     const { toast } = useToast();
 
-    /**
-     * Handles the entire flow of requesting permission and syncing the token.
-     * @param userId - The UID of the user to associate the token with.
-     * @param isSilent - If true, logs less and won't show success toasts.
-     * @returns The permission status granted by the user.
-     */
-    const requestPermission = useCallback(async (userId: string, isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
+    const requestPermission = useCallback(async (isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
+        if (!user) {
+          console.log("[FCM] Request skipped: User not logged in.");
+          return;
+        }
+
+        const userId = user.uid;
         const logPrefix = `[FCM] User: ${userId} |`;
         console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
 
         if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
             console.warn(`${logPrefix} ❌ Notifications not supported in this environment.`);
+            if (!isSilent) toast({ variant: "destructive", title: "Niet Ondersteund", description: "Push-meldingen worden niet ondersteund door je browser." });
             return 'denied';
         }
 
-        if (!app || !userId) {
-            console.error(`${logPrefix} ❌ Request skipped: Firebase App not ready or user not logged in.`);
+        if (!app) {
+            console.error(`${logPrefix} ❌ Request skipped: Firebase App not ready.`);
             return;
         }
 
-        // 1. Check Current Permission
         const currentPermission = Notification.permission;
         console.log(`${logPrefix} ℹ️ Current permission state: '${currentPermission}'.`);
         
         let finalPermission = currentPermission;
 
-        // 2. Handle different permission states
         if (finalPermission === 'denied') {
              if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geblokkeerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
              console.warn(`${logPrefix} 🛑 Permission is 'denied'. User must change browser settings.`);
@@ -52,7 +53,6 @@ export const useRequestNotificationPermission = () => {
                 console.log(`${logPrefix} 🤫 Permission is 'default'. Skipping silent request as user has not yet interacted.`);
                 return 'default';
              }
-             // Only request permission if it's a direct user action (not silent)
              console.log(`${logPrefix} 👉 Requesting browser permission...`);
              finalPermission = await Notification.requestPermission();
              console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
@@ -63,13 +63,11 @@ export const useRequestNotificationPermission = () => {
              }
         }
         
-        // 3. If permission is granted, proceed to get token
         if (finalPermission !== 'granted') {
           console.log(`${logPrefix} 🛑 Final permission is not 'granted'. Aborting token retrieval.`);
           return finalPermission;
         }
 
-        // 4. Get VAPID Key
         const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
         if (!vapidKey) {
             console.error(`%c${logPrefix} 🔥 CRITICAL: VAPID key not found. Ensure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.`, 'color: red; font-weight: bold;');
@@ -77,7 +75,6 @@ export const useRequestNotificationPermission = () => {
             return;
         }
         
-        // 5. Get Token and Save
         try {
             console.log(`${logPrefix} ✅ Permission granted. Proceeding to get token...`);
             const messaging = getMessaging(app);
@@ -95,6 +92,7 @@ export const useRequestNotificationPermission = () => {
             if (currentToken) {
                 console.log(`${logPrefix} ✅ Token received: ${currentToken.substring(0, 20)}...`);
                 
+                console.log(`${logPrefix} 📞 Calling API endpoint /api/save-fcm-token...`);
                 const response = await fetch('/api/save-fcm-token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -102,7 +100,7 @@ export const useRequestNotificationPermission = () => {
                 });
 
                 const result = await response.json();
-                if (!response.ok) {
+                if (!response.ok || !result.success) {
                     throw new Error(result.error || 'Failed to save token via API.');
                 }
                 
@@ -118,7 +116,7 @@ export const useRequestNotificationPermission = () => {
         
         return finalPermission;
 
-    }, [app, toast]);
+    }, [app, toast, user]);
 
     return { requestPermission };
 };
@@ -158,5 +156,3 @@ export const ForegroundMessageListener = () => {
     
     return null; // This component does not render anything
 }
-
-    
