@@ -27,9 +27,10 @@ export default function FcmDebugger() {
 
       if (permission !== 'granted') return;
 
-      alert("Stap 3: Service Worker Ready check...");
-      const registration = await navigator.serviceWorker.ready;
-      alert("SW is ready: " + (registration.active?.state || 'unknown'));
+      alert("Stap 3: Service Worker forceren...");
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      alert("SW Geregistreerd: " + registration.scope);
+
 
       alert("Stap 4: Token ophalen bij Google...");
       const messaging = getMessaging(app);

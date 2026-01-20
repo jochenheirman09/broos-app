@@ -1,9 +1,15 @@
+// /public/firebase-messaging-sw.js
 
-// This file needs to be in the public directory
-importScripts("https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.9.0/firebase-messaging-compat.js");
+// This file must be in the public folder to be served at the root of the site.
 
-// This config is public and can be exposed.
+// Using the compat libraries for broader compatibility with Firebase v8 and v9 examples.
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
+
+// --- IMPORTANT ---
+// The configuration object is hardcoded here. This is intentional.
+// It removes the race condition of waiting for a message from the main thread.
+// This is a public configuration and does not contain any secret keys.
 const firebaseConfig = {
   apiKey: "AIzaSyBVOId-CRlTD6oKqvZ0CxKSFxObOoHEHd8",
   authDomain: "studio-5690519872-e0869.firebaseapp.com",
@@ -18,64 +24,15 @@ firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
-// Optional: Handle background messages
+// Handler for background messages.
 messaging.onBackgroundMessage((payload) => {
-  console.log(
-    "[firebase-messaging-sw.js] Received background message ",
-    payload
-  );
-
-  // Update the app badge
-  if (navigator.setAppBadge) {
-    navigator.setAppBadge(1);
-  }
-
+  console.log('[firebase-messaging-sw.js] Received background message: ', payload);
+  
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: "/icons/icon-192x192.png",
-    data: {
-        FCM_OPTIONS: payload.fcmOptions
-    }
+    icon: '/icons/icon-192x192.png'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
-
-
-self.addEventListener('notificationclick', (event) => {
-    console.log('[Service Worker] Notification click received.', event);
-    event.notification.close();
-
-    // Clear the badge when the user interacts with a notification.
-    if (navigator.clearAppBadge) {
-        navigator.clearAppBadge();
-    }
-    
-    // This looks for an open window with the same URL as the notification's link.
-    // If one is found, it focuses that window. If not, it opens a new window.
-    const link = event.notification?.data?.FCM_OPTIONS?.link;
-    if (link) {
-        event.waitUntil(clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true,
-        }).then((clientList) => {
-            // Check if a window is already open at the target URL.
-            for (const client of clientList) {
-                // Use URL objects to compare paths without origin
-                const clientPath = new URL(client.url).pathname;
-                const linkPath = new URL(link, self.location.origin).pathname;
-                if (clientPath === linkPath && 'focus' in client) {
-                    return client.focus();
-                }
-            }
-            // If no window is found, open a new one.
-            if (clients.openWindow) {
-                return clients.openWindow(link);
-            }
-        }));
-    }
-});
-
-
-    
