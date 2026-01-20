@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
@@ -11,11 +10,13 @@ import {
   useAuth,
   useDoc,
   useMemoFirebase,
+  useFirebaseApp, // Import useFirebaseApp
 } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
+import { silentSyncAndListen } from "@/lib/firebase/messaging"; // Import the silent sync function
 
 interface UserContextType {
   user: FirebaseUser | null;
@@ -53,6 +54,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
+  const app = useFirebaseApp(); // Get the Firebase App instance
 
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -75,7 +77,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           setClaimsReady(true);
         } catch (error) {
            console.error("[UserProvider] Failed to refresh token:", error);
-           setClaimsReady(true); // Proceed even if refresh fails, might be offline
+           setClaimsReady(true);
         }
       }
     };
@@ -83,9 +85,19 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     if (!isAuthLoading && user) {
       syncClaims();
     } else if (!isAuthLoading && !user) {
-      setClaimsReady(true); // No user, so no claims to wait for
+      setClaimsReady(true);
     }
   }, [user, isAuthLoading]);
+
+  // Automatic silent sync and background refresh listener
+  useEffect(() => {
+    if (user && app) {
+      const unsubscribe = silentSyncAndListen(app, user);
+      // Return the cleanup function to unsubscribe the listener on component unmount
+      return () => unsubscribe();
+    }
+  }, [user, app]);
+
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));
 

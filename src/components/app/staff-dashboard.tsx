@@ -1,3 +1,4 @@
+
 "use client";
 
 import { StaffUpdates } from "./staff-updates";
@@ -16,7 +17,6 @@ import Link from "next/link";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { NotificationBadge } from "./notification-badge";
-import FcmDebugger from "./FcmDebugger";
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
   const { userProfile, loading } = useUser();
@@ -46,7 +46,6 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
 
   return (
     <div className="space-y-6">
-      <FcmDebugger />
       <Card>
         <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-4">

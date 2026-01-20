@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -20,11 +21,8 @@ import { AlertList } from "./alert-list";
 import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
 import { NotificationBadge } from "./notification-badge";
-import { useUser } from "@/context/user-context";
-import FcmDebugger from "./FcmDebugger";
 
 function ClubManagement({ clubId }: { clubId: string }) {
-  const { userProfile } = useUser();
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleTeamChange = useCallback(() => {
@@ -33,7 +31,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
 
   return (
     <>
-      <FcmDebugger />
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-4">

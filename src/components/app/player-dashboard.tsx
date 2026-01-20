@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -19,7 +20,6 @@ import { AddTrainingDialog } from "./add-training-dialog";
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
 import { NotificationBadge } from "./notification-badge";
-import FcmDebugger from "./FcmDebugger";
 
 function ProfileIncompleteAlert() {
   return (
@@ -57,7 +57,6 @@ export function PlayerDashboard() {
   return (
     <>
       <div className="space-y-6">
-        <FcmDebugger />
         <Card>
           <CardHeader>
             <CardTitle>Recent Welzijnsoverzicht</CardTitle>
