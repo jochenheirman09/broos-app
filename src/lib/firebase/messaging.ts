@@ -5,7 +5,7 @@ import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useFirebaseApp } from '@/firebase';
 import { useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/user-context';
+import { type User } from "firebase/auth";
 
 /**
  * A robust, reusable hook for handling FCM notification permission and token management.
@@ -13,12 +13,11 @@ import { useUser } from '@/context/user-context';
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
-    const { user } = useUser();
     const { toast } = useToast();
 
-    const requestPermission = useCallback(async (isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
+    const requestPermission = useCallback(async (user: User | null, isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
         if (!user) {
-          console.log("[FCM] Request skipped: User not logged in.");
+          console.log("[FCM] Request skipped: User object is null.");
           return;
         }
 
@@ -37,23 +36,15 @@ export const useRequestNotificationPermission = () => {
             return;
         }
 
-        const currentPermission = Notification.permission;
-        console.log(`${logPrefix} ℹ️ Current permission state: '${currentPermission}'.`);
+        let finalPermission = Notification.permission;
+        console.log(`${logPrefix} ℹ️ Current permission state: '${finalPermission}'.`);
         
-        let finalPermission = currentPermission;
-
-        if (finalPermission === 'denied') {
-             if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geblokkeerd', description: 'Je moet meldingen in je browserinstellingen inschakelen.' });
-             console.warn(`${logPrefix} 🛑 Permission is 'denied'. User must change browser settings.`);
-             return 'denied';
-        }
-
         if (finalPermission === 'default') {
              if (isSilent) {
-                console.log(`${logPrefix} 🤫 Permission is 'default'. Skipping silent request as user has not yet interacted.`);
+                console.log(`${logPrefix} 🤫 Permission is 'default', skipping silent request as user has not yet interacted.`);
                 return 'default';
              }
-             console.log(`${logPrefix} 👉 Requesting browser permission...`);
+             console.log(`${logPrefix} 👉 Requesting browser permission via Notification.requestPermission()...`);
              finalPermission = await Notification.requestPermission();
              console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
              if (finalPermission !== 'granted') {
@@ -107,6 +98,7 @@ export const useRequestNotificationPermission = () => {
                 console.log(`${logPrefix} ✅ API call to save token successful.`);
                 if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
             } else {
+                console.error(`${logPrefix} ❌ Failed to get token. It was null or empty.`);
                 throw new Error("Kon geen notificatie-token genereren. De Service Worker is mogelijk nog niet volledig actief. Probeer de pagina te vernieuwen.");
             }
         } catch (err: any) {
@@ -116,7 +108,7 @@ export const useRequestNotificationPermission = () => {
         
         return finalPermission;
 
-    }, [app, toast, user]);
+    }, [app, toast]);
 
     return { requestPermission };
 };

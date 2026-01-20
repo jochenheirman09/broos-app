@@ -93,8 +93,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const logPrefix = '👁️ [Visibility Sync Effect]';
 
-    if (!userProfile?.uid) {
-        console.log(`${logPrefix} Skipping: userProfile.uid is not available.`);
+    if (!user) {
+        console.log(`${logPrefix} Skipping: user is not available.`);
         return;
     }
     
@@ -110,20 +110,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             console.log(`${logPrefix} Service Worker is ready.`);
             
             // Pass `true` for isSilent. The hook will now correctly do nothing if permission is 'default'.
-            await requestPermission(userProfile.uid, true);
+            // Also pass the user object directly.
+            await requestPermission(user, true);
         } catch (err) {
             console.error(`${logPrefix} CRITICAL: Failed during sync operation:`, err);
         }
     };
+    
+    const initialSyncTimeout = setTimeout(performSync, 2000);
     
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
             performSync();
         }
     };
-    
-    const initialSyncTimeout = setTimeout(performSync, 2000);
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', performSync);
     
@@ -135,7 +136,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', performSync);
     };
-  }, [userProfile?.uid, requestPermission]);
+  }, [user, requestPermission]);
 
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));

@@ -16,26 +16,27 @@ export async function POST(request: Request) {
     console.log(`${logPrefix} 🚀 Received token for user ${userId}: ${token.substring(0,20)}...`);
 
     const { adminDb } = await getFirebaseAdmin();
+    // Correctly reference the subcollection under the user
     const tokenRef = adminDb.collection('users').doc(userId).collection('fcmTokens').doc(token);
     
-    const doc = await tokenRef.get();
+    // Use a transaction to handle creation vs. update atomically and idempotently.
+    await adminDb.runTransaction(async (transaction) => {
+        const doc = await transaction.get(tokenRef);
+        if (!doc.exists) {
+            console.log(`${logPrefix} ℹ️ Token does not exist. Creating new document.`);
+            transaction.set(tokenRef, {
+                token: token,
+                createdAt: FieldValue.serverTimestamp(),
+                lastSeen: FieldValue.serverTimestamp(),
+                platform: 'web', // Or derive from user-agent if needed
+            });
+        } else {
+            console.log(`${logPrefix} ℹ️ Token exists. Updating 'lastSeen' timestamp.`);
+            transaction.update(tokenRef, { lastSeen: FieldValue.serverTimestamp() });
+        }
+    });
 
-    if (!doc.exists) {
-        console.log(`${logPrefix} ℹ️ Token does not exist. Creating new document.`);
-        await tokenRef.set({
-            token: token,
-            createdAt: FieldValue.serverTimestamp(),
-            lastSeen: FieldValue.serverTimestamp(),
-            platform: 'web',
-        });
-        console.log(`${logPrefix} ✅ Successfully CREATED token document.`);
-
-    } else {
-        console.log(`${logPrefix} ℹ️ Token exists. Updating 'lastSeen' timestamp.`);
-        await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
-        console.log(`${logPrefix} ✅ Successfully UPDATED token document.`);
-    }
-
+    console.log(`${logPrefix} ✅ Successfully CREATED or UPDATED token document.`);
     return NextResponse.json({ success: true, message: 'Token saved successfully.' });
 
   } catch (error: any) {

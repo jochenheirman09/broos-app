@@ -27,16 +27,10 @@ export function getFirebaseAdmin() {
 
     if (getApps().length > 0) {
         _firebaseAdminApp = getApps()[0];
-        console.log('[Firebase Admin] Using existing app.');
-    } else if (process.env.GCLOUD_PROJECT) {
-        // In Google Cloud environment, initialize without credentials.
-        _firebaseAdminApp = initializeApp();
-        console.log('[Firebase Admin] Initialized using Application Default Credentials.');
     } else {
-        // For local development, use the service account key.
         const serviceAccountKey = process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT;
         if (!serviceAccountKey) {
-            throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable not set for local development.');
+            throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT environment variable not set.');
         }
 
         try {
@@ -44,9 +38,9 @@ export function getFirebaseAdmin() {
             _firebaseAdminApp = initializeApp({
                 credential: cert(serviceAccount),
             });
-            console.log('[Firebase Admin] Initialized using service account key for local dev.');
+            console.log('[Firebase Admin] Initialized using service account key.');
         } catch (error: any) {
-            console.error('[Firebase Admin] CRITICAL: Failed to parse service account key or initialize app locally.', error.message);
+            console.error('[Firebase Admin] CRITICAL: Failed to parse service account key or initialize app.', error.message);
             throw new Error('Failed to initialize Firebase Admin SDK. Check your service account credentials.');
         }
     }

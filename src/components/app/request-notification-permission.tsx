@@ -8,32 +8,44 @@ import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 import { BellRing, Check } from "lucide-react";
 import { Spinner } from "../ui/spinner";
 import { useUser } from "@/context/user-context";
+import { useToast } from "@/hooks/use-toast";
 
 export function RequestNotificationPermission() {
     const { user } = useUser();
+    const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
-    const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported">("default");
+    const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported">(
+        () => (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "unsupported"
+    );
+
     const { requestPermission } = useRequestNotificationPermission();
-
-    // Effect to check initial permission status on mount
-    useEffect(() => {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            setPermissionStatus(Notification.permission);
-        } else {
-            setPermissionStatus("unsupported");
-        }
-    }, []);
-
+    
     const handleRequestPermission = async () => {
-        if (!user) return;
+        console.log("[RequestPermissionButton] onClick handler fired.");
+        if (!user) {
+            console.error("[RequestPermissionButton] Aborting: user is null inside handler.");
+            toast({ variant: 'destructive', title: 'Fout', description: 'Gebruiker niet gevonden. Probeer opnieuw in te loggen.' });
+            return;
+        }
         setIsLoading(true);
         // Call with isSilent = false to show toasts on success/failure
-        const newPermission = await requestPermission(user.uid, false); 
+        // Pass the user object directly to the hook
+        const newPermission = await requestPermission(user, false); 
         if (newPermission) {
             setPermissionStatus(newPermission);
         }
         setIsLoading(false);
     };
+    
+    // Periodically check permission status in case it's changed in another tab
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if ("Notification" in window) {
+                setPermissionStatus(Notification.permission);
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Don't show the banner if permission is already granted, denied, or not supported.
     if (permissionStatus !== 'default' || !user) {
