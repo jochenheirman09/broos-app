@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { getFirebaseAdmin } from '@/ai/genkit';
+import { getFirebaseAdmin } from '@/lib/server/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     
     if (!token || !userId) {
       console.error(`${logPrefix} ❌ Missing token or userId in request body.`);
-      return NextResponse.json({ error: 'Missing data' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing token or user ID' }, { status: 400 });
     }
 
     console.log(`${logPrefix} 🚀 Received token for user ${userId}: ${token.substring(0,20)}...`);
@@ -28,12 +28,14 @@ export async function POST(request: Request) {
             lastSeen: FieldValue.serverTimestamp(),
             platform: 'web',
         });
+        console.log(`${logPrefix} ✅ Successfully CREATED token document.`);
+
     } else {
         console.log(`${logPrefix} ℹ️ Token exists. Updating 'lastSeen' timestamp.`);
         await tokenRef.update({ lastSeen: FieldValue.serverTimestamp() });
+        console.log(`${logPrefix} ✅ Successfully UPDATED token document.`);
     }
 
-    console.log(`${logPrefix} ✅ Successfully saved token for user ${userId}.`);
     return NextResponse.json({ success: true, message: 'Token saved successfully.' });
 
   } catch (error: any) {

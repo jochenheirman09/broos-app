@@ -1,6 +1,6 @@
 
 "use server";
-import { getFirebaseAdmin } from "@/ai/genkit";
+import { getFirebaseAdmin } from "@/lib/server/firebase-admin"; // Correctly import from the new centralized file
 import { UserProfile, WithId, Club, Team } from "@/lib/types";
 import { GenkitError } from "genkit";
 import { getStorage } from "firebase-admin/storage";
