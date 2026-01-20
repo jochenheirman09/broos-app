@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,7 +15,6 @@ export function RequestNotificationPermission() {
     const [isLoading, setIsLoading] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState<NotificationPermission | "unsupported">("default");
 
-    // Effect to check the initial permission status on mount
     useEffect(() => {
         if (typeof window !== "undefined" && "Notification" in window) {
             setPermissionStatus(Notification.permission);
@@ -25,26 +25,23 @@ export function RequestNotificationPermission() {
 
     const handleRequestPermission = async () => {
         setIsLoading(true);
-        // Pass the user object directly to the hook function
-        const success = await requestPermission(user);
+        // Pass `true` to indicate this is a manual trigger by the user.
+        const success = await requestPermission(user, true); 
         if (success) {
-            // If permission is granted, component will hide on next status check.
             setPermissionStatus('granted');
         }
         setIsLoading(false);
     };
     
-    // Periodically check permission status in case it's changed in browser settings
     useEffect(() => {
         const interval = setInterval(() => {
             if ("Notification" in window) {
                 setPermissionStatus(Notification.permission);
             }
-        }, 3000); // Check every 3 seconds
+        }, 3000); 
         return () => clearInterval(interval);
     }, []);
 
-    // Only render the component if the user needs to be prompted.
     if (permissionStatus !== 'default' || !user) {
         return null; 
     }

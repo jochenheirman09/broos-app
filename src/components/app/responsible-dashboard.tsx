@@ -21,6 +21,7 @@ import { AlertList } from "./alert-list";
 import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
 import { NotificationBadge } from "./notification-badge";
+import { NotificationTroubleshooter } from "./notification-troubleshooter";
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -158,6 +159,8 @@ function ClubManagement({ clubId }: { clubId: string }) {
             <KnowledgeBaseManager />
         </CardContent>
       </Card>
+
+      <NotificationTroubleshooter />
     </>
   );
 }

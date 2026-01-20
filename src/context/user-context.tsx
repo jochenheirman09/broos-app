@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
@@ -10,13 +11,13 @@ import {
   useAuth,
   useDoc,
   useMemoFirebase,
-  useFirebaseApp, // Import useFirebaseApp
+  useFirebaseApp,
 } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
-import { silentSyncAndListen } from "@/lib/firebase/messaging"; // Import the silent sync function
+import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
 interface UserContextType {
   user: FirebaseUser | null;
@@ -54,7 +55,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
-  const app = useFirebaseApp(); // Get the Firebase App instance
+  const { requestPermission } = useRequestNotificationPermission();
 
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -91,12 +92,36 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Automatic silent sync and background refresh listener
   useEffect(() => {
-    if (user && app) {
-      const unsubscribe = silentSyncAndListen(app, user);
-      // Return the cleanup function to unsubscribe the listener on component unmount
-      return () => unsubscribe();
-    }
-  }, [user, app]);
+    // This function will be triggered on load and when the app gains focus.
+    const silentSync = () => {
+      console.log("👁️ [Visibility Sync Effect] Triggered.");
+      if (user) {
+        // We call requestPermission with `isManualTrigger` as false.
+        // It will only try to get a token if permission is already 'granted'.
+        // It will NOT show a prompt.
+        requestPermission(user, false);
+      } else {
+        console.log("👁️ [Visibility Sync Effect] Skipping: no user.");
+      }
+    };
+
+    // Use a small delay on initial load to ensure the service worker is ready.
+    const initialSyncTimeout = setTimeout(() => {
+      console.log("👁️ [Visibility Sync Effect] Initializing with a 2s delay.");
+      silentSync();
+    }, 2000);
+
+    // Set up listeners for app visibility
+    window.addEventListener('visibilitychange', silentSync);
+    window.addEventListener('focus', silentSync);
+
+    // Return a cleanup function
+    return () => {
+      clearTimeout(initialSyncTimeout);
+      window.removeEventListener('visibilitychange', silentSync);
+      window.removeEventListener('focus', silentSync);
+    };
+  }, [user, requestPermission]);
 
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));

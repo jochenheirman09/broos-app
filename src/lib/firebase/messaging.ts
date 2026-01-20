@@ -7,46 +7,66 @@ import { type User } from "firebase/auth";
 import { useCallback, useEffect } from 'react';
 
 /**
- * Hook providing a function to request notification permission and sync the token.
- * This is intended to be called by a user gesture (e.g., a button click).
+ * A flexible hook for handling notification permissions and token synchronization.
+ * It can be triggered manually by a user action or silently in the background.
  */
 export const useRequestNotificationPermission = () => {
     const app = useFirebaseApp();
     const { toast } = useToast();
 
-    const requestPermission = useCallback(async (user: User | null): Promise<boolean> => {
-        const logPrefix = `[FCM Request] User: ${user?.uid} |`;
-        console.log(`${logPrefix} Manual permission request initiated.`);
-
+    /**
+     * @param user The authenticated Firebase user.
+     * @param isManualTrigger True if triggered by a direct user action (e.g., a button click).
+     * This controls whether UI feedback like toasts is shown.
+     */
+    const requestPermission = useCallback(async (user: User | null, isManualTrigger: boolean = false): Promise<boolean> => {
+        const logPrefix = `[FCM] User: ${user?.uid} | Manual: ${isManualTrigger} |`;
+        
         if (!user || !app || !("Notification" in window) || !("serviceWorker" in navigator)) {
-            toast({ variant: 'destructive', title: 'Fout', description: 'Browser ondersteunt geen meldingen of je bent niet ingelogd.' });
+            if (isManualTrigger) {
+                toast({ variant: 'destructive', title: 'Fout', description: 'Browser ondersteunt geen meldingen of je bent niet ingelogd.' });
+            }
+            console.log(`${logPrefix} Skipping: Browser/env does not support notifications or user not logged in.`);
             return false;
         }
-
+        
         try {
-            console.log(`${logPrefix} Requesting browser permission...`);
-            const permission = await Notification.requestPermission();
-            
-            if (permission !== 'granted') {
-                console.warn(`${logPrefix} Permission not granted, was '${permission}'.`);
-                toast({ variant: "destructive", title: "Toestemming geweigerd", description: "Je hebt geen toestemming gegeven voor meldingen." });
+            // Step 1: Check current permission state.
+            let currentPermission = Notification.permission;
+            console.log(`${logPrefix} ℹ️ Current permission state: '${currentPermission}'.`);
+
+            // If triggered manually and permission is default, request it from the user.
+            if (isManualTrigger && currentPermission === 'default') {
+                console.log(`${logPrefix} Requesting browser permission...`);
+                currentPermission = await Notification.requestPermission();
+            }
+
+            // If permission is not granted, exit. Show a toast only if it was a manual attempt.
+            if (currentPermission !== 'granted') {
+                console.warn(`${logPrefix} Permission not granted, was '${currentPermission}'.`);
+                if (isManualTrigger) {
+                    toast({ variant: "destructive", title: "Toestemming geweigerd", description: "Pas de instellingen in je browser aan om meldingen in te schakelen." });
+                }
                 return false;
             }
 
-            console.log(`${logPrefix} ✅ Permission granted. Proceeding to get token...`);
+            // Step 2: Permission is granted, explicitly register the service worker to get a registration object.
+            console.log(`${logPrefix} ✅ Permission granted. Explicitly registering SW...`);
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            console.log(`${logPrefix} ✅ SW registered with scope: ${registration.scope}. Calling getToken().`);
+
+            // Step 3: Proceed to get the token, passing the explicit registration.
             const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
             if (!vapidKey) throw new Error("VAPID key ontbreekt in de configuratie.");
 
             const messaging = getMessaging(app);
-            
-            console.log(`${logPrefix} ⏳ Registering service worker...`);
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log(`${logPrefix} ✅ Service Worker registered, scope: ${registration.scope}. Calling getToken().`);
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
 
-            if (!currentToken) throw new Error("Kon geen FCM-token genereren.");
+            if (!currentToken) throw new Error("Kon geen FCM-token genereren. De Service Worker is mogelijk niet actief.");
             
             console.log(`${logPrefix} ✅ Token received: ${currentToken.substring(0,20)}...`);
+            
+            // Step 4: Send the token to your server to be saved.
             console.log(`${logPrefix} 📲 Sending token to server via API route...`);
             const response = await fetch('/api/save-fcm-token', {
                 method: 'POST',
@@ -60,12 +80,16 @@ export const useRequestNotificationPermission = () => {
             }
             
             console.log(`${logPrefix} ✅ Server API '/api/save-fcm-token' called successfully.`);
-            toast({ title: "Meldingen Ingeschakeld!" });
+            if (isManualTrigger) {
+                toast({ title: "Meldingen Succesvol Gesynchroniseerd!" });
+            }
             return true;
 
         } catch (err: any) {
             console.error(`${logPrefix} 🔥 ERROR:`, err);
-            toast({ variant: "destructive", title: "Fout bij inschakelen", description: err.message });
+            if (isManualTrigger) {
+                toast({ variant: "destructive", title: "Fout bij Synchroniseren", description: err.message });
+            }
             return false;
         }
     }, [app, toast]);
@@ -74,102 +98,30 @@ export const useRequestNotificationPermission = () => {
 };
 
 
-/**
- * Handles silent, automatic synchronization of the FCM token on app load/focus
- * and listens for foreground messages.
- * @param app The Firebase App instance.
- * @param user The authenticated Firebase user.
- * @returns An empty unsubscribe function for API consistency.
- */
-export const silentSyncAndListen = (app: any, user: User | null) => {
-    if (!user || !app || !("Notification" in window) || !("serviceWorker" in navigator)) {
-        return () => {}; // Return an empty unsubscribe function
-    }
-
-    const logPrefix = `[Auto-Sync] User: ${user.uid} |`;
-    const messaging = getMessaging(app);
-
-    const syncToken = async () => {
-        if (Notification.permission !== 'granted') {
-            console.log(`${logPrefix} Skipping auto-sync: Permission not 'granted'.`);
-            return;
-        }
-        try {
-            console.log(`${logPrefix} Permission is granted. Attempting silent token sync.`);
-            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-            if (!vapidKey) throw new Error("VAPID key not found for silent sync.");
-            
-            const registration = await navigator.serviceWorker.ready;
-            const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
-            
-            if (currentToken) {
-                console.log(`${logPrefix} ✅ Token found silently, sending to server.`);
-                await fetch('/api/save-fcm-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.uid, token: currentToken })
-                });
-            } else {
-                 console.warn(`${logPrefix} 🤷‍♂️ Permission granted, but no token found silently.`);
-            }
-        } catch (err: any) {
-            console.error(`${logPrefix} 🔥 Silent sync failed:`, err.message);
-        }
-    };
-    
-    // Set up listeners for app visibility
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-          console.log(`${logPrefix} App became visible. Triggering sync.`);
-          syncToken();
-        }
-    };
-    
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', syncToken); // Additional trigger for reliability
-
-    // Initial sync on load
-    syncToken();
-    
-    // Return a cleanup function
-    return () => {
-        window.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('focus', syncToken);
-    };
-};
-
-
 // A component that listens for foreground messages
 export const ForegroundMessageListener = () => {
     const app = useFirebaseApp();
-    
+    const { toast } = useToast();
+
     useEffect(() => {
-        if (app && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        if (app && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
             try {
                 const messaging = getMessaging(app);
                 const unsubscribe = onMessage(messaging, (payload) => {
                     console.log('[FCM] Foreground message received. ', payload);
                     
-                    const notification = new Notification(payload.notification?.title || 'New Message', {
-                        body: payload.notification?.body,
-                        icon: payload.notification?.icon,
-                        data: payload.data
+                    toast({
+                        title: payload.notification?.title || "Nieuw Bericht",
+                        description: payload.notification?.body,
                     });
-
-                    notification.onclick = (event) => {
-                        event.preventDefault();
-                        const link = payload.data?.link || '/';
-                        window.open(link, '_self');
-                        notification.close();
-                    }
                 });
 
                 return () => unsubscribe();
             } catch (error) {
-                console.warn('[FCM] Messaging not available in this environment:', error);
+                console.warn('[FCM] Could not set up foreground message listener:', error);
             }
         }
-    }, [app]);
+    }, [app, toast]);
     
     return null; // This component does not render anything
-}
+};

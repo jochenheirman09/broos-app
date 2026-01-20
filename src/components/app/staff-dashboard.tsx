@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { NotificationBadge } from "./notification-badge";
+import { NotificationTroubleshooter } from "./notification-troubleshooter";
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
   const { userProfile, loading } = useUser();
@@ -114,6 +115,8 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
             </Link>
         </CardContent>
       </Card>
+
+      <NotificationTroubleshooter />
       
     </div>
   );
