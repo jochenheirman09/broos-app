@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useUser } from "@/context/user-context";
@@ -19,8 +18,8 @@ import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import { AddTrainingDialog } from "./add-training-dialog";
 import { useState } from "react";
 import { CalendarPlus } from "lucide-react";
-import { NotificationTroubleshooter } from "./notification-troubleshooter";
 import { NotificationBadge } from "./notification-badge";
+import FcmDebugger from "./FcmDebugger";
 
 function ProfileIncompleteAlert() {
   return (
@@ -58,6 +57,7 @@ export function PlayerDashboard() {
   return (
     <>
       <div className="space-y-6">
+        <FcmDebugger />
         <Card>
           <CardHeader>
             <CardTitle>Recent Welzijnsoverzicht</CardTitle>
@@ -92,8 +92,6 @@ export function PlayerDashboard() {
             <PlayerUpdates status="new" showDateInHeader={true} />
           </CardContent>
         </Card>
-
-        <NotificationTroubleshooter />
       </div>
       
        <div className="fixed bottom-24 right-4 z-50">

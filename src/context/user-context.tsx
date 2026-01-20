@@ -16,7 +16,6 @@ import type { UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/app/logo";
 import { Wordmark } from "@/components/app/wordmark";
-import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
 interface UserContextType {
   user: FirebaseUser | null;
@@ -54,7 +53,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [claimsReady, setClaimsReady] = useState(false);
-  const { requestPermission } = useRequestNotificationPermission();
 
   const userDocRef = useMemoFirebase(
     () => (user ? doc(firestore, "users", user.uid) : null),
@@ -88,56 +86,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       setClaimsReady(true); // No user, so no claims to wait for
     }
   }, [user, isAuthLoading]);
-
-  // Robust "Silent Sync" for FCM tokens, using visibilitychange and focus events.
-  useEffect(() => {
-    const logPrefix = '👁️ [Visibility Sync Effect]';
-
-    if (!user) {
-        console.log(`${logPrefix} Skipping: user is not available.`);
-        return;
-    }
-    
-    const performSync = async () => {
-        console.log(`${logPrefix} Triggered. Document visible: ${document.visibilityState === 'visible'}.`);
-        if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
-            return;
-        }
-
-        try {
-            console.log(`${logPrefix} Waiting for Service Worker to be ready...`);
-            await navigator.serviceWorker.ready;
-            console.log(`${logPrefix} Service Worker is ready.`);
-            
-            // Pass `true` for isSilent. The hook will now correctly do nothing if permission is 'default'.
-            // Also pass the user object directly.
-            await requestPermission(user, true);
-        } catch (err) {
-            console.error(`${logPrefix} CRITICAL: Failed during sync operation:`, err);
-        }
-    };
-    
-    const initialSyncTimeout = setTimeout(performSync, 2000);
-    
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-            performSync();
-        }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', performSync);
-    
-    console.log(`${logPrefix} Initialized with a 2s delay and added visibility/focus listeners.`);
-
-    return () => {
-        console.log(`${logPrefix} Cleaning up timeout and listeners.`);
-        clearTimeout(initialSyncTimeout);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('focus', performSync);
-    };
-  }, [user, requestPermission]);
-
 
   const loading = isAuthLoading || (!!user && (isProfileLoading || !claimsReady));
 

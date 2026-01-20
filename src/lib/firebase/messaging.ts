@@ -1,114 +1,19 @@
 
 "use client";
 
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, onMessage } from 'firebase/messaging';
 import { useFirebaseApp } from '@/firebase';
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { type User } from "firebase/auth";
 
-/**
- * A robust, reusable hook for handling FCM notification permission and token management.
- * @returns An object containing the `requestPermission` function.
- */
+
+// This hook is now empty. The logic has been moved directly into the component.
 export const useRequestNotificationPermission = () => {
-    const app = useFirebaseApp();
-    const { toast } = useToast();
-
-    const requestPermission = useCallback(async (user: User | null, isSilent: boolean = false): Promise<NotificationPermission | undefined> => {
-        if (!user) {
-          console.log("[FCM] Request skipped: User object is null.");
-          return;
-        }
-
-        const userId = user.uid;
-        const logPrefix = `[FCM] User: ${userId} |`;
-        console.log(`${logPrefix} 'requestPermission' initiated. Silent mode: ${isSilent}`);
-
-        if (typeof window === 'undefined' || !("Notification" in window) || !("serviceWorker" in navigator)) {
-            console.warn(`${logPrefix} ❌ Notifications not supported in this environment.`);
-            if (!isSilent) toast({ variant: "destructive", title: "Niet Ondersteund", description: "Push-meldingen worden niet ondersteund door je browser." });
-            return 'denied';
-        }
-
-        if (!app) {
-            console.error(`${logPrefix} ❌ Request skipped: Firebase App not ready.`);
-            return;
-        }
-
-        let finalPermission = Notification.permission;
-        console.log(`${logPrefix} ℹ️ Current permission state: '${finalPermission}'.`);
-        
-        if (finalPermission === 'default') {
-             if (isSilent) {
-                console.log(`${logPrefix} 🤫 Permission is 'default', skipping silent request as user has not yet interacted.`);
-                return 'default';
-             }
-             console.log(`${logPrefix} 👉 Requesting browser permission via Notification.requestPermission()...`);
-             finalPermission = await Notification.requestPermission();
-             console.log(`${logPrefix} Browser permission dialog result: '${finalPermission}'.`);
-             if (finalPermission !== 'granted') {
-                 if (!isSilent) toast({ variant: 'destructive', title: 'Permissie Geweigerd' });
-                 console.log(`${logPrefix} ❌ Permission was not granted.`);
-                 return finalPermission;
-             }
-        }
-        
-        if (finalPermission !== 'granted') {
-          console.log(`${logPrefix} 🛑 Final permission is not 'granted'. Aborting token retrieval.`);
-          return finalPermission;
-        }
-
-        const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-        if (!vapidKey) {
-            console.error(`%c${logPrefix} 🔥 CRITICAL: VAPID key not found. Ensure NEXT_PUBLIC_FIREBASE_VAPID_KEY is set.`, 'color: red; font-weight: bold;');
-            if (!isSilent) toast({ variant: 'destructive', title: 'Configuratiefout', description: 'Client configuration for notifications is missing.' });
-            return;
-        }
-        
-        try {
-            console.log(`${logPrefix} ✅ Permission granted. Proceeding to get token...`);
-            const messaging = getMessaging(app);
-            console.log(`${logPrefix} ⏳ Waiting for service worker to be ready...`);
-            const serviceWorkerRegistration = await navigator.serviceWorker.ready;
-            
-            if (!serviceWorkerRegistration.active) {
-                console.warn(`${logPrefix} ⚠️ Service Worker is ready but not active yet. Aborting token retrieval for now.`);
-                return;
-            }
-            console.log(`${logPrefix} ✅ Service Worker is active. Calling getToken().`);
-            
-            const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
-
-            if (currentToken) {
-                console.log(`${logPrefix} ✅ Token received: ${currentToken.substring(0, 20)}...`);
-                
-                console.log(`${logPrefix} 📞 Calling API endpoint /api/save-fcm-token...`);
-                const response = await fetch('/api/save-fcm-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: userId, token: currentToken })
-                });
-
-                const result = await response.json();
-                if (!response.ok || !result.success) {
-                    throw new Error(result.error || 'Failed to save token via API.');
-                }
-                
-                console.log(`${logPrefix} ✅ API call to save token successful.`);
-                if (!isSilent) toast({ title: "Notificaties Ingeschakeld!", description: "Je bent klaar om meldingen te ontvangen." });
-            } else {
-                console.error(`${logPrefix} ❌ Failed to get token. It was null or empty.`);
-                throw new Error("Kon geen notificatie-token genereren. De Service Worker is mogelijk nog niet volledig actief. Probeer de pagina te vernieuwen.");
-            }
-        } catch (err: any) {
-            console.error(`%c${logPrefix} 🔥 ERROR during token flow:`, 'color: red; font-weight: bold;', err);
-            if (!isSilent) toast({ variant: 'destructive', title: 'Fout bij Inschakelen', description: err.message });
-        }
-        
-        return finalPermission;
-
-    }, [app, toast]);
+    // This function is now a no-op, its logic lives in the button component for debugging.
+    const requestPermission = async (user: User | null, isSilent: boolean = false) => {
+        console.warn("[FCM] `useRequestNotificationPermission` is deprecated and has been moved to the button component for debugging.");
+    };
 
     return { requestPermission };
 };
