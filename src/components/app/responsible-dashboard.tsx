@@ -71,6 +71,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
                     <Button variant="secondary" size="sm" className="flex items-center relative">
                         <Archive className="mr-2 h-4 w-4" />
                         Bekijk Archief
+                        <NotificationBadge type="staffUpdates" />
                     </Button>
                  </Link>
             </div>

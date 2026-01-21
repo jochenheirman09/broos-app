@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Users, Info, Archive } from "lucide-react";
+import { Archive } from "lucide-react";
 import Link from "next/link";
 import { WellnessChart } from "./wellness-chart";
 import { PlayerUpdates } from "./player-updates";
@@ -18,7 +18,7 @@ import { Spinner } from "../ui/spinner";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import { AddTrainingDialog } from "./add-training-dialog";
 import { useState } from "react";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, Info } from "lucide-react";
 import { NotificationBadge } from "./notification-badge";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
 

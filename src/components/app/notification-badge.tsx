@@ -19,44 +19,55 @@ export function NotificationBadge({ type, status = 'new' }: NotificationBadgePro
 
   useEffect(() => {
     const fetchCount = async () => {
-      // Guard Clause: Stop if essential data is missing.
-      if (!db || !userProfile?.clubId || !userProfile?.role || !user) {
-        console.log(`[Badge-${type}] Skipping fetch: Incomplete user data.`);
+      // Create a unique ID for this instance for clearer logging
+      const logId = `${type}-${Math.random().toString(36).substring(2, 7)}`;
+      console.log(`[Badge ${logId}] 🚀 Initializing. Type: ${type}, Status: ${status}`);
+
+      if (!db || !userProfile?.clubId || !user || !userProfile.role) {
+        console.log(`[Badge ${logId}] 🛑 Skipping: Missing user data or DB instance.`);
         setIsLoading(false);
         return;
       }
 
       const { clubId, role, teamId, uid } = userProfile;
+      setIsLoading(true);
 
       try {
         let finalQuery: Query | null = null;
+        let queryPath = 'N/A';
 
-        // Build query based on type AND role.
         if (type === 'alerts') {
           const alertsRef = collectionGroup(db, 'alerts');
+          queryPath = 'collectionGroup(alerts)';
           if (role === 'responsible') {
             finalQuery = query(alertsRef, where('clubId', '==', clubId), where('status', '==', status));
           } else if (role === 'staff' && teamId) {
             finalQuery = query(alertsRef, where('clubId', '==', clubId), where('teamId', '==', teamId), where('status', '==', status));
           }
         } else if (type === 'messages') {
+          queryPath = `users/${uid}/myChats`;
           const myChatsRef = collection(db, 'users', uid, 'myChats');
           finalQuery = query(myChatsRef, where(`unreadCounts.${uid}`, '>', 0));
         } else if (type === 'playerUpdates' && role === 'player') {
+          queryPath = `users/${uid}/updates`;
           finalQuery = query(collection(db, 'users', uid, 'updates'), where('read', '==', false));
         } else if (type === 'staffUpdates') {
-          // CRITICAL: Only staff can query for staff updates.
-          if (role === 'staff' && teamId) {
+          // This is the key change: handle 'responsible' role for staff updates.
+          if (role === 'responsible' && clubId) {
+            queryPath = `collectionGroup(staffUpdates) for club ${clubId}`;
+            // Query across all teams for the club
+            finalQuery = query(collectionGroup(db, 'staffUpdates'), where('clubId', '==', clubId), where('read', '==', false));
+          } else if (role === 'staff' && teamId && clubId) {
+            queryPath = `clubs/${clubId}/teams/${teamId}/staffUpdates`;
             finalQuery = query(collection(db, `clubs/${clubId}/teams/${teamId}/staffUpdates`), where('read', '==', false));
-          } else {
-             console.log(`[Badge] Skipping staffUpdates query: role '${role}' is not authorized.`);
-             // Explicitly do nothing if the role is not staff.
           }
         } else if (type === 'clubUpdates' && role === 'responsible') {
+          queryPath = `clubs/${clubId}/clubUpdates`;
           finalQuery = query(collection(db, `clubs/${clubId}/clubUpdates`), where('read', '==', false));
         }
         
-        // Fetch data only if a valid query was built.
+        console.log(`[Badge ${logId}] 🛠️ Built query for path: ${queryPath}`);
+
         if (finalQuery) {
           const snapshot = await getDocs(finalQuery);
           if (type === 'messages') {
@@ -64,15 +75,18 @@ export function NotificationBadge({ type, status = 'new' }: NotificationBadgePro
                 const data = doc.data();
                 return total + (data.unreadCounts?.[uid] || 0);
             }, 0);
+            console.log(`[Badge ${logId}] ✅ Success! Found ${totalUnread} unread messages.`);
             setCount(totalUnread);
           } else {
+             console.log(`[Badge ${logId}] ✅ Success! Found ${snapshot.size} documents.`);
              setCount(snapshot.size);
           }
         } else {
-            setCount(0); // No query means no count
+            console.log(`[Badge ${logId}] 🤷 No valid query built for role '${role}'. Setting count to 0.`);
+            setCount(0);
         }
       } catch (error) {
-        console.error(`[Badge Error for type '${type}']:`, error);
+        console.error(`[Badge ${logId}] 🔥 ERROR fetching count for type '${type}':`, error);
         setCount(0);
       } finally {
         setIsLoading(false);
