@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
@@ -93,29 +92,27 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, isAuthLoading]);
 
-  // Automatic silent sync and background refresh listener
+  // Effect to handle visibility changes
   useEffect(() => {
-    const silentSync = () => {
-      console.log("👁️ [Visibility Sync Effect] Triggered.");
-      if (user) {
-        requestPermission(user, false);
-      } else {
-        console.log("👁️ [Visibility Sync Effect] Skipping: no user.");
-      }
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            console.log("👁️ [Visibility Sync Effect] Triggered.");
+            if (user) {
+              requestPermission(user, false);
+            }
+        }
     };
     
-    const initialSyncTimeout = setTimeout(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Initial check
+    setTimeout(() => {
       console.log("👁️ [Visibility Sync Effect] Initializing with a 2s delay.");
-      silentSync();
+      handleVisibilityChange();
     }, 2000);
 
-    window.addEventListener('visibilitychange', silentSync);
-    window.addEventListener('focus', silentSync);
-
     return () => {
-      clearTimeout(initialSyncTimeout);
-      window.removeEventListener('visibilitychange', silentSync);
-      window.removeEventListener('focus', silentSync);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user, requestPermission]);
 
@@ -166,7 +163,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoggingOut(true);
     setClaimsReady(false);
     
-    // --- New Logout Logic ---
     const logPrefix = `[Logout] User: ${user?.uid} |`;
     if (user && 'Notification' in window && Notification.permission === 'granted') {
       try {
@@ -185,7 +181,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
             body: JSON.stringify({ userId: user.uid, token: currentToken }),
           }).catch(err => console.error(`${logPrefix} Failed to send token for removal:`, err));
 
-          // Also delete the token from the client instance to be safe
           await deleteToken(messaging);
           console.log(`${logPrefix} Client token instance deleted.`);
         } else {
@@ -195,7 +190,6 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         console.error(`${logPrefix} Error disassociating FCM token:`, error);
       }
     }
-    // --- End New Logout Logic ---
     
     await auth.signOut();
     router.push("/");

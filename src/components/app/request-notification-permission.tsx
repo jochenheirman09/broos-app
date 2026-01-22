@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { BellRing, Check } from "lucide-react";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useUser } from "@/context/user-context";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 
@@ -25,7 +25,7 @@ export function RequestNotificationPermission() {
 
     const handleRequestPermission = async () => {
         setIsLoading(true);
-        // Pass `true` to indicate this is a manual trigger by the user.
+        // Pass `true` to indicate this is a manual user action.
         const success = await requestPermission(user, true); 
         if (success) {
             setPermissionStatus('granted');

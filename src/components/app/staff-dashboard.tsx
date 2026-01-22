@@ -10,20 +10,40 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
-import { AlertTriangle, Users, Archive, MessageSquare } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle, Users, Archive, MessageSquare, Pencil, CalendarDays } from "lucide-react";
 import { AlertList } from "./alert-list";
 import Link from "next/link";
-import { Button } from "../ui/button";
-import { Spinner } from "../ui/spinner";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { NotificationBadge } from "./notification-badge";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { Team } from "@/lib/types";
+import { useState, useCallback } from "react";
+import { EditTeamDialog } from "./edit-team-dialog";
+import { WeekSchedule } from "./week-schedule";
 
 export function StaffDashboard({ clubId }: { clubId: string }) {
   const { userProfile, loading } = useUser();
   const teamId = userProfile?.teamId;
+  const db = useFirestore();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  if (loading) {
+  const teamRef = useMemoFirebase(() => {
+    if (!clubId || !teamId) return null;
+    return doc(db, "clubs", clubId, "teams", teamId);
+  }, [db, clubId, teamId]);
+  const { data: teamData, isLoading: isTeamLoading, forceRefetch } = useDoc<Team>(teamRef);
+  
+  const handleTeamChange = useCallback(() => {
+    forceRefetch();
+    setRefreshKey(prev => prev + 1);
+  }, [forceRefetch]);
+
+  if (loading || (teamId && isTeamLoading)) {
     return <div className="flex justify-center items-center h-64"><Spinner /></div>;
   }
 
@@ -116,8 +136,42 @@ export function StaffDashboard({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center">
+                <CalendarDays className="mr-3 h-6 w-6" />
+                Jouw Weekschema
+              </CardTitle>
+              <CardDescription>
+                Het trainings- en wedstrijdschema voor jouw team.
+              </CardDescription>
+            </div>
+            {teamData && (
+              <Button variant="outline" size="sm" onClick={() => setIsEditDialogOpen(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Schema Bewerken
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <WeekSchedule key={refreshKey} />
+        </CardContent>
+      </Card>
+
       <NotificationTroubleshooter />
       
+      {teamData && (
+        <EditTeamDialog
+          isOpen={isEditDialogOpen}
+          setIsOpen={setIsEditDialogOpen}
+          clubId={clubId}
+          team={teamData}
+          onTeamUpdated={handleTeamChange}
+        />
+      )}
     </div>
   );
 }

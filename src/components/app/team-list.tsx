@@ -4,10 +4,10 @@
 import { useFirestore, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
 import type { Team } from "@/lib/types";
-import { Spinner } from "../ui/spinner";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Copy, KeyRound, Users, RefreshCw, Pencil, Trash2 } from "lucide-react";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { generateTeamInvitationCode } from "@/lib/firebase/firestore/team";
@@ -17,7 +17,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "../ui/card";
+} from "@/components/ui/card";
 import { EditTeamDialog } from "./edit-team-dialog";
 import { DeleteTeamDialog } from "./delete-team-dialog";
 import Link from "next/link";

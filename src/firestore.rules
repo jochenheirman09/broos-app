@@ -1,151 +1,172 @@
 
 rules_version = '2';
-
 service cloud.firestore {
+  
   match /databases/{database}/documents {
     
-    // --- HELPER FUNCTIONS ---
-
+    // --- HELPERS ---
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
+        return request.auth.uid == userId;
     }
 
-    function isCreatingOwnData(userId) {
-        return isOwner(userId) && request.resource.data.uid == userId;
+    function hasRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
     
-    function getMyProfile() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    function isResponsible() {
+      return hasRole('responsible');
     }
-    
-    function isResponsibleForClub(clubId) { 
-        let profile = getMyProfile();
-        return profile.exists 
-               && profile.data.get('role', 'none') == 'responsible' 
-               && profile.data.get('clubId', null) == clubId;
-    }
-    
+
     function isStaff() {
-       let profile = getMyProfile();
-       return profile.exists && profile.data.get('role', 'none') == 'staff';
+      return hasRole('staff');
     }
     
-    function getMyTeamId() {
-       let profile = getMyProfile();
-       return profile.exists ? profile.data.get('teamId', null) : null;
+    function isStaffOrResponsible() {
+      return isStaff() || isResponsible();
     }
     
-    function getMyClubId() {
-        let profile = getMyProfile();
-        return profile.exists ? profile.data.get('clubId', null) : null;
+    function isTeamStaff(teamId) {
+      return isStaff() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
     }
     
-    function isResponsibleGlobal() {
-      let profile = getMyProfile();
-      return profile.exists && profile.data.get('role', 'none') == 'responsible';
+    function isClubMember(clubId) {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
     }
 
-    // --- COLLECTION GROUP RULES ---
-    
-    match /{path=**}/alerts/{alertId} {
-      allow read: if isSignedIn() && (
-          isResponsibleForClub(resource.data.get('clubId', null)) || 
-          (isStaff() && getMyTeamId() == resource.data.get('teamId', null))
-      );
+    function isClubResponsible(clubId) {
+      // Check if the user is a 'responsible' AND their clubId matches the one provided.
+      // Also check if the clubId being checked is not null to prevent errors on incomplete user docs.
+      return clubId != null && isResponsible() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == clubId;
     }
 
-    // --- COLLECTION RULES ---
+    function isSuperAdmin() {
+      return request.auth.token.email != null && request.auth.token.email in ['jochen.heirman@gmail.com', 'nilsvanbever@gmail.com'];
+    }
 
+    // --- USER-SPECIFIC DATA ---
     match /users/{userId} {
-      // Gebruikers mogen hun eigen profiel en dat van anderen lezen.
-      // Dit is nodig om chatpartners en teamleden op te kunnen halen.
+      // NEW: Explicit broad read access for superadmins to all user data and subcollections.
+      // This is the most reliable way to ensure admin dashboard queries succeed.
+      match /{allPaths=**} {
+        allow read: if isSuperAdmin();
+      }
+      
+      allow list: if isSignedIn();
       allow get: if isSignedIn();
-      // Het listen is beperkt tot specifieke queries.
-      allow list: if isSignedIn() && (
-          (isResponsibleForClub(getMyClubId()) && request.query.where[0][0] == 'clubId' && request.query.where[0][2] == getMyClubId())
-          || (isStaff() && request.query.where[0][0] == 'teamId' && request.query.where[0][2] == getMyTeamId())
-          // Allow fetching multiple users by UID, necessary for displaying chat participants.
-          || (isSignedIn() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'uid')
-      );
-      allow create: if isCreatingOwnData(userId);
-      allow update: if isOwner(userId);
-      allow delete: if false;
+      allow create: if isOwner(userId);
+      allow update, delete: if isOwner(userId);
 
-      // NIEUWE SUBCOLLECTIE: /users/{userId}/myChats
-      match /myChats/{chatId} {
-          // Alleen de eigenaar mag zijn persoonlijke chatlijst lezen
-          allow read, list: if isOwner(userId);
-          // Schrijven wordt beheerd door de backend (server action)
-          allow write: if false; 
+      // Player-specific subcollections
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isOwner(userId);
       }
-
-      match /chats/{chatId} { allow read, write: if isOwner(userId); match /messages/{messageId} { allow read, write: if isOwner(userId); } }
-      match /wellnessScores/{scoreId} { allow read, write: if isOwner(userId); }
-      match /trainings/{trainingId} { allow read, write: if isOwner(userId); }
-      match /fcmTokens/{tokenId} { allow write: if isOwner(userId); }
-      match /updates/{updateId} { allow read: if isOwner(userId); allow write: if false; }
-    }
-    
-    match /p2p_chats/{chatId} {
-      // GET, UPDATE blijven werken (nodig voor het lezen van de chat)
-      allow get, update: if isSignedIn() && request.auth.uid in resource.data.participants;
-      
-      // LIST RULE VERWIJDERD: De client gebruikt nu /users/{userId}/myChats voor de lijst.
-
-      // CREATE blijft werken (nodig om nieuwe chat aan te maken)
-      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
-      
-      match /messages/{messageId} {
-        allow read, list: if isSignedIn() && get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
-        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants;
+      match /updates/{updateId} {
+        allow read: if isOwner(userId);
+        allow write: if false; 
+      }
+      match /trainings/{trainingId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /games/{gameId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /chats/{chatId} {
+        // A user can read/write their own chat sessions.
+        // A 'responsible' can read the chat sessions of users within their own club for analytics.
+        allow get, list: if isOwner(userId) || isClubResponsible(get(/databases/$(database)/documents/users/$(userId)).data.clubId);
+        allow write: if isOwner(userId);
+        match /messages/{messageId} {
+          allow get, list: if isOwner(userId) || isClubResponsible(get(/databases/$(database)/documents/users/$(userId)).data.clubId);
+          allow write: if isOwner(userId);
+        }
+      }
+      match /wellnessScores/{scoreId} {
+        allow read, write: if isOwner(userId);
+      }
+       match /myChats/{chatId} {
+        allow read, write: if isOwner(userId);
       }
     }
 
+    // --- CLUB & TEAM DATA ---
     match /clubs/{clubId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isResponsibleForClub(clubId); 
-
-      match /clubUpdates/{updateId} {
-        allow read: if isResponsibleForClub(clubId);
-        allow write: if false;
+      allow list: if isSignedIn();
+      allow get: if isClubMember(clubId);
+      allow create: if isResponsible();
+      allow update: if isResponsible() && isClubMember(clubId);
+      
+      // Give 'responsible' users read/list access to everything under their club.
+      match /{allSubpaths=**} {
+        allow list, get: if isResponsible() && isClubMember(clubId);
       }
 
       match /teams/{teamId} {
-        allow read: if isSignedIn();
-        allow list, create, update, delete: if isResponsibleForClub(clubId);
+        allow get: if isClubMember(clubId);
+        allow list: if isClubMember(clubId) && isStaffOrResponsible();
+        allow create, delete: if isResponsible() && isClubMember(clubId);
+        allow update: if (isResponsible() && isClubMember(clubId)) || (isClubMember(clubId) && isTeamStaff(teamId));
+
+        // Specific rules for 'staff' remain in effect for individual document access.
+        match /staffUpdates/{updateId} {
+          allow get: if isClubMember(clubId) && hasRole('staff') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
+          allow write: if false;
+        }
+        
+        match /alerts/{alertId} {
+          allow get: if isClubMember(clubId) && hasRole('staff') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
+          allow write: if false;
+        }
 
         match /summaries/{summaryId} {
-            allow read: if isResponsibleForClub(clubId) || teamId == getMyTeamId(); 
-            allow write: if false;
+          allow get: if isClubMember(clubId) && hasRole('staff') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == teamId;
+          allow write: if false;
         }
+      }
+
+      match /clubUpdates/{updateId} {
+        allow read: if isResponsible() && isClubMember(clubId);
+        allow write: if false;
+      }
+    }
     
-        match /staffUpdates/{updateId} {
-            allow read: if isResponsibleForClub(clubId) || teamId == getMyTeamId();
-            allow write: if false;
-        }
+    // --- OTHER COLLECTIONS ---
+    match /user_registrations/{userId} {
+      allow create: if isOwner(userId);
+    }
     
-        match /alerts/{alertId} {
-            allow read: if isResponsibleForClub(clubId) || teamId == getMyTeamId();
-            allow write: if isOwner(request.resource.data.userId)
-                         || isResponsibleForClub(clubId)
-                         || (isStaff() && teamId == getMyTeamId()); 
-        }
+    match /p2p_chats/{chatId} {
+      allow read, write: if isSignedIn() && resource.data.participants.hasAny([request.auth.uid]);
+      match /messages/{messageId} {
+         allow read, write: if isSignedIn() && get(/databases/$(database)/documents/p2p_chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
       }
     }
     
     match /knowledge_base/{docId} {
-      allow read, list: if isResponsibleGlobal();
-      allow create, update, delete: if false;
+      allow read: if isSignedIn();
+      allow write: if isResponsible();
+    }
+    match /knowledge_stats/{statId} {
+      allow read, write: if false; // Only backend can write
     }
 
-    match /knowledge_stats/{statId} {
-      allow read: if isResponsibleGlobal();
-      allow write: if false;
+    match /_locks/{lockName} {
+      allow read, write: if isSignedIn();
+    }
+
+
+    // --- COLLECTION GROUP QUERIES ---
+    match /{path=**}/alerts/{alertId} {
+      allow list: if isSuperAdmin() || (isSignedIn() && (hasRole('responsible') || hasRole('staff')));
+      allow get: if isSuperAdmin() || (isSignedIn() && (hasRole('responsible') || hasRole('staff')) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == resource.data.clubId);
+    }
+
+    match /{path=**}/staffUpdates/{updateId} {
+      allow list: if isSuperAdmin() || (isSignedIn() && (hasRole('responsible') || hasRole('staff')));
+      allow get: if isSuperAdmin() || (isSignedIn() && (hasRole('responsible') || hasRole('staff')) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clubId == resource.data.clubId);
     }
   }
 }

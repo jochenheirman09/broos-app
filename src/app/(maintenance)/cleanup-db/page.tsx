@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -22,10 +21,37 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, ShieldAlert, Users, Wrench, PlayCircle } from "lucide-react";
+import { Trash2, ShieldAlert, Users, Wrench, PlayCircle, Activity, ArrowLeft } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { handleCleanup, handleConditionalUserCleanup, handleFixStuckOnboarding } from "@/actions/cleanup-actions";
 import { handleRunAnalysisJob } from "@/actions/cron-actions";
+import Link from 'next/link';
+
+function AdminDashboardCard() {
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <Activity className="h-8 w-8 text-primary" />
+                    <div>
+                        <CardTitle className="text-2xl">Applicatie Dashboard</CardTitle>
+                        <CardDescription>
+                            Bekijk gebruiksstatistieken en de status van de pilootfase.
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                 <Link href="/admin/dashboard">
+                    <Button variant="outline" className="w-full" size="lg">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Terug naar Admin Dashboard
+                    </Button>
+                 </Link>
+            </CardContent>
+        </Card>
+    )
+}
 
 function AnalysisJobCard() {
   const { toast } = useToast();
@@ -340,6 +366,7 @@ export default function CleanupDbPage() {
   return (
     <div className="container mx-auto py-8">
         <div className="space-y-8 max-w-xl mx-auto">
+            <AdminDashboardCard />
             <AnalysisJobCard />
             <OnboardingFixCard />
             <ConditionalCleanupCard />

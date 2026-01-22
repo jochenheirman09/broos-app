@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, Users, Shield, ArrowRight } from "lucide-react";
-import { Spinner } from "../ui/spinner";
-import { Button } from "../ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
 import Link from 'next/link';
 
 const roleIcons: { [key: string]: React.ReactNode } = {

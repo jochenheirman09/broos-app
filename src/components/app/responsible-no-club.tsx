@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, LogOut, Building } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@/context/user-context";
-import { Separator } from "../ui/separator";
+import { Separator } from "@/components/ui/separator";
 
 export function ResponsibleNoClub() {
   const { logout } = useUser();

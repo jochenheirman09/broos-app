@@ -1,12 +1,13 @@
-'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
+"use client";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { BellRing, Wrench } from "lucide-react";
 import { useUser } from "@/context/user-context";
 import { useRequestNotificationPermission } from "@/lib/firebase/messaging";
 import { useState } from "react";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 export function NotificationTroubleshooter() {
     const { user } = useUser();

@@ -10,7 +10,7 @@ import {
 } from "@/firebase";
 import { collection, doc, query } from "firebase/firestore";
 import type { PlayerTraining, Team, WithId } from "@/lib/types";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { format, addDays, isSameDay } from "date-fns";
 import { nl } from "date-fns/locale";
@@ -20,7 +20,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "../ui/tooltip";
+} from "@/components/ui/tooltip";
 
 const activityDetails = {
   training: {

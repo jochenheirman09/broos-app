@@ -170,6 +170,7 @@ export interface PlayerUpdate {
 
 export interface StaffUpdate {
   id: string;
+  clubId: string;
   title: string;
   content: string;
   category: 'Team Performance' | 'Player Wellness' | 'Injury Risk';

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,11 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useFirestore } from "@/firebase";
 import type { Team, Schedule, DayOfWeek } from "@/lib/types";
 import { updateTeam } from "@/lib/firebase/firestore/team";
-import { Checkbox } from "../ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const days: DayOfWeek[] = [
   "monday",
@@ -180,9 +181,12 @@ export function EditTeamDialog({
             />
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 border p-4 rounded-lg bg-background">
+             <p className="text-sm text-muted-foreground">
+                Pas het weekschema aan. Spelers krijgen alleen een herinnering voor een check-in op trainings- en wedstrijddagen.
+            </p>
             <div>
-              <Label>Trainingsdagen</Label>
+              <Label className="font-semibold">Trainingsdagen</Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
                 {days.map((day) => (
                   <div key={day} className="flex items-center space-x-2">
@@ -202,7 +206,7 @@ export function EditTeamDialog({
               </div>
             </div>
             <div>
-              <Label>Wedstrijddag</Label>
+              <Label className="font-semibold">Wedstrijddag</Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
                 {days.map((day) => (
                   <div key={day} className="flex items-center space-x-2">

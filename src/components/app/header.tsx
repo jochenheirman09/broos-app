@@ -4,7 +4,7 @@
 import { useUser } from "@/context/user-context";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThemeToggle } from "../theme-toggle";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "./logo";
 import { Wordmark } from "./wordmark";
 import Link from "next/link";

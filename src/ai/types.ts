@@ -9,6 +9,7 @@ import type { Schedule } from '@/lib/types';
 // For analyzeTeamData flow
 export const TeamAnalysisInputSchema = z.object({
     teamId: z.string(),
+    clubId: z.string(),
     teamName: z.string(),
     playersData: z.array(z.object({
         name: z.string(),

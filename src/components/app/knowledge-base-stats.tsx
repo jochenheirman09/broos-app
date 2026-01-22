@@ -2,10 +2,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { Button } from "../ui/button";
-import { Card, CardContent } from "../ui/card";
-import { Spinner } from "../ui/spinner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { UploadCloud, BrainCircuit, FileText, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import type { KnowledgeDocument, WithId } from "@/lib/types";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";

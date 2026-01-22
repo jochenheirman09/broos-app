@@ -28,7 +28,7 @@ import Link from 'next/link';
 import { sendP2PMessage, markChatAsRead } from '@/actions/p2p-chat-actions';
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from 'uuid'; // Import uuid
-import { Spinner } from '../ui/spinner';
+import { Spinner } from '@/components/ui/spinner';
 
 interface ChatInput {
     content: string;

@@ -57,7 +57,7 @@ const WellnessPromptInputSchema = z.object({
 const wellnessBuddyPromptPromise = aiPromise.then(async ai => {
   const resolvedWebSearchTool = await webSearchToolPromise;
   return ai.definePrompt({
-    name: 'wellnessBuddyPrompt_v41_historyaware',
+    name: 'wellnessBuddyPrompt_v43_individual_training',
     model: googleAI.model('gemini-2.5-flash'),
     tools: [resolvedWebSearchTool], 
     input: { schema: WellnessPromptInputSchema }, // Use the new, strong schema
@@ -69,7 +69,11 @@ const wellnessBuddyPromptPromise = aiPromise.then(async ai => {
         TAAK:
         1.  **Voer een SNELLE check-in.** Je doel is om binnen 5 minuten een update te krijgen over de belangrijkste welzijnsthema's.
         2.  **Begin het gesprek correct:**
-            -   Als de 'Gespreksgeschiedenis' LEEG is, begin dan met een open vraag zoals "Hey, hoe gaat het vandaag?".
+            -   Als de 'Gespreksgeschiedenis' LEEG is, begin dan met een vraag gebaseerd op 'Activiteit vandaag ({{{todayActivity}}})'.
+                -   Bij 'game': "Hey {{{userName}}}! Het is wedstrijddag, veel succes! Hoe voel je je?"
+                -   Bij 'training': "Hey {{{userName}}}! Trainingsdag vandaag. Klaar voor? Hoe gaat het met je?"
+                -   Bij 'individual': "Hey {{{userName}}}, hoe ging je individuele training vandaag?"
+                -   Bij 'rest': "Hey {{{userName}}}, hoe gaat het vandaag met je?"
             -   Als er al een 'Gespreksgeschiedenis' is, ga dan direct verder met het gesprek zonder opnieuw te begroeten. Reageer op de laatste opmerking van de gebruiker.
         3.  **Vraag naar ontbrekende onderwerpen:** Probeer op een natuurlijke manier te informeren naar onderwerpen van deze lijst die nog niet besproken zijn: {{#if missingTopics}}[{{#each missingTopics}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}]{{else}}Alle onderwerpen zijn besproken.{{/if}}. Vraag niet naar alles tegelijk, maar pik er één uit als het past in het gesprek.
         4.  **Bied een dieper gesprek aan na de check-in.** Nadat je een paar onderwerpen hebt besproken, kun je afsluiten met een aanbod, zoals: "Oké, bedankt voor de update! Ik merkte dat je niet zo goed sliep, wil je daar nog even over praten?" Geef de speler de controle.
@@ -137,3 +141,5 @@ export async function runWellnessAnalysisFlow(
         throw new Error(`Kon de AI-buddy niet bereiken. Server-log bevat details. Fout: ${detail}`);
     }
 }
+
+    

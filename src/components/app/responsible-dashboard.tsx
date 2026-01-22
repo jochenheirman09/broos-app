@@ -7,13 +7,13 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-} from "../ui/card";
-import { Building, BookOpen, Users, AlertTriangle, Archive, MessageSquare } from "lucide-react";
+} from "@/components/ui/card";
+import { Building, BookOpen, Users, AlertTriangle, Archive, MessageSquare, Activity } from "lucide-react";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
 import { ClubUpdates } from "./club-updates";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { StaffUpdates } from "./staff-updates";
 import { KnowledgeBaseManager } from "./knowledge-base-stats";
@@ -22,6 +22,7 @@ import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
 import { NotificationBadge } from "./notification-badge";
 import { NotificationTroubleshooter } from "./notification-troubleshooter";
+import { UsageCharts } from "./admin/usage-charts";
 
 function ClubManagement({ clubId }: { clubId: string }) {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -57,8 +58,8 @@ function ClubManagement({ clubId }: { clubId: string }) {
           <ClubUpdates clubId={clubId} status="new" showDateInHeader={true} />
         </CardContent>
       </Card>
-
-      <Card>
+      
+       <Card>
          <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -81,29 +82,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
         </CardContent>
       </Card>
 
-
-       <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center text-2xl">
-                <AlertTriangle className="mr-3 h-6 w-6 text-destructive" />
-                Actieve Alerts
-              </CardTitle>
-            </div>
-            <Link href="/alerts" passHref>
-              <Button variant="outline" className="w-full sm:w-auto flex items-center relative">
-                Bekijk Alle Alerts
-                <NotificationBadge type="alerts" status="new" />
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent>
-            <AlertList status="new" limit={5} />
-        </CardContent>
-      </Card>
-      
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center">
@@ -122,6 +100,44 @@ function ClubManagement({ clubId }: { clubId: string }) {
                     <NotificationBadge type="messages" />
                 </Button>
             </Link>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-2xl">
+                <Activity className="h-7 w-7 text-primary" />
+                Team Activiteit
+            </CardTitle>
+            <CardDescription>
+                Een overzicht van het wekelijkse check-in gebruik per team.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <UsageCharts clubId={clubId} />
+        </CardContent>
+      </Card>
+
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center text-2xl">
+                <AlertTriangle className="mr-3 h-6 w-6 text-destructive" />
+                Actieve Alerts
+              </CardTitle>
+            </div>
+            <Link href="/alerts" passHref>
+              <Button variant="outline" className="w-full sm:w-auto flex items-center relative">
+                Bekijk Alle Alerts
+                <NotificationBadge type="alerts" status="new" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+            <AlertList status="new" limit={5} />
         </CardContent>
       </Card>
 
@@ -146,7 +162,7 @@ function ClubManagement({ clubId }: { clubId: string }) {
           </div>
         </CardContent>
       </Card>
-
+      
       <ClubLogoManager clubId={clubId} />
       
       <Card>

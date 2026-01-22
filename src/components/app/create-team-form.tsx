@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -5,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { createTeam } from "@/lib/firebase/firestore/team";
 import { useFirestore } from "@/firebase";
 import { Schedule, DayOfWeek } from "@/lib/types";
-import { Checkbox } from "../ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const days: DayOfWeek[] = [
   "monday",
@@ -142,10 +143,13 @@ export function CreateTeamForm({
         />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 border p-4 rounded-lg bg-background">
+         <p className="text-sm text-muted-foreground">
+            Stel het weekschema in. Spelers krijgen alleen een herinnering voor een check-in op trainings- en wedstrijddagen.
+        </p>
         <div>
-          <Label>Trainingsdagen</Label>
-          <div className="grid grid-cols-3 gap-4 mt-2">
+          <Label className="font-semibold">Trainingsdagen</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
             {days.map((day) => (
               <div key={day} className="flex items-center space-x-2">
                 <Checkbox
@@ -164,8 +168,8 @@ export function CreateTeamForm({
           </div>
         </div>
          <div>
-          <Label>Wedstrijddag</Label>
-           <div className="grid grid-cols-3 gap-4 mt-2">
+          <Label className="font-semibold">Wedstrijddag</Label>
+           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-2">
             {days.map((day) => (
               <div key={day} className="flex items-center space-x-2">
                 <Checkbox

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore } from "@/firebase";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useUser } from "@/context/user-context";
 import {
   collection,
@@ -30,7 +30,7 @@ import { errorEmitter } from "@/firebase/error-emitter";
 import { Club } from "@/lib/types";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import Link from "next/link";
-import { Separator } from "../ui/separator";
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   clubCode: z.string().min(1, { message: "Clubcode is vereist." }),

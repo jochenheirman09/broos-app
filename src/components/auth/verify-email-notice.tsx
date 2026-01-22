@@ -4,12 +4,12 @@
 import { useUser } from "@/context/user-context";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { sendEmailVerification } from "firebase/auth";
 import { MailCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Card, CardContent } from "../ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 export function VerifyEmailNotice() {
   const { user, loading, logout } = useUser();

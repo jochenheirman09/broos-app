@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser } from "@/context/user-context";
 import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
-import { Separator } from "../ui/separator";
+import { Separator } from "@/components/ui/separator";
 import { createClubWithLogo } from "@/actions/club-actions";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload } from "lucide-react";
 
 export function CreateClubForm() {

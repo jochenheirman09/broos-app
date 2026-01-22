@@ -78,13 +78,15 @@ export async function chatWithBuddy(
     } else if (userProfile.teamId && userProfile.clubId) {
         const teamDocRef = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').doc(userProfile.teamId);
         const teamDoc = await teamDocRef.get();
-        if (teamDoc.exists) {
+        if (teamDoc.exists()) {
             const teamData = teamDoc.data();
             if (teamData?.schedule && teamData.schedule[dayName]) {
                 todayActivity = teamData.schedule[dayName];
             }
         }
     }
+    console.log(`[Chat Action] Determined today's activity for user ${userId}: ${todayActivity}`);
+
     isGameDay = todayActivity === 'game';
     if (isGameDay) {
         const gameDocRef = userRef.collection('games').doc(today);
@@ -138,9 +140,9 @@ export async function chatWithBuddy(
     await saveAssistantResponse(userId, today, result.response);
     console.log("[Chat Action] Assistant response saved.");
     
-    // Trigger background analysis with the full history
+    // Trigger background analysis with the full history and the correct date
     const finalChatHistory = chatHistory + `\nuser: ${input.userMessage}\nassistant: ${result.response}`;
-    analyzeAndSaveChatData(userId, finalChatHistory).catch(err => {
+    analyzeAndSaveChatData(userId, finalChatHistory, today).catch(err => {
         console.error(`[Chat Action] Background analysis failed for user ${userId}:`, err);
     });
 
@@ -157,3 +159,5 @@ export async function chatWithBuddy(
     throw error;
   }
 }
+
+    

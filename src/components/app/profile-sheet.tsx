@@ -1,4 +1,3 @@
-
 "use client";
 import { useUser } from "@/context/user-context";
 import {
@@ -50,8 +49,8 @@ import {
   SheetDescription,
   SheetFooter
 } from "@/components/ui/sheet";
-import { BuddyProfileCustomizer } from "./buddy-profile/page";
-import { ScrollArea, ScrollViewport } from "../ui/scroll-area";
+import { BuddyProfileCustomizer } from "@/app/(app)/buddy-profile/page";
+import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { updateUserTeam } from "@/actions/user-actions";
 import { doc } from 'firebase/firestore';

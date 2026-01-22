@@ -14,16 +14,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useUser } from "@/context/user-context";
 import { useFirestore } from "@/firebase";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
-import { Calendar } from "../ui/calendar";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { addPlayerTraining } from "@/lib/firebase/firestore/training";
-import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
+import { DatePickerWithDropdowns } from "@/components/ui/date-picker-with-dropdowns";
 
 interface AddTrainingDialogProps {
   isOpen: boolean;

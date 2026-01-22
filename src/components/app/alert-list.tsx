@@ -6,12 +6,12 @@ import { useFirestore } from '@/firebase';
 import { doc, getDoc, collection, collectionGroup, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useUser } from '@/context/user-context';
 import type { UserProfile, Alert as AlertType, WithId, Team } from '@/lib/types';
-import { Spinner } from '../ui/spinner';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Spinner } from '@/components/ui/spinner';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, Archive, Check, Shield, Calendar, MessageSquare, Tag, Users, MoreVertical, ChevronDown, UserX } from 'lucide-react';
 import { format } from 'date-fns';
 import { nl } from 'date-fns/locale';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Accordion,
   AccordionContent,
@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { updateAlertStatus } from '@/actions/alert-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';

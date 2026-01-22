@@ -13,7 +13,7 @@ import { SendHorizonal, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage as ChatMessageType, WithId } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import {
   collection,
   query,

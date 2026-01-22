@@ -16,13 +16,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 import { useUser } from "@/context/user-context";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { DatePickerWithDropdowns } from "../ui/date-picker-with-dropdowns";
+import { DatePickerWithDropdowns } from "@/components/ui/date-picker-with-dropdowns";
 import { updateUserTeam } from "@/actions/user-actions";
 import { useRouter } from "next/navigation";
 

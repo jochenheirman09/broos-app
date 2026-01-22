@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useFirebaseApp } from '@/firebase';
@@ -32,11 +31,21 @@ export const useRequestNotificationPermission = () => {
         }
         
         try {
-            // Step 1: Check current permission state.
             let currentPermission = Notification.permission;
             console.log(`${logPrefix} ℹ️ Current permission state: '${currentPermission}'.`);
 
-            // If triggered manually and permission is default, request it from the user.
+            if (currentPermission === 'denied') {
+                console.warn(`${logPrefix} Permission explicitly denied in browser settings. Aborting sync.`);
+                if (isManualTrigger) {
+                    toast({
+                        variant: "destructive",
+                        title: "Toestemming Geblokkeerd",
+                        description: "Je hebt meldingen geblokkeerd in je browser. Pas dit aan in je browser-instellingen om meldingen in te schakelen.",
+                    });
+                }
+                return false;
+            }
+
             if (isManualTrigger && currentPermission === 'default') {
                 console.log(`${logPrefix} Requesting browser permission...`);
                 currentPermission = await Notification.requestPermission();
@@ -45,21 +54,19 @@ export const useRequestNotificationPermission = () => {
             if (currentPermission !== 'granted') {
                 console.warn(`${logPrefix} Permission not granted, was '${currentPermission}'.`);
                 if (isManualTrigger) {
-                    toast({ variant: "destructive", title: "Toestemming geweigerd", description: "Pas de instellingen in je browser aan om meldingen in te schakelen." });
+                    toast({ title: "Toestemming niet verleend", description: "Je ontvangt geen meldingen." });
                 }
                 return false;
             }
 
             console.log(`${logPrefix} ✅ Permission granted. Registering SW...`);
-            // THE FIX: Explicitly register the correct service worker file.
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
             console.log(`${logPrefix} ✅ SW Registered, scope: ${registration.scope}. Calling getToken().`);
 
             const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
             if (!vapidKey) throw new Error("VAPID key ontbreekt in de configuratie.");
 
             const messaging = getMessaging(app);
-            // Pass the specific registration to getToken to avoid ambiguity.
             const currentToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
 
             if (!currentToken) throw new Error("Kon geen FCM-token genereren. De Service Worker is mogelijk niet actief.");
@@ -110,8 +117,8 @@ export const ForegroundMessageListener = () => {
                     console.log('[FCM] Foreground message received. ', payload);
                     
                     toast({
-                        title: payload.notification?.title || "Nieuw Bericht",
-                        description: payload.notification?.body,
+                        title: payload.data?.title || "Nieuw Bericht",
+                        description: payload.data?.body,
                     });
                 });
 

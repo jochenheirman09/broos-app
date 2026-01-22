@@ -1,4 +1,3 @@
-
 'use server';
 import * as functions from 'firebase-functions/v1';
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -83,6 +82,11 @@ export const morningSummary = onSchedule({
 });
 
 
+/**
+ * Sends a daily check-in reminder to players.
+ * If a team schedule is set, it only sends on 'training' or 'game' days.
+ * If no schedule is set, it sends a generic reminder as a fallback.
+ */
 export const dailyCheckInReminder = onSchedule({
     schedule: "0 17 * * *",
     timeZone: "Europe/Brussels",
@@ -94,26 +98,78 @@ export const dailyCheckInReminder = onSchedule({
     }
 
     try {
-        const players = await db.collection('users').where('role', '==', 'player').get();
-        for (const playerDoc of players.docs) {
+        const dayMapping: { [key: number]: string } = { 0: 'sunday', 1: 'monday', 2: 'tuesday', 3: 'wednesday', 4: 'thursday', 5: 'friday', 6: 'saturday' };
+        const now = new Date();
+        const todayName = dayMapping[now.getDay()];
+        console.log(`[dailyCheckInReminder] Running for day: ${todayName} (UTC Day Index: ${now.getDay()})`);
+
+        const playersSnapshot = await db.collection('users').where('role', '==', 'player').get();
+        const teamSchedules = new Map<string, any>();
+        let notificationsSent = 0;
+
+        for (const playerDoc of playersSnapshot.docs) {
+            const player = playerDoc.data();
+            if (!player.teamId || !player.clubId) {
+                continue; // Skip players without a team/club
+            }
+
+            // Fetch and cache team schedule if not already fetched
+            let schedule = teamSchedules.get(player.teamId);
+            if (schedule === undefined) {
+                const teamDocRef = db.doc(`clubs/${player.clubId}/teams/${player.teamId}`);
+                const teamDoc = await teamDocRef.get();
+                if (teamDoc.exists()) {
+                    schedule = teamDoc.data()?.schedule || null; // explicit null for missing
+                    teamSchedules.set(player.teamId, schedule);
+                } else {
+                    teamSchedules.set(player.teamId, null); // Cache miss
+                    continue;
+                }
+            }
+            
             const tokens = await getTokensForUser(playerDoc.id);
-            if (tokens.length > 0) {
-                await admin.messaging().sendEachForMulticast({
-                    tokens,
+            if (tokens.length === 0) {
+                continue;
+            }
+
+            let notificationPayload: { data: any, webpush: any } | null = null;
+
+            if (!schedule) {
+                // FALLBACK: If no schedule is set for the team, send a generic daily reminder.
+                console.log(`[dailyCheckInReminder] Fallback: No schedule for team ${player.teamId}. Sending generic reminder to ${player.name}.`);
+                notificationPayload = {
                     data: {
-                        title: "Check-in met Broos!",
-                        body: `Hey ${playerDoc.data().name || 'buddy'}, je buddy wacht op je!`,
+                        title: "Tijd voor je check-in!",
+                        body: `Hey ${player.name || 'buddy'}, je buddy wacht op je!`,
                         link: '/chat',
                         tag: `daily_checkin_${playerDoc.id}`
                     },
-                    webpush: {
-                        fcmOptions: {
-                            link: '/chat'
-                        }
-                    }
-                });
+                    webpush: { fcmOptions: { link: '/chat' } }
+                };
+            } else {
+                // SCHEDULED LOGIC: Send notification based on today's activity.
+                const activity = schedule[todayName];
+                if (activity === 'training' || activity === 'game') {
+                    const title = activity === 'game' ? "Het is wedstrijddag!" : "Het is trainingsdag!";
+                    const body = `Tijd voor je check-in, ${player.name || 'buddy'}!`;
+                    notificationPayload = {
+                        data: {
+                            title,
+                            body,
+                            link: '/chat',
+                            tag: `activity_checkin_${playerDoc.id}`
+                        },
+                        webpush: { fcmOptions: { link: '/chat' } }
+                    };
+                }
+            }
+
+            if (notificationPayload) {
+                await admin.messaging().sendEachForMulticast({ tokens, ...notificationPayload });
+                notificationsSent++;
             }
         }
+        console.log(`✅ Daily check-in reminders sent to ${notificationsSent} players.`);
     } catch (error) {
         console.error("❌ Fout bij dailyCheckInReminder:", error);
     }

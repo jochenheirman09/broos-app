@@ -78,8 +78,8 @@ export async function saveAssistantResponse(userId: string, today: string, assis
  * It then saves all extracted data to Firestore in a single transaction to ensure idempotency.
  * This is a 'fire-and-forget' function from the client's perspective.
  */
-export async function analyzeAndSaveChatData(userId: string, fullChatHistory: string) {
-    console.log(`[Analysis Service] Starting full analysis for user ${userId}.`);
+export async function analyzeAndSaveChatData(userId: string, fullChatHistory: string, today: string) {
+    console.log(`[Analysis Service] Starting full analysis for user ${userId} for date ${today}.`);
     const ai = await getAiInstance();
 
     // Define the Zod schema for the expected output of the analysis prompt.
@@ -149,7 +149,6 @@ export async function analyzeAndSaveChatData(userId: string, fullChatHistory: st
         }
 
         const { adminDb } = await getFirebaseAdmin();
-        const today = new Date().toISOString().split('T')[0];
         
         await adminDb.runTransaction(async (transaction) => {
             const userDocRef = adminDb.collection('users').doc(userId);

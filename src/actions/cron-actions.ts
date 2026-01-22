@@ -5,7 +5,7 @@ import { analyzeTeamData } from '../ai/flows/team-analysis-flow';
 import { generatePlayerUpdate } from '../ai/flows/player-update-flow';
 import { analyzeClubData } from '../ai/flows/club-analysis-flow';
 import type { TeamAnalysisInput, NotificationInput, PlayerUpdateInput, ClubAnalysisInput, AITeamSummary, TeamInsight } from '../ai/types';
-import type { UserProfile, Team, WellnessScore, WithId, ClubUpdate, PlayerUpdate } from '../lib/types';
+import type { UserProfile, Team, WellnessScore, WithId, ClubUpdate, PlayerUpdate, StaffUpdate } from '../lib/types';
 import { getFirebaseAdmin } from '../ai/genkit';
 import { formatInTimeZone } from 'date-fns-tz';
 import { createHash } from 'crypto';
@@ -80,6 +80,7 @@ export async function runAnalysisJob() {
                 // 5. Run team-level analysis
                 console.log(`[CRON] Running team analysis for ${team.name} with data from ${playersWithData.length} players.`);
                 const teamAnalysisInput: TeamAnalysisInput = { 
+                    clubId,
                     teamId: team.id, 
                     teamName: team.name, 
                     playersData: playersWithData.map(p => ({ name: p.playerProfile.name, scores: p.scores }))
@@ -94,7 +95,12 @@ export async function runAnalysisJob() {
                     await db.runTransaction(async (transaction) => {
                         const doc = await transaction.get(staffUpdateRef);
                         if (!doc.exists) {
-                            const staffUpdateData: Omit<TeamInsight, 'id'> = { ...teamAnalysisResult.insight, date: today, read: false };
+                            const staffUpdateData: Omit<StaffUpdate, 'id'> = { 
+                                ...teamAnalysisResult.insight,
+                                clubId: clubId, 
+                                date: today, 
+                                read: false 
+                            };
                             transaction.set(staffUpdateRef, { ...staffUpdateData, id: staffUpdateRef.id });
                             console.log(`[CRON] Saved NEW staff update for team ${team.name}`);
                         } else {
@@ -197,5 +203,3 @@ export async function handleRunAnalysisJob(): Promise<{ success: boolean; messag
     };
   }
 }
-
-    
