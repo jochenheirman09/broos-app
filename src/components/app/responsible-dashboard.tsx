@@ -8,7 +8,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Building, BookOpen, Users, AlertTriangle, Archive, MessageSquare, Activity } from "lucide-react";
+import { Building, Users, AlertTriangle, Archive, MessageSquare, Activity } from "lucide-react";
 import { CreateTeamForm } from "./create-team-form";
 import { TeamList } from "./team-list";
 import { useCallback, useState } from "react";
@@ -16,7 +16,6 @@ import { ClubUpdates } from "./club-updates";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { StaffUpdates } from "./staff-updates";
-import { KnowledgeBaseManager } from "./knowledge-base-stats";
 import { AlertList } from "./alert-list";
 import { ResponsibleNoClub } from "./responsible-no-club";
 import { ClubLogoManager } from "./club-logo-manager";
@@ -164,18 +163,6 @@ function ClubManagement({ clubId }: { clubId: string }) {
       </Card>
       
       <ClubLogoManager clubId={clubId} />
-      
-      <Card>
-        <CardHeader>
-             <CardTitle className="flex items-center text-2xl">
-                <BookOpen className="h-6 w-6 mr-3" />
-                Kennisbank
-            </CardTitle>
-        </CardHeader>
-        <CardContent>
-            <KnowledgeBaseManager />
-        </CardContent>
-      </Card>
 
       <NotificationTroubleshooter />
     </>

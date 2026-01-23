@@ -3,7 +3,7 @@ import * as functions from 'firebase-functions/v1';
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import type { Alert } from '../../src/lib/types';
+import type { Alert } from '../../lib/types';
 
 
 if (!admin.apps.length) {
@@ -59,10 +59,17 @@ export const morningSummary = onSchedule({
             if (tokens.length === 0) continue;
 
             const role = userData.role;
+            const notificationTitle = role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten";
+            const notificationBody = "Er staan nieuwe updates voor je klaar in de Broos app.";
+
             const notificationPayload = {
+                notification: {
+                    title: notificationTitle,
+                    body: notificationBody,
+                },
                 data: {
-                    title: role === 'player' ? "Nieuw Weetje!" : "Nieuwe Team Inzichten",
-                    body: "Er staan nieuwe updates voor je klaar in de Broos app.",
+                    title: notificationTitle,
+                    body: notificationBody,
                     link: '/dashboard',
                     tag: `morning_summary_${userDoc.id}`
                 },
@@ -132,15 +139,18 @@ export const dailyCheckInReminder = onSchedule({
                 continue;
             }
 
-            let notificationPayload: { data: any, webpush: any } | null = null;
+            let notificationPayload: { notification: { title: string; body: string; }; data: any, webpush: any } | null = null;
 
             if (!schedule) {
                 // FALLBACK: If no schedule is set for the team, send a generic daily reminder.
+                const title = "Tijd voor je check-in!";
+                const body = `Hey ${player.name || 'buddy'}, je buddy wacht op je!`;
                 console.log(`[dailyCheckInReminder] Fallback: No schedule for team ${player.teamId}. Sending generic reminder to ${player.name}.`);
                 notificationPayload = {
+                    notification: { title, body },
                     data: {
-                        title: "Tijd voor je check-in!",
-                        body: `Hey ${player.name || 'buddy'}, je buddy wacht op je!`,
+                        title,
+                        body,
                         link: '/chat',
                         tag: `daily_checkin_${playerDoc.id}`
                     },
@@ -153,6 +163,7 @@ export const dailyCheckInReminder = onSchedule({
                     const title = activity === 'game' ? "Het is wedstrijddag!" : "Het is trainingsdag!";
                     const body = `Tijd voor je check-in, ${player.name || 'buddy'}!`;
                     notificationPayload = {
+                        notification: { title, body },
                         data: {
                             title,
                             body,
@@ -224,10 +235,14 @@ export const onAlertCreated = functions.firestore
                 console.log(`[onAlertCreated] Found ${tokensToSend.length} tokens for users:`, Array.from(userIdsToNotify));
 
                 if (tokensToSend.length > 0) {
+                     const title = `Broos Alert: ${alertData.alertType || "Aandacht!"}`;
+                     const body = alertData.triggeringMessage || "Nieuwe analyse beschikbaar.";
+
                      const notificationPayload = {
+                        notification: { title, body },
                         data: {
-                            title: `Broos Alert: ${alertData.alertType || "Aandacht!"}`,
-                            body: alertData.triggeringMessage || "Nieuwe analyse beschikbaar.",
+                            title,
+                            body,
                             link: "/alerts",
                             type: "ALERT",
                             alertId: alertId,

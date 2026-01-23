@@ -1,4 +1,3 @@
-
 'use server';
 import { getFirebaseAdmin } from '../genkit';
 import type { FcmToken } from '../../lib/types';
@@ -24,8 +23,13 @@ export async function sendNotification(
     const tokens = tokensSnapshot.docs.map(doc => (doc.data() as FcmToken).token);
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
-    // Use a data-only payload. The service worker will construct the notification.
     const message: MulticastMessage = {
+        // DEBUG: Add notification object to force display even if SW fails.
+        notification: {
+            title: title || 'Nieuw bericht',
+            body: body || 'Je hebt een nieuw bericht.',
+            icon: '/icons/icon-192x192.png',
+        },
         data: {
             title: title || 'Nieuw bericht',
             body: body || 'Je hebt een nieuw bericht.',
@@ -57,7 +61,7 @@ export async function sendNotification(
         tokens: tokens,
     };
     
-    console.log('[sendNotification] FCM Data-Only Payload:', JSON.stringify(message, null, 2));
+    console.log('[sendNotification] FCM Payload:', JSON.stringify(message, null, 2));
 
     try {
       const response = await adminMessaging.sendEachForMulticast(message);
