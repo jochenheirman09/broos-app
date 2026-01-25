@@ -29,16 +29,17 @@ export async function sendNotification(
     const notificationBody = body || 'Je hebt een nieuw bericht.';
 
     const message: MulticastMessage = {
-        // This is the "display" notification for reliability, especially when the app is killed.
+        // --- HYBRID PAYLOAD FIX ---
+        // 1. The 'notification' object for reliability on killed apps.
         notification: {
             title: notificationTitle,
             body: notificationBody,
         },
-        // This is for the service worker click handler and custom logic.
+        // 2. The 'data' object for custom logic in the service worker (click actions).
         data: {
             link: link || '/',
         },
-        android: {
+        android: { 
             priority: 'high',
             notification: {
                 channel_id: "default_channel",
@@ -47,21 +48,11 @@ export async function sendNotification(
             }
         },
         apns: {
-            payload: {
-                aps: {
-                    'content-available': 1,
-                    sound: 'default',
-                    badge: 1,
-                },
-            },
-            headers: {
-                'apns-priority': '10',
-            },
+            payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
+            headers: { 'apns-priority': '10' },
         },
         webpush: {
-            headers: {
-                Urgency: "high"
-            },
+            headers: { Urgency: "high" },
             // This object customizes the appearance of the browser-handled notification.
             notification: {
                 title: notificationTitle,
@@ -78,7 +69,7 @@ export async function sendNotification(
         tokens: tokens,
     };
     
-    console.log('[sendNotification] FCM Payload:', JSON.stringify(message, null, 2));
+    console.log('[sendNotification] FCM Hybrid Payload:', JSON.stringify(message, null, 2));
 
     try {
       const response = await adminMessaging.sendEachForMulticast(message);
