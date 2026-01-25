@@ -24,19 +24,14 @@ export async function sendNotification(
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
     const message: MulticastMessage = {
-        // DEBUG: Add notification object to force display even if SW fails.
+        // notification object at the root makes it a "notification message", which is higher priority
         notification: {
             title: title || 'Nieuw bericht',
             body: body || 'Je hebt een nieuw bericht.',
-            icon: '/icons/icon-192x192.png',
         },
+        // data object is for the service worker click handler
         data: {
-            title: title || 'Nieuw bericht',
-            body: body || 'Je hebt een nieuw bericht.',
             link: link || '/',
-            tag: id || `broos-message-${Date.now()}`, // Unique tag for idempotency
-            icon: '/icons/icon-192x192.png',
-            badge: '/icons/icon-72x72.png',
         },
         android: {
             priority: 'high',
@@ -54,6 +49,18 @@ export async function sendNotification(
             },
         },
         webpush: {
+            headers: {
+                Urgency: "high"
+            },
+            // The webpush.notification object controls the visual appearance on web
+            notification: {
+                title: title || 'Nieuw bericht',
+                body: body || 'Je hebt een nieuw bericht.',
+                icon: '/icons/icon-192x192.png',
+                badge: '/icons/icon-192x192.png', // Corrected path to avoid 404
+                tag: id || `broos-message-${Date.now()}`,
+                renotify: true,
+            },
             fcmOptions: {
                 link: link || '/',
             },

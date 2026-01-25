@@ -68,12 +68,23 @@ export const morningSummary = onSchedule({
                     body: notificationBody,
                 },
                 data: {
-                    title: notificationTitle,
-                    body: notificationBody,
                     link: '/dashboard',
-                    tag: `morning_summary_${userDoc.id}`
+                },
+                android: { priority: 'high' },
+                apns: {
+                    payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
+                    headers: { 'apns-priority': '10' },
                 },
                 webpush: {
+                    headers: { Urgency: "high" },
+                    notification: {
+                        title: notificationTitle,
+                        body: notificationBody,
+                        icon: '/icons/icon-192x192.png',
+                        badge: '/icons/icon-192x192.png',
+                        tag: `morning_summary_${userDoc.id}`,
+                        renotify: true,
+                    },
                     fcmOptions: {
                         link: '/dashboard'
                     }
@@ -139,41 +150,50 @@ export const dailyCheckInReminder = onSchedule({
                 continue;
             }
 
-            let notificationPayload: { notification: { title: string; body: string; }; data: any, webpush: any } | null = null;
+            let notificationPayload: { notification: { title: string; body: string; }; data: any, webpush: any, android: any, apns: any } | null = null;
+            let title: string | null = null;
+            let body: string | null = null;
 
             if (!schedule) {
                 // FALLBACK: If no schedule is set for the team, send a generic daily reminder.
-                const title = "Tijd voor je check-in!";
-                const body = `Hey ${player.name || 'buddy'}, je buddy wacht op je!`;
+                title = "Tijd voor je check-in!";
+                body = `Hey ${player.name || 'buddy'}, je buddy wacht op je!`;
                 console.log(`[dailyCheckInReminder] Fallback: No schedule for team ${player.teamId}. Sending generic reminder to ${player.name}.`);
-                notificationPayload = {
-                    notification: { title, body },
-                    data: {
-                        title,
-                        body,
-                        link: '/chat',
-                        tag: `daily_checkin_${playerDoc.id}`
-                    },
-                    webpush: { fcmOptions: { link: '/chat' } }
-                };
             } else {
                 // SCHEDULED LOGIC: Send notification based on today's activity.
                 const activity = schedule[todayName];
                 if (activity === 'training' || activity === 'game') {
-                    const title = activity === 'game' ? "Het is wedstrijddag!" : "Het is trainingsdag!";
-                    const body = `Tijd voor je check-in, ${player.name || 'buddy'}!`;
-                    notificationPayload = {
-                        notification: { title, body },
-                        data: {
-                            title,
-                            body,
-                            link: '/chat',
-                            tag: `activity_checkin_${playerDoc.id}`
-                        },
-                        webpush: { fcmOptions: { link: '/chat' } }
-                    };
+                    title = activity === 'game' ? "Het is wedstrijddag!" : "Het is trainingsdag!";
+                    body = `Tijd voor je check-in, ${player.name || 'buddy'}!`;
                 }
             }
+            
+            if (title && body) {
+                notificationPayload = {
+                    notification: { title, body },
+                    data: {
+                        link: '/chat',
+                    },
+                    android: { priority: 'high' },
+                    apns: {
+                        payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
+                        headers: { 'apns-priority': '10' },
+                    },
+                    webpush: {
+                        headers: { Urgency: "high" },
+                        notification: {
+                            title,
+                            body,
+                            icon: '/icons/icon-192x192.png',
+                            badge: '/icons/icon-192x192.png',
+                            tag: `activity_checkin_${playerDoc.id}`,
+                            renotify: true
+                        },
+                        fcmOptions: { link: '/chat' }
+                    }
+                };
+            }
+
 
             if (notificationPayload) {
                 await admin.messaging().sendEachForMulticast({ tokens, ...notificationPayload });
@@ -241,15 +261,25 @@ export const onAlertCreated = functions.firestore
                      const notificationPayload = {
                         notification: { title, body },
                         data: {
-                            title,
-                            body,
                             link: "/alerts",
                             type: "ALERT",
                             alertId: alertId,
-                            tag: `alert_${alertId}`,
-                            badge: "1"
                         },
-                         webpush: {
+                        android: { priority: 'high' },
+                        apns: {
+                            payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
+                            headers: { 'apns-priority': '10' },
+                        },
+                        webpush: {
+                            headers: { Urgency: "high" },
+                            notification: {
+                                title,
+                                body,
+                                icon: '/icons/icon-192x192.png',
+                                badge: '/icons/icon-192x192.png',
+                                tag: `alert_${alertId}`,
+                                renotify: true,
+                            },
                             fcmOptions: { link: "/alerts" }
                         }
                     };
