@@ -1,82 +1,80 @@
 // public/firebase-messaging-sw.js
-import { initializeApp } from 'firebase/app';
-import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
 
-// This message is a placeholder. The AppProviders component will post the
-// actual config when the service worker is ready.
-let firebaseConfig = {};
-let isInitialized = false;
+// This file must be in the public directory
+if (typeof self.importScripts === 'function') {
+    self.importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+    self.importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+}
 
+let firebaseConfig = null;
+let messaging;
+
+// Listen for the config from the main app
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'FIREBASE_CONFIG') {
-        if (isInitialized) return;
-        
-        console.log('[SW] Received Firebase config:', event.data.firebaseConfig);
-        firebaseConfig = event.data.firebaseConfig;
-        
-        // Initialize Firebase App after receiving the config
-        try {
-            const app = initializeApp(firebaseConfig);
-            const messaging = getMessaging(app);
-            isInitialized = true;
-            console.log('[SW] Firebase Initialized.');
-
-            onBackgroundMessage(messaging, (payload) => {
-                console.log('[SW] Background message received. ', payload);
-
-                // If the payload already has a notification object, the browser will handle it automatically.
-                // We do nothing to prevent a duplicate notification. This is the key fix.
-                if (payload.notification) {
-                    console.log('[SW] Notification payload found, browser will display it. Skipping showNotification().');
-                    return;
-                }
-
-                // Only show a notification if it's a data-only message.
-                // This is now a fallback for older payload structures.
-                const notificationTitle = payload.data.title || "Nieuw bericht";
-                const notificationOptions = {
-                    body: payload.data.body,
-                    icon: "/icons/icon-192x192.png", // Use an icon that exists
-                    badge: "/icons/icon-192x192.png", // Use a valid icon path
-                    data: {
-                        link: payload.data.link || '/'
-                    },
-                    tag: payload.data.tag,
-                    renotify: true,
-                };
+        if (!firebaseConfig) { // Only initialize once
+            firebaseConfig = event.data.firebaseConfig;
+            console.log('[SW] Firebase config received:', firebaseConfig);
             
-                return self.registration.showNotification(notificationTitle, notificationOptions);
-            });
+            if (firebaseConfig && self.firebase && !self.firebase.apps.length) {
+                try {
+                    self.firebase.initializeApp(firebaseConfig);
+                    console.log('[SW] Firebase Initialized.');
+                    messaging = self.firebase.messaging();
+                    
+                    // Set up the background message handler *after* initialization
+                    messaging.onBackgroundMessage((payload) => {
+                        console.log('[SW] Background message received:', payload);
+                        
+                        // IMPORTANT: If the payload has a 'notification' object, the browser handles it automatically.
+                        // Doing nothing here prevents a duplicate notification when the app is in the foreground/background.
+                        if (payload.notification) {
+                            console.log('[SW] Browser is handling the notification display, SW will not show another.');
+                            return;
+                        }
 
-        } catch (e) {
-            console.error('[SW] Error during initialization or background message handling:', e);
+                        // If only a 'data' payload is present (fallback), we must manually show the notification.
+                        console.log('[SW] Data-only message received. Manually showing notification.');
+                        const notificationTitle = payload.data.title || "Nieuw Bericht";
+                        const notificationOptions = {
+                            body: payload.data.body,
+                            icon: payload.data.icon || '/icons/icon-192x192.png',
+                            badge: payload.data.badge || '/icons/icon-192x192.png',
+                            tag: payload.data.tag || 'broos-general',
+                            renotify: true,
+                            data: {
+                                link: payload.data.link || '/'
+                            }
+                        };
+                    
+                        event.waitUntil(self.registration.showNotification(notificationTitle, notificationOptions));
+                    });
+                } catch (e) {
+                    console.error('[SW] Error during Firebase initialization:', e);
+                }
+            }
         }
     }
 });
 
 
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Notification click Received.');
-
     event.notification.close();
-
-    const link = event.notification.data.link || '/';
-
+    const link = event.notification.data?.link || '/';
+  
     event.waitUntil(
-        clients.matchAll({
-            type: "window"
-        }).then((clientList) => {
-            // Check if there's already a client running with the correct URL
-            for (const client of clientList) {
-                // Use includes() for more flexible matching, e.g., ignoring search params
-                if (client.url.includes(link) && 'focus' in client) {
-                    return client.focus();
-                }
-            }
-            // If no client is found, open a new window
-            if (clients.openWindow) {
-                return clients.openWindow(link);
-            }
-        })
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        // Check if a window for this app is already open
+        for (const client of clientList) {
+          // If a window is already open and at the target URL, just focus it.
+          if (client.url === self.location.origin + link && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // If no window is open, or not at the right URL, open a new one.
+        if (clients.openWindow) {
+          return clients.openWindow(link);
+        }
+      })
     );
 });

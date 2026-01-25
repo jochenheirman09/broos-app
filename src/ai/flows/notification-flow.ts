@@ -24,13 +24,17 @@ export async function sendNotification(
     const tokens = tokensSnapshot.docs.map(doc => (doc.data() as FcmToken).token);
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
+    const tag = id || `broos-message-${Date.now()}`;
+    const notificationTitle = title || 'Nieuw bericht';
+    const notificationBody = body || 'Je hebt een nieuw bericht.';
+
     const message: MulticastMessage = {
-        // Add a root notification object to ensure delivery on all platforms
+        // This is the "display" notification for reliability, especially when the app is killed.
         notification: {
-            title: title || 'Nieuw bericht',
-            body: body || 'Je hebt een nieuw bericht.',
+            title: notificationTitle,
+            body: notificationBody,
         },
-        // data object is for the service worker click handler
+        // This is for the service worker click handler and custom logic.
         data: {
             link: link || '/',
         },
@@ -39,7 +43,7 @@ export async function sendNotification(
             notification: {
                 channel_id: "default_channel",
                 icon: "stock_ticker_update",
-                color: "#3F51B5" // App's primary color
+                color: "#3F51B5"
             }
         },
         apns: {
@@ -58,13 +62,13 @@ export async function sendNotification(
             headers: {
                 Urgency: "high"
             },
-            // The webpush.notification object controls the visual appearance on web
+            // This object customizes the appearance of the browser-handled notification.
             notification: {
-                title: title || 'Nieuw bericht',
-                body: body || 'Je hebt een nieuw bericht.',
+                title: notificationTitle,
+                body: notificationBody,
                 icon: '/icons/icon-192x192.png',
-                badge: '/icons/icon-192x192.png', // Corrected path to avoid 404
-                tag: id || `broos-message-${Date.now()}`,
+                badge: '/icons/icon-192x192.png', // Corrected path to prevent 404
+                tag: tag,
                 renotify: true,
             },
             fcmOptions: {
