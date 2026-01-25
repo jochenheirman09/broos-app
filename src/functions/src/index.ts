@@ -70,7 +70,14 @@ export const morningSummary = onSchedule({
                 data: {
                     link: '/dashboard',
                 },
-                android: { priority: 'high' },
+                android: { 
+                    priority: 'high',
+                    notification: {
+                        channel_id: "default_channel",
+                        icon: "stock_ticker_update",
+                        color: "#3F51B5"
+                    }
+                },
                 apns: {
                     payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
                     headers: { 'apns-priority': '10' },
@@ -174,7 +181,14 @@ export const dailyCheckInReminder = onSchedule({
                     data: {
                         link: '/chat',
                     },
-                    android: { priority: 'high' },
+                    android: { 
+                        priority: 'high',
+                        notification: {
+                            channel_id: "default_channel",
+                            icon: "stock_ticker_update",
+                            color: "#3F51B5"
+                        }
+                    },
                     apns: {
                         payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
                         headers: { 'apns-priority': '10' },
@@ -265,7 +279,14 @@ export const onAlertCreated = functions.firestore
                             type: "ALERT",
                             alertId: alertId,
                         },
-                        android: { priority: 'high' },
+                        android: { 
+                            priority: 'high',
+                            notification: {
+                                channel_id: "alerts_channel",
+                                icon: "stock_ticker_update",
+                                color: "#cf222e" // Destructive color
+                            }
+                        },
                         apns: {
                             payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
                             headers: { 'apns-priority': '10' },

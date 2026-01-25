@@ -1,76 +1,82 @@
-// DO NOT EDIT - This file will be overwritten by the build process
-// Import the Firebase messaging service worker scripts
-try {
-    importScripts('https://www.gstatic.com/firebasejs/11.9.1/firebase-app-compat.js');
-    importScripts('https://www.gstatic.com/firebasejs/11.9.1/firebase-messaging-compat.js');
-    console.log('[SW] Firebase scripts imported successfully.');
-} catch (e) {
-    console.error('[SW] Error importing Firebase scripts:', e);
-}
+// public/firebase-messaging-sw.js
+import { initializeApp } from 'firebase/app';
+import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
 
-// This is a placeholder for the config that will be sent by the client
-let firebaseConfig = null;
+// This message is a placeholder. The AppProviders component will post the
+// actual config when the service worker is ready.
+let firebaseConfig = {};
+let isInitialized = false;
 
-// The service worker needs to be able to handle messages to set the config
-self.addEventListener('message', (event) => {  
-  if (event.data && event.data.type === 'FIREBASE_CONFIG') {
-    firebaseConfig = event.data.firebaseConfig;
-    console.log('[SW] Firebase config received and set.');
-    
-    // Initialize Firebase App after config is received
-    if (firebaseConfig && firebase.apps.length === 0) {
-      firebase.initializeApp(firebaseConfig);
-      const messaging = firebase.messaging();
-      console.log('[SW] Firebase Messaging initialized.');
-      
-      messaging.onBackgroundMessage((payload) => {
-        console.log('[SW] Received background message: ', payload);
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+        if (isInitialized) return;
         
-        const notificationTitle = payload.data.title || 'Broos 2.0';
-        const notificationOptions = {
-          body: payload.data.body || 'Je hebt een nieuw bericht.',
-          icon: payload.data.icon || '/icons/icon-192x192.png',
-          badge: payload.data.badge || '/icons/icon-72x72.png',
-          data: {
-            link: payload.data.link || '/'
-          },
-          tag: payload.data.tag || 'broos-notification'
-        };
+        console.log('[SW] Received Firebase config:', event.data.firebaseConfig);
+        firebaseConfig = event.data.firebaseConfig;
+        
+        // Initialize Firebase App after receiving the config
+        try {
+            const app = initializeApp(firebaseConfig);
+            const messaging = getMessaging(app);
+            isInitialized = true;
+            console.log('[SW] Firebase Initialized.');
 
-        self.registration.showNotification(notificationTitle, notificationOptions);
-      });
+            onBackgroundMessage(messaging, (payload) => {
+                console.log('[SW] Background message received. ', payload);
+
+                // If the payload already has a notification object, the browser will handle it automatically.
+                // We do nothing to prevent a duplicate notification. This is the key fix.
+                if (payload.notification) {
+                    console.log('[SW] Notification payload found, browser will display it. Skipping showNotification().');
+                    return;
+                }
+
+                // Only show a notification if it's a data-only message.
+                // This is now a fallback for older payload structures.
+                const notificationTitle = payload.data.title || "Nieuw bericht";
+                const notificationOptions = {
+                    body: payload.data.body,
+                    icon: "/icons/icon-192x192.png", // Use an icon that exists
+                    badge: "/icons/icon-192x192.png", // Use a valid icon path
+                    data: {
+                        link: payload.data.link || '/'
+                    },
+                    tag: payload.data.tag,
+                    renotify: true,
+                };
+            
+                return self.registration.showNotification(notificationTitle, notificationOptions);
+            });
+
+        } catch (e) {
+            console.error('[SW] Error during initialization or background message handling:', e);
+        }
     }
-  }
 });
 
-// Event listener for when a user clicks on the notification
+
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification click received.', event);
-  event.notification.close();
-  const link = event.notification.data.link || '/';
+    console.log('[SW] Notification click Received.');
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if there's already a tab open for this app
-      if (clientList.length > 0) {
-          clientList[0].navigate(link);
-          return clientList[0].focus();
-      }
-      // If not, open a new window
-      if (clients.openWindow) {
-        return clients.openWindow(link);
-      }
-    })
-  );
-});
+    event.notification.close();
 
-// A simple service worker event to ensure it activates quickly
-self.addEventListener('install', (event) => {
-  console.log('[SW] Service worker installing...');
-  event.waitUntil(self.skipWaiting());
-});
+    const link = event.notification.data.link || '/';
 
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Service worker activating...');
-  event.waitUntil(self.clients.claim());
+    event.waitUntil(
+        clients.matchAll({
+            type: "window"
+        }).then((clientList) => {
+            // Check if there's already a client running with the correct URL
+            for (const client of clientList) {
+                // Use includes() for more flexible matching, e.g., ignoring search params
+                if (client.url.includes(link) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If no client is found, open a new window
+            if (clients.openWindow) {
+                return clients.openWindow(link);
+            }
+        })
+    );
 });

@@ -1,3 +1,4 @@
+
 'use server';
 import { getFirebaseAdmin } from '../genkit';
 import type { FcmToken } from '../../lib/types';
@@ -24,7 +25,7 @@ export async function sendNotification(
     console.log(`[sendNotification] Found ${tokens.length} tokens for user ${userId}.`);
 
     const message: MulticastMessage = {
-        // notification object at the root makes it a "notification message", which is higher priority
+        // Add a root notification object to ensure delivery on all platforms
         notification: {
             title: title || 'Nieuw bericht',
             body: body || 'Je hebt een nieuw bericht.',
@@ -35,6 +36,11 @@ export async function sendNotification(
         },
         android: {
             priority: 'high',
+            notification: {
+                channel_id: "default_channel",
+                icon: "stock_ticker_update",
+                color: "#3F51B5" // App's primary color
+            }
         },
         apns: {
             payload: {
