@@ -73,11 +73,6 @@ export const morningSummary = onSchedule({
                 },
                 android: { 
                     priority: 'high',
-                    notification: {
-                        channel_id: "default_channel",
-                        icon: "stock_ticker_update",
-                        color: "#3F51B5"
-                    }
                 },
                 apns: {
                     payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
@@ -86,8 +81,6 @@ export const morningSummary = onSchedule({
                 webpush: {
                     headers: { Urgency: "high" },
                     notification: {
-                        title: notificationTitle,
-                        body: notificationBody,
                         icon: '/icons/icon-192x192.png',
                         badge: '/icons/icon-192x192.png',
                         tag: `morning_summary_${userDoc.id}`,
@@ -108,11 +101,6 @@ export const morningSummary = onSchedule({
 });
 
 
-/**
- * Sends a daily check-in reminder to players.
- * If a team schedule is set, it only sends on 'training' or 'game' days.
- * If no schedule is set, it sends a generic reminder as a fallback.
- */
 export const dailyCheckInReminder = onSchedule({
     schedule: "0 17 * * *",
     timeZone: "Europe/Brussels",
@@ -139,7 +127,6 @@ export const dailyCheckInReminder = onSchedule({
                 continue; // Skip players without a team/club
             }
 
-            // Fetch and cache team schedule if not already fetched
             let schedule = teamSchedules.get(player.teamId);
             if (schedule === undefined) {
                 const teamDocRef = db.doc(`clubs/${player.clubId}/teams/${player.teamId}`);
@@ -158,17 +145,15 @@ export const dailyCheckInReminder = onSchedule({
                 continue;
             }
 
-            let notificationPayload: { notification: { title: string; body: string; }; data: any, webpush: any, android: any, apns: any } | null = null;
+            let notificationPayload: any | null = null;
             let title: string | null = null;
             let body: string | null = null;
 
             if (!schedule) {
-                // FALLBACK: If no schedule is set for the team, send a generic daily reminder.
                 title = "Tijd voor je check-in!";
                 body = `Hey ${player.name || 'buddy'}, je buddy wacht op je!`;
                 console.log(`[dailyCheckInReminder] Fallback: No schedule for team ${player.teamId}. Sending generic reminder to ${player.name}.`);
             } else {
-                // SCHEDULED LOGIC: Send notification based on today's activity.
                 const activity = schedule[todayName];
                 if (activity === 'training' || activity === 'game') {
                     title = activity === 'game' ? "Het is wedstrijddag!" : "Het is trainingsdag!";
@@ -184,11 +169,6 @@ export const dailyCheckInReminder = onSchedule({
                     },
                     android: { 
                         priority: 'high',
-                        notification: {
-                            channel_id: "default_channel",
-                            icon: "stock_ticker_update",
-                            color: "#3F51B5"
-                        }
                     },
                     apns: {
                         payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
@@ -197,8 +177,6 @@ export const dailyCheckInReminder = onSchedule({
                     webpush: {
                         headers: { Urgency: "high" },
                         notification: {
-                            title,
-                            body,
                             icon: '/icons/icon-192x192.png',
                             badge: '/icons/icon-192x192.png',
                             tag: `activity_checkin_${playerDoc.id}`,
@@ -208,7 +186,6 @@ export const dailyCheckInReminder = onSchedule({
                     }
                 };
             }
-
 
             if (notificationPayload) {
                 await admin.messaging().sendEachForMulticast({ tokens, ...notificationPayload });
@@ -282,11 +259,6 @@ export const onAlertCreated = functions.firestore
                         },
                         android: { 
                             priority: 'high',
-                            notification: {
-                                channel_id: "alerts_channel",
-                                icon: "stock_ticker_update",
-                                color: "#cf222e" // Destructive color
-                            }
                         },
                         apns: {
                             payload: { aps: { 'content-available': 1, sound: 'default', badge: 1 } },
@@ -295,8 +267,6 @@ export const onAlertCreated = functions.firestore
                         webpush: {
                             headers: { Urgency: "high" },
                             notification: {
-                                title,
-                                body,
                                 icon: '/icons/icon-192x192.png',
                                 badge: '/icons/icon-192x192.png',
                                 tag: `alert_${alertId}`,

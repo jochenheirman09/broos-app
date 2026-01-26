@@ -1,100 +1,91 @@
+// This file MUST be in the /public directory
 
-// Import the Firebase app and messaging packages
-importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+// Give the service worker access to the Firebase Messaging SDK.
+try {
+  importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+  console.log('[SW] Firebase scripts imported successfully.');
+} catch (e) {
+  console.error('[SW] Error importing Firebase scripts:', e);
+}
 
-// This is a placeholder for the config object.
-// The client-side code will send the actual config object via postMessage.
-let firebaseConfig = {};
 
-let app;
-let messaging;
+let firebaseApp;
 
+// This listener waits for the main app to send its Firebase config.
 self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'FIREBASE_CONFIG') {
-        firebaseConfig = event.data.firebaseConfig;
-        console.log('[SW] Received Firebase config from client:', firebaseConfig);
+  if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+    if (!firebase.apps.length) {
+      console.log('[SW] Received FIREBASE_CONFIG, initializing app.');
+      firebaseApp = firebase.initializeApp(event.data.firebaseConfig);
+    } else {
+      console.log('[SW] Firebase app already initialized.');
+      firebaseApp = firebase.app();
+    }
+  }
+});
 
-        // Initialize Firebase
-        if (firebase.apps.length === 0) {
-            app = firebase.initializeApp(firebaseConfig);
-            messaging = firebase.messaging(app);
-            console.log('[SW] Firebase initialized successfully.');
+
+// Set up the background message handler.
+if (typeof firebase !== 'undefined' && firebase.messaging) {
+    const messaging = firebase.messaging();
+    
+    messaging.onBackgroundMessage((payload) => {
+        console.log('[SW] Background message received:', payload);
+
+        // --- IMPORTANT ---
+        // If the payload has a 'notification' object, the browser will
+        // automatically display it when the app is in the background or killed.
+        // We do NOT need to call showNotification() again, as it would cause a duplicate.
+        // The browser will still wake the SW for the 'notificationclick' event.
+        if (payload.notification) {
+            console.log('[SW] "notification" payload found. Browser will display it.');
+            return;
         }
-    }
-});
 
-// onBackgroundMessage is called when the app is in the background or closed.
-self.addEventListener('push', (event) => {
-    const payload = event.data.json();
-    console.log('[SW] Push event received.', payload);
+        // --- FALLBACK ---
+        // If the payload is data-only (no 'notification' object), we must
+        // manually show a notification. This is less reliable for killed apps.
+        console.log('[SW] Data-only payload. Manually showing notification.');
+        const notificationTitle = payload.data.title || "Nieuw Bericht";
+        const notificationOptions = {
+            body: payload.data.body || "Je hebt een nieuw bericht.",
+            icon: payload.data.icon || '/icons/icon-192x192.png',
+            badge: payload.data.badge || '/icons/icon-192x192.png',
+            data: { 
+                link: payload.data.link || '/' 
+            },
+        };
 
-    // If the payload has a 'notification' object, the browser will likely
-    // display it automatically. We should still call showNotification to ensure
-    // we can handle the click event correctly with our custom link.
-    // The browser is smart enough to not show two notifications if the tag is the same.
-    
-    let notificationTitle = "Nieuw Bericht";
-    let notificationOptions = {
-        body: "Je hebt een nieuw bericht.",
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-192x192.png',
-        data: { link: '/' }, // Default link
-        tag: 'default-tag',
-        renotify: true,
-    };
+        return self.registration.showNotification(notificationTitle, notificationOptions);
+    });
+} else {
+    console.warn('[SW] Firebase messaging is not available in the service worker. Background messages will not be handled.');
+}
 
-    if (payload.notification) {
-        notificationTitle = payload.notification.title || notificationTitle;
-        notificationOptions.body = payload.notification.body || notificationOptions.body;
-        if(payload.notification.icon) notificationOptions.icon = payload.notification.icon;
-        if(payload.notification.badge) notificationOptions.badge = payload.notification.badge;
-    }
-    
-    if (payload.data) {
-        // Prefer data from the 'data' payload for more control if it exists
-        notificationTitle = payload.data.title || notificationTitle;
-        notificationOptions.body = payload.data.body || notificationOptions.body;
-        notificationOptions.data.link = payload.data.link || '/';
-        notificationOptions.tag = payload.data.tag || 'default-tag';
-        notificationOptions.icon = payload.data.icon || notificationOptions.icon;
-        notificationOptions.badge = payload.data.badge || notificationOptions.badge;
-    }
-
-    console.log(`[SW] Showing notification with title: "${notificationTitle}" and options:`, notificationOptions);
-    
-    event.waitUntil(
-        self.registration.showNotification(notificationTitle, notificationOptions)
-    );
-});
-
-
-// notificationclick is called when the user clicks on a notification.
+// Handle notification clicks.
 self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Notification click received.', event.notification);
+    console.log('[SW] Notification click received.', event);
     event.notification.close();
-
+    
     const link = event.notification.data?.link || '/';
     
     event.waitUntil(
-        clients.matchAll({
-            type: "window",
-            includeUncontrolled: true
-        }).then((clientList) => {
-            // If a window for the app is already open, focus it.
-            for (let i = 0; i < clientList.length; i++) {
-                let client = clientList[i];
-                if (client.url.includes(self.location.origin) && 'focus' in client) {
-                    console.log(`[SW] Found open client, focusing and navigating to: ${link}`);
-                    client.navigate(link);
-                    return client.focus();
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            // Check if there's already a window open for this app.
+            if (clientList.length > 0) {
+                let client = clientList[0];
+                for (let i = 0; i < clientList.length; i++) {
+                    if (clientList[i].focused) {
+                        client = clientList[i];
+                    }
                 }
+                // If a window is open, focus it and navigate.
+                client.navigate(link);
+                return client.focus();
             }
-            // If no window is open, open a new one.
-            if (clients.openWindow) {
-                console.log(`[SW] No open client, opening new window to: ${link}`);
-                return clients.openWindow(link);
-            }
+            // If not, open a new window.
+            return clients.openWindow(link);
         })
     );
 });
