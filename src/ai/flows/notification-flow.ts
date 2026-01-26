@@ -26,20 +26,23 @@ export async function sendNotification(
 
     const tag = id || `broos-message-${Date.now()}`;
 
-    // --- HYBRID PAYLOAD ---
-    // This structure ensures delivery to killed apps (via `notification`)
-    // and provides data for click actions in the service worker (via `data`).
+    // --- HYBRID PAYLOAD (DEFINITIVE FIX) ---
     const message: MulticastMessage = {
-        // This is the "display" part, handled by the OS/browser directly.
+        // 1. FOR RELIABLE DELIVERY (especially on killed Android apps)
         notification: {
             title: title || 'Nieuw bericht',
             body: body || 'Je hebt een nieuw bericht.',
         },
-        // This is the "logic" part for the service worker.
+        // 2. FOR SERVICE WORKER LOGIC (click action, etc.)
         data: {
+            title: title || 'Nieuw bericht',
+            body: body || 'Je hebt een nieuw bericht.',
             link: link || '/',
+            tag: tag,
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-192x192.png', // Corrected icon path
         },
-        // Platform-specific configurations
+        // 3. PLATFORM-SPECIFIC CONFIGS
         android: { 
             priority: 'high',
         },
@@ -49,12 +52,14 @@ export async function sendNotification(
         },
         webpush: {
             headers: { Urgency: "high" },
+            // Add notification details here for webpush standards
             notification: {
                 icon: '/icons/icon-192x192.png',
                 badge: '/icons/icon-192x192.png',
                 tag: tag,
                 renotify: true,
             },
+            // fcmOptions is critical for click_action on web
             fcmOptions: {
                 link: link || '/',
             },
@@ -62,7 +67,8 @@ export async function sendNotification(
         tokens: tokens,
     };
     
-    console.log(`${logPrefix} Sending Hybrid FCM Payload:`, JSON.stringify(message, null, 2));
+    // Corrected log message to be unambiguous
+    console.log(`${logPrefix} 📲 Sending HYBRID FCM Payload:`, JSON.stringify(message, null, 2));
 
     try {
       const response = await adminMessaging.sendEachForMulticast(message);
