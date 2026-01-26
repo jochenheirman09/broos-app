@@ -1,6 +1,6 @@
-
 "use client";
 
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -8,20 +8,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Activity, Wrench, BookOpen, Upload, Users } from "lucide-react";
+import { Activity, Wrench, BookOpen, Upload, Users, BarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from 'next/link';
-import { UsageCharts, OnboardingFunnelChart } from "@/components/app/admin/usage-charts";
-import { useUser } from "@/context/user-context";
+import { OnboardingFunnelChart, UsageCharts } from "@/components/app/admin/usage-charts";
+import { ChatInteractionChart } from "@/components/app/admin/chat-interaction-chart";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query } from "firebase/firestore";
-import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Club } from "@/lib/types";
 
 export default function AdminDashboardPage() {
   const db = useFirestore();
   const [selectedClubId, setSelectedClubId] = useState<string | undefined>(undefined);
+  const [selectedChart, setSelectedChart] = useState<'onboarding' | 'usage' | 'chat'>('onboarding');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<'weekly' | 'total'>('weekly');
 
   const clubsQuery = useMemoFirebase(
     () => (db ? query(collection(db, "clubs")) : null),
@@ -29,9 +30,14 @@ export default function AdminDashboardPage() {
   );
   const { data: clubs } = useCollection<Club>(clubsQuery);
 
-  // The clubId passed to charts will be undefined if "all" is selected
   const clubIdForCharts = selectedClubId === "all" ? undefined : selectedClubId;
   const selectedClubName = clubs?.find(c => c.id === selectedClubId)?.name || "Alle Clubs";
+
+  const chartComponents: { [key: string]: React.ReactNode } = {
+    onboarding: <OnboardingFunnelChart clubId={clubIdForCharts} />,
+    usage: <UsageCharts clubId={clubIdForCharts} />,
+    chat: <ChatInteractionChart clubId={clubIdForCharts} timeRange={selectedTimeRange} />,
+  };
 
   return (
     <div className="space-y-8">
@@ -64,10 +70,48 @@ export default function AdminDashboardPage() {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="grid gap-6 md:grid-cols-2">
-                <OnboardingFunnelChart clubId={clubIdForCharts} />
-                <UsageCharts clubId={clubIdForCharts} />
-            </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                      <CardTitle className="flex items-center gap-3 text-2xl">
+                          <BarChart className="h-7 w-7 text-primary" />
+                          Grafieken
+                      </CardTitle>
+                      <CardDescription>
+                          Selecteer een grafiek en periode om de data te visualiseren.
+                      </CardDescription>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Select onValueChange={(value) => setSelectedChart(value as any)} defaultValue="onboarding">
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue placeholder="Selecteer een grafiek..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="onboarding">Onboarding Funnel</SelectItem>
+                            <SelectItem value="usage">Wekelijkse Activiteit</SelectItem>
+                            <SelectItem value="chat">Chat Interacties</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {selectedChart === 'chat' && (
+                       <Select onValueChange={(value) => setSelectedTimeRange(value as 'weekly' | 'total')} defaultValue="weekly">
+                          <SelectTrigger className="w-full sm:w-[200px]">
+                              <SelectValue placeholder="Selecteer een periode..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="weekly">Laatste 7 Dagen</SelectItem>
+                              <SelectItem value="total">Volledige Historiek</SelectItem>
+                          </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+              </div>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+              {chartComponents[selectedChart]}
+          </CardContent>
         </Card>
         
         <Card>

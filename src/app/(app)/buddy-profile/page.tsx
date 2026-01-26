@@ -24,6 +24,7 @@ interface BuddyProfileCustomizerProps {
   onSave?: () => void;
 }
 
+// This component now contains only the logic and fields, not the Card wrapper
 export function BuddyProfileCustomizer({ onSave }: BuddyProfileCustomizerProps) {
   const { userProfile, user, forceRefetch } = useUser();
   const db = useFirestore();
@@ -40,7 +41,6 @@ export function BuddyProfileCustomizer({ onSave }: BuddyProfileCustomizerProps) 
       setSelectedAvatar(userProfile.buddyAvatar || 'logo');
     }
   }, [userProfile]);
-
 
   const handleSave = async () => {
     if (!user) {
@@ -121,64 +121,68 @@ export function BuddyProfileCustomizer({ onSave }: BuddyProfileCustomizerProps) 
   }
 
   return (
-    <Card className="max-w-2xl mx-auto shadow-none border-0">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-2xl">
-          <Sparkles className="h-6 w-6 text-primary" />
-          <span>Pas je Buddy aan</span>
-        </CardTitle>
-        <CardDescription>
-          Geef je AI-buddy een persoonlijke naam en uiterlijk.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-8">
+    <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="buddy-name">Naam van je Buddy</Label>
-          <Input
+            <Label htmlFor="buddy-name">Naam van je Buddy</Label>
+            <Input
             id="buddy-name"
             value={buddyName}
             onChange={(e) => setBuddyName(e.target.value)}
             placeholder="bv. Broos"
-          />
+            />
         </div>
 
         <div className="space-y-4">
-          <Label>Avatar van je Buddy</Label>
-          
-          <div className="flex justify-center my-4">
-            {renderSelectedAvatar()}
-          </div>
+            <Label>Avatar van je Buddy</Label>
+            
+            <div className="flex justify-center my-4">
+              {renderSelectedAvatar()}
+            </div>
 
-          <div className="grid grid-cols-3 gap-4">
-              {predefinedAvatars.map(avatar => {
-                  const AvatarComponent = avatar.component;
-                  const isSelected = selectedAvatar === avatar.id;
-                  return (
-                      <div key={avatar.id} onClick={() => setSelectedAvatar(avatar.id)} className={cn("cursor-pointer p-2 rounded-2xl border-2 transition-all", isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted")}>
-                         <AvatarComponent className="w-full h-auto" />
-                      </div>
-                  )
-              })}
-          </div>
-          
-          <div className="!mt-6">
-              <Button variant="outline" className="w-full" onClick={handleCustomUploadClick}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload eigen afbeelding
-              </Button>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
-          </div>
-
+            <div className="grid grid-cols-3 gap-4">
+                {predefinedAvatars.map(avatar => {
+                    const AvatarComponent = avatar.component;
+                    const isSelected = selectedAvatar === avatar.id;
+                    return (
+                        <div key={avatar.id} onClick={() => setSelectedAvatar(avatar.id)} className={cn("cursor-pointer p-2 rounded-2xl border-2 transition-all", isSelected ? "border-primary bg-primary/10" : "border-transparent hover:bg-muted")}>
+                            <AvatarComponent className="w-full h-auto" />
+                        </div>
+                    )
+                })}
+            </div>
+            
+            <div className="!mt-6">
+                <Button variant="outline" className="w-full" onClick={handleCustomUploadClick}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload eigen afbeelding
+                </Button>
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+            </div>
         </div>
 
         <Button onClick={handleSave} className="w-full !mt-8" size="lg" disabled={isLoading}>
-          {isLoading ? <Spinner size="small" className="mr-2" /> : "Wijzigingen Opslaan"}
+            {isLoading ? <Spinner size="small" className="mr-2" /> : "Buddy Opslaan"}
         </Button>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
+// This page component now wraps the customizer in a Card for the standalone route
 export default function BuddyProfileCustomizerPage() {
-    return <BuddyProfileCustomizer />;
+    return (
+        <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-2xl">
+                <Sparkles className="h-6 w-6 text-primary" />
+                <span>Pas je Buddy aan</span>
+                </CardTitle>
+                <CardDescription>
+                Geef je AI-buddy een persoonlijke naam en uiterlijk.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <BuddyProfileCustomizer />
+            </CardContent>
+        </Card>
+    );
 }

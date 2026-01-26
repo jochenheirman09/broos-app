@@ -5,16 +5,18 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import type { Club, Team, WithId, UserProfile } from "@/lib/types";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell, PieChart, Pie, Label as RechartsLabel, Tooltip as RechartsTooltip, LabelList } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Cell, PieChart, Pie, Label as RechartsLabel, Tooltip as RechartsTooltip, LabelList, Legend } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
 } from "@/components/ui/chart";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, query, where, limit } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { collection, getDocs, query, where, limit, type QuerySnapshot, type DocumentData } from "firebase/firestore";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Users } from "lucide-react";
 
 const usageChartConfig = {
@@ -118,7 +120,7 @@ export function UsageCharts({ clubId }: { clubId?: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const chartTitle = clubId ? "Wekelijkse Activiteit per Team" : "Wekelijkse Activiteit per Club";
+  const chartTitle = "Wekelijkse Activiteit";
   const yAxisLabel = clubId ? "Team" : "Club";
 
   useEffect(() => {
@@ -130,81 +132,47 @@ export function UsageCharts({ clubId }: { clubId?: string }) {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
 
-        let data: { name: string; activeUsers: number; totalUsers: number }[] = [];
-
-        if (clubId) {
-          // Per-team stats for a specific club
-          console.log(`[UsageCharts] Fetching teams for clubId: ${clubId}`);
-          const teamsRef = collection(db, `clubs/${clubId}/teams`);
-          const teamsSnap = await getDocs(teamsRef);
-          const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as WithId<Team>[];
-          console.log(`[UsageCharts] Found ${teams.length} teams.`);
-          
-          const teamStatsPromises = teams.map(async (team) => {
-            console.log(`[UsageCharts] Querying users for teamId: ${team.id}`);
-            const usersRef = query(collection(db, 'users'), where('teamId', '==', team.id));
-            const usersSnap = await getDocs(usersRef);
-            const totalUsers = usersSnap.size;
-            let activeUsers = 0;
-            
-            if (totalUsers > 0) {
-              console.log(`[UsageCharts] Found ${usersSnap.size} users for team ${team.name}. Fetching chat activity...`);
-              const activePromises = usersSnap.docs.map(async (userDoc) => {
-                  const chatsRef = query(collection(db, `users/${userDoc.id}/chats`), where('date', '>=', sevenDaysAgoStr), limit(1));
-                  const chatSnap = await getDocs(chatsRef);
-                  return !chatSnap.empty;
-              });
-              const results = await Promise.allSettled(activePromises);
-              results.forEach((result, index) => {
-                const userId = usersSnap.docs[index].id;
-                if (result.status === 'fulfilled' && result.value === true) {
-                    activeUsers++;
-                } else if (result.status === 'rejected') {
-                    console.error(`[UsageCharts] ---- FAILED to check activity for user ${userId}. Full Error:`, result.reason);
-                }
-              });
+        const processGroup = async (group: WithId<Club | Team>, isTeam: boolean) => {
+            let usersQuery;
+            if (isTeam) {
+                usersQuery = query(collection(db, 'users'), where('teamId', '==', group.id));
+            } else {
+                usersQuery = query(collection(db, 'users'), where('clubId', '==', group.id));
             }
-            return { name: team.name, activeUsers, totalUsers };
-          });
-          data = await Promise.all(teamStatsPromises);
-        } else {
-          // Per-club stats globally
-          console.log(`[UsageCharts] Fetching all clubs.`);
-          const clubsRef = collection(db, 'clubs');
-          const clubsSnap = await getDocs(clubsRef);
-          const clubs = clubsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as WithId<Club>[];
-          console.log(`[UsageCharts] Found ${clubs.length} clubs.`);
-
-          const clubStatsPromises = clubs.map(async (club) => {
-            console.log(`[UsageCharts] Querying users for clubId: ${club.id}`);
-            const usersRef = query(collection(db, 'users'), where('clubId', '==', club.id));
-            const usersSnap = await getDocs(usersRef);
+            const usersSnap = await getDocs(usersQuery);
             const totalUsers = usersSnap.size;
             let activeUsers = 0;
 
             if (totalUsers > 0) {
-                console.log(`[UsageCharts] Found ${usersSnap.size} users for club ${club.name}. Fetching chat activity...`);
                 const activePromises = usersSnap.docs.map(async (userDoc) => {
                     const chatsRef = query(collection(db, `users/${userDoc.id}/chats`), where('date', '>=', sevenDaysAgoStr), limit(1));
                     const chatSnap = await getDocs(chatsRef);
                     return !chatSnap.empty;
                 });
                 const results = await Promise.allSettled(activePromises);
-                results.forEach((result, index) => {
-                    const userId = usersSnap.docs[index].id;
+                results.forEach((result) => {
                     if (result.status === 'fulfilled' && result.value === true) {
-                       activeUsers++;
-                    } else if (result.status === 'rejected') {
-                        console.error(`[UsageCharts] ---- FAILED to check activity for user ${userId}. Full Error:`, result.reason);
+                        activeUsers++;
                     }
                 });
             }
-            return { name: club.name, activeUsers, totalUsers };
-          });
-          data = await Promise.all(clubStatsPromises);
+            return { name: group.name, activeUsers, totalUsers };
+        }
+
+        let data: { name: string; activeUsers: number; totalUsers: number }[] = [];
+        if (clubId) {
+          const teamsRef = collection(db, `clubs/${clubId}/teams`);
+          const teamsSnap = await getDocs(teamsRef);
+          const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as WithId<Team>[];
+          data = await Promise.all(teams.map(team => processGroup(team, true)));
+        } else {
+          const clubsRef = collection(db, 'clubs');
+          const clubsSnap = await getDocs(clubsRef);
+          const clubs = clubsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as WithId<Club>[];
+          data = await Promise.all(clubs.map(club => processGroup(club, false)));
         }
         
-        setChartData(data.filter(d => d.totalUsers > 0)); // Only show items with users
+        setChartData(data.filter(d => d.totalUsers > 0));
 
       } catch (e: any) {
         console.error("UsageCharts error:", e);
@@ -246,6 +214,7 @@ export function UsageCharts({ clubId }: { clubId?: string }) {
             <Users className="h-5 w-5" />
             {chartTitle}
           </CardTitle>
+           <CardDescription>Actieve gebruikers in de laatste 7 dagen.</CardDescription>
         </CardHeader>
         <CardContent>
             <ChartContainer config={usageChartConfig} className="min-h-[250px] w-full">
@@ -269,7 +238,7 @@ export function UsageCharts({ clubId }: { clubId?: string }) {
                         value={yAxisLabel} 
                         angle={-90} 
                         position="insideLeft" 
-                        style={{ textAnchor: 'middle', fill: 'hsl(var(--foreground))' }}
+                        style={{ fill: 'hsl(var(--foreground))' }}
                         offset={-10}
                     />
                 </YAxis>
@@ -315,3 +284,4 @@ export function UsageCharts({ clubId }: { clubId?: string }) {
   );
 }
 
+    

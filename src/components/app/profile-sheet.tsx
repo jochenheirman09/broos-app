@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { WeekSchedule } from "@/components/app/week-schedule";
-import { AddTrainingDialog } from "@/components/app/add-training-dialog";
+import { AddTrainingDialog } from "./add-training-dialog";
 import {
   Sheet,
   SheetContent,
@@ -50,7 +50,7 @@ import {
   SheetFooter
 } from "@/components/ui/sheet";
 import { BuddyProfileCustomizer } from "@/app/(app)/buddy-profile/page";
-import { ScrollArea, ScrollViewport } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollViewport } from "../ui/scroll-area";
 import { updateUserProfile } from "@/lib/firebase/firestore/user";
 import { updateUserTeam } from "@/actions/user-actions";
 import { doc } from 'firebase/firestore';
@@ -155,7 +155,6 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAddTrainingOpen, setIsAddTrainingOpen] = useState(false);
   const [refreshSchedule, setRefreshSchedule] = useState(0);
-  const [showBuddyCustomizer, setShowBuddyCustomizer] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -251,12 +250,6 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
     });
   }
 
-  useEffect(() => {
-    if (!isOpen) {
-      setShowBuddyCustomizer(false);
-    }
-  }, [isOpen]);
-
   if (!userProfile) return null;
 
   return (
@@ -264,27 +257,15 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="w-full max-w-md p-0 flex flex-col">
           <SheetHeader className="p-6 pb-4">
-            <SheetTitle>
-                {showBuddyCustomizer ? "Buddy Aanpassen" : "Jouw Profiel"}
-            </SheetTitle>
+            <SheetTitle>Jouw Profiel</SheetTitle>
             <SheetDescription>
-              {showBuddyCustomizer 
-                ? "Geef je AI-buddy een persoonlijke naam en uiterlijk." 
-                : "Bekijk en bewerk hier je persoonlijke gegevens en planning."
-              }
+              Bekijk en bewerk hier je persoonlijke gegevens en planning.
             </SheetDescription>
           </SheetHeader>
           
           <ScrollArea className="flex-1 min-h-0">
             <ScrollViewport className="h-full">
                 <div className="px-6 pb-6 space-y-6">
-                    {showBuddyCustomizer ? (
-                    <BuddyProfileCustomizer onSave={() => {
-                        setShowBuddyCustomizer(false); 
-                        forceRefetch();
-                    }} />
-                    ) : (
-                    <>
                     <div className="flex items-center gap-6 pt-2">
                         <div className="relative">
                         <Avatar
@@ -333,25 +314,38 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                         />
                         <Button type="submit" disabled={isLoading} className="w-full">
                             {isLoading && <Spinner className="mr-2 h-4 w-4" />}
-                            Wijzigingen opslaan
+                            Profiel Opslaan
                         </Button>
                         </form>
                     </Form>
+                    
+                    {userProfile.role === 'player' && (
+                        <>
+                            <Separator />
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-xl">
+                                        <Sparkles className="h-5 w-5" />
+                                        Buddy Aanpassen
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <BuddyProfileCustomizer onSave={() => onOpenChange(false)} />
+                                </CardContent>
+                            </Card>
+                        </>
+                    )}
 
                     {userProfile.role === 'player' && (
                         <>
                         <Separator />
                         <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Planning & Instellingen</h3>
+                            <h3 className="text-lg font-medium">Jouw Planning</h3>
                             <WeekSchedule key={refreshSchedule} />
                             <div className="flex flex-wrap gap-2 mt-4">
                                 <Button variant="outline" onClick={() => setIsAddTrainingOpen(true)}>
                                     <CalendarPlus className="mr-2 h-4 w-4" />
                                     Individuele Training Toevoegen
-                                </Button>
-                                <Button variant="outline" onClick={() => setShowBuddyCustomizer(true)}>
-                                    <Sparkles className="mr-2 h-4 w-4" />
-                                    Buddy Aanpassen
                                 </Button>
                             </div>
                         </div>
@@ -359,41 +353,35 @@ export function ProfileSheet({ isOpen, onOpenChange }: { isOpen: boolean; onOpen
                     )}
 
                     {(userProfile.role === 'player' || userProfile.role === 'staff') && <TeamManagementCard />}
-
-                    </>
-                    )}
                 </div>
             </ScrollViewport>
           </ScrollArea>
 
-          {!showBuddyCustomizer && (
-            <SheetFooter className="p-6 pt-4 border-t">
-                <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="w-full sm:w-auto ml-auto">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Uitloggen
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Je wordt uitgelogd en teruggestuurd naar de
-                        startpagina.
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel>Annuleren</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { onOpenChange(false); logout(); }}>
-                        Uitloggen
-                    </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-                </AlertDialog>
-            </SheetFooter>
-          )}
-
+          <SheetFooter className="p-6 pt-4 border-t">
+              <AlertDialog>
+              <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="w-full sm:w-auto ml-auto">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Uitloggen
+                  </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                  <AlertDialogTitle>Weet je het zeker?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Je wordt uitgelogd en teruggestuurd naar de
+                      startpagina.
+                  </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                  <AlertDialogCancel>Annuleren</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => { onOpenChange(false); logout(); }}>
+                      Uitloggen
+                  </AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+              </AlertDialog>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
       <AddTrainingDialog

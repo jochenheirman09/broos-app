@@ -58,7 +58,7 @@ export async function sendNotification(
                 title: notificationTitle,
                 body: notificationBody,
                 icon: '/icons/icon-192x192.png',
-                badge: '/icons/icon-192x192.png', // Corrected path to prevent 404
+                badge: '/icons/icon-192x192.png',
                 tag: tag,
                 renotify: true,
             },
