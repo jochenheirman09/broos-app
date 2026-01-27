@@ -1,1 +1,4 @@
-// This file is intentionally left blank to resolve a build conflict.
+// This file is intentionally neutralized to resolve a routing conflict.
+export default function NeutralizedLayout() {
+  return null;
+}
