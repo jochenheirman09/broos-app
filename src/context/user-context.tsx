@@ -92,12 +92,13 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, isAuthLoading]);
 
-  // Effect to handle visibility changes
+  // Effect to handle visibility changes for smarter token sync
   useEffect(() => {
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-            console.log("👁️ [Visibility Sync Effect] Triggered.");
+            console.log("👁️ [Visibility Sync Effect] App became visible. Triggering token sync.");
             if (user) {
+              // Pass false for a silent, non-manual sync attempt
               requestPermission(user, false);
             }
         }
@@ -105,14 +106,15 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Initial check
-    setTimeout(() => {
+    // Initial check after a small delay to ensure app is stable
+    const initialSyncTimeout = setTimeout(() => {
       console.log("👁️ [Visibility Sync Effect] Initializing with a 2s delay.");
       handleVisibilityChange();
     }, 2000);
 
     return () => {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
+        clearTimeout(initialSyncTimeout);
     };
   }, [user, requestPermission]);
 
