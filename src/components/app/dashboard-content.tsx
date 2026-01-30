@@ -4,10 +4,11 @@ import { useEffect } from "react";
 import { PlayerDashboard } from "./player-dashboard";
 import { StaffDashboard } from "./staff-dashboard";
 import { ResponsibleDashboard } from "./responsible-dashboard";
-import { WelcomeHeader } from "./welcome-header";
+import { SportProfileCard } from "./sport-profile-card"; // This is now the combined component
 import { Spinner } from "@/components/ui/spinner";
 import { useUser } from "@/context/user-context";
 import { RequestNotificationPermission } from "./request-notification-permission";
+// The WelcomeHeader is no longer needed here.
 
 export function DashboardContent() {
   const { userProfile, loading: isProfileLoading } = useUser();
@@ -24,7 +25,7 @@ export function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      <WelcomeHeader />
+      <SportProfileCard /> {/* This now contains the welcome message and sport info */}
       <RequestNotificationPermission />
 
       {role === 'player' && <PlayerDashboard />}

@@ -13,14 +13,26 @@ import { Separator } from "@/components/ui/separator";
 import { createClubWithLogo } from "@/actions/club-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from "firebase/firestore";
+import type { SportProfile } from "@/lib/types";
 
 export function CreateClubForm() {
   const { user } = useUser();
+  const db = useFirestore();
   const { toast } = useToast();
   const [clubName, setClubName] = useState("");
+  const [sport, setSport] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const sportsQuery = useMemoFirebase(
+    () => (db ? query(collection(db, "sport_profiles"), orderBy("name")) : null),
+    [db]
+  );
+  const { data: sports, isLoading: isLoadingSports } = useCollection<SportProfile>(sportsQuery);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -47,12 +59,15 @@ export function CreateClubForm() {
       toast({ variant: "destructive", title: "Fout", description: "Clubnaam moet minstens 3 tekens lang zijn." });
       return;
     }
+    if (!sport) {
+      toast({ variant: "destructive", title: "Fout", description: "Selecteer een sport voor de club." });
+      return;
+    }
 
     setIsLoading(true);
 
     try {
-      // The logoPreview is the data URL string
-      const result = await createClubWithLogo(user.uid, clubName, logoPreview || undefined);
+      const result = await createClubWithLogo(user.uid, clubName, sport, logoPreview || undefined);
       
       if (result.success) {
         toast({ title: "Succes!", description: `${result.message} De pagina wordt vernieuwd.` });
@@ -96,6 +111,23 @@ export function CreateClubForm() {
               onChange={(e) => setClubName(e.target.value)}
             />
           </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="sport">Sport</Label>
+            <Select onValueChange={setSport} value={sport} disabled={isLoadingSports}>
+              <SelectTrigger id="sport">
+                <SelectValue placeholder={isLoadingSports ? "Laden..." : "Selecteer de hoofdsport..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {sports?.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Button type="submit" className="w-full" disabled={isLoading} size="lg">
             {isLoading && <Spinner size="small" className="mr-2" />}
             {isLoading ? "Club aanmaken..." : "Nieuwe club aanmaken"}

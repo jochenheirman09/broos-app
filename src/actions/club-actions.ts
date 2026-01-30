@@ -17,12 +17,13 @@ const generateCode = (length = 8) => {
  * Creates a new club, storing the provided logo as a base64 data URL in Firestore.
  * @param userId The UID of the user creating the club.
  * @param clubName The name of the new club.
+ * @param sport The sport associated with the club.
  * @param logoDataURL The base64-encoded data URL of the logo image.
  * @returns An object indicating success or failure.
  */
-export async function createClubWithLogo(userId: string, clubName: string, logoDataURL?: string): Promise<{ success: boolean; message: string; }> {
-    if (!userId || !clubName) {
-        return { success: false, message: "Gebruikers-ID en clubnaam zijn vereist." };
+export async function createClubWithLogo(userId: string, clubName: string, sport: string, logoDataURL?: string): Promise<{ success: boolean; message: string; }> {
+    if (!userId || !clubName || !sport) {
+        return { success: false, message: "Gebruikers-ID, clubnaam en sport zijn vereist." };
     }
     const { adminDb, adminAuth } = await getFirebaseAdmin();
     const clubRef = adminDb.collection("clubs").doc();
@@ -33,6 +34,7 @@ export async function createClubWithLogo(userId: string, clubName: string, logoD
             name: clubName,
             ownerId: userId,
             id: clubRef.id,
+            sport: sport, // Save the selected sport
             invitationCode: generateCode(),
             ...(logoDataURL && { logoURL: logoDataURL }),
         });
@@ -47,6 +49,7 @@ export async function createClubWithLogo(userId: string, clubName: string, logoD
         return { success: false, message: error.message || "Kon de club niet aanmaken." };
     }
 }
+
 
 /**
  * Updates an existing club's logo by saving the new logo as a base64 data URL.

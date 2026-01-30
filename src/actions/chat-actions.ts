@@ -78,7 +78,7 @@ export async function chatWithBuddy(
     } else if (userProfile.teamId && userProfile.clubId) {
         const teamDocRef = adminDb.collection('clubs').doc(userProfile.clubId).collection('teams').doc(userProfile.teamId);
         const teamDoc = await teamDocRef.get();
-        if (teamDoc.exists()) {
+        if (teamDoc.exists) {
             const teamData = teamDoc.data();
             if (teamData?.schedule && teamData.schedule[dayName]) {
                 todayActivity = teamData.schedule[dayName];
